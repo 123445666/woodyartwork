@@ -1,0 +1,56 @@
+﻿@inject AdminAreaSettings adminAreaSettings
+@model ShoppingCartModel
+@inject IEventPublisher eventPublisher
+@{
+    //page title
+    ViewBag.Title = T("Admin.CurrentCartWishlists").Text;
+}
+<antiforgery-token />
+<div class="row">
+    <div class="col-md-12">
+        <div class="portlet light form-fit">
+            <div class="portlet-title">
+                <div class="caption">
+                    <i class="fa fa-cart-plus"></i>
+                    @T("Admin.CurrentCartWishlists")
+                </div>
+            </div>
+            <div class="portlet-body form">
+                <div id="shoppingcarts-list" style="display:none">
+                    <ul>
+                        <li @Html.RenderSelectedTabIndex(0, GetSelectedTabIndex())>
+                            @T("Admin.CurrentCarts")
+                        </li>
+                        <li @Html.RenderSelectedTabIndex(1, GetSelectedTabIndex())>
+                            @T("Admin.CurrentWishlists")
+                        </li>
+                    </ul>
+                    <div>
+                        @Html.Partial("_CurrentCarts.TabCurrentCarts", Model)
+                    </div>
+                    <div>
+                        @Html.Partial("_CurrentCarts.TabCurrentWishlists", Model)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $(document).ready(function () {
+        var tabPos = 'top';
+        if (window.devicePixelRatio == 2)
+            tabPos = 'top';
+
+        $('#shoppingcarts-list').show();
+        $("#shoppingcarts-list").kendoTabStrip({
+            animation: {
+                open: {
+                    effects: "fadeIn"
+                }
+            },
+            tabPosition: tabPos,
+            select: tabstrip_on_tab_select
+        });
+    });
+</script>
