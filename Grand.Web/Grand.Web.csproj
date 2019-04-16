@@ -24,4 +24,8 @@
     <Content Remove="wwwroot\content\images\thumbs\*.jpeg;wwwroot\content\images\thumbs\*.jpg;wwwroot\content\images\thumbs\*.png" />
     <Content Remove="wwwroot\bundles\*.css;wwwroot\bundles\*.js" />
   </ItemGroup>
+  <ItemGroup>
+    <None Remove="Themes\DefaultClean\Content\css\ext.css" />
+    <None Remove="Themes\DefaultClean\Content\css\style - Copy.rtl.css" />
+  </ItemGroup>
 </Project>
