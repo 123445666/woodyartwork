@@ -19,16 +19,6 @@
                     <span class="fa fa-cogs" aria-hidden="true"></span>
                 </a>
             </li>
-            <li class="nav-item float-xs-right d-none d-lg-block mr-auto dropdowns-container">
-                <div class="generalDropDown btn-toolbar float-xs-right">
-                    @await Component.InvokeAsync("TaxTypeSelector")
-                    @await Component.InvokeAsync("CurrencySelector")
-                    @await Component.InvokeAsync("LanguageSelector")
-                    @await Component.InvokeAsync("StoreSelector")
-                    @await Component.InvokeAsync("Widget", new { widgetZone = "header_selectors" })
-                </div>
-            </li>
-            @await Component.InvokeAsync("HeaderLinks")
         </ul>
         <div class="collapse navbar-collapse" id="mobile-collapsing-menu">
             <div class="col-12 options-container">
