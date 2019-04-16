@@ -1078,8 +1078,8 @@ nav .nav-item.list-inline {
 /*header*/
 
 header {
-    padding-top: 1px;
-    margin-top: 43px;
+    /*padding-top: 1px;
+    margin-top: 43px;*/
 }
 
     header .dropdown-menu .totals {
