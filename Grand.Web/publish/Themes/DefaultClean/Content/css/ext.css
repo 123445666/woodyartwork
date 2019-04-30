@@ -1,1 +1,12 @@
-﻿
+﻿.category-description {
+    display: none !important;
+}
+.category-page .generalTitle {
+    display: none !important;
+}
+.generalLeftSide {
+    display: none !important;
+}
+.card-body-content .px-0, .card-body-content .px-3 {
+    display: none !important;
+}

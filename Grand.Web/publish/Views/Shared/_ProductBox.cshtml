@@ -48,12 +48,6 @@
         <div class="card-body p-0">
             <div class="d-flex justify-content-center card-buttons">
                     <div class="btn-group">
-                        @if (Model.ShowQty)
-                        {
-                            var qtyId = "addtocart_" + @Model.Id + "_EnteredQuantity";
-                            <input class="form-control input-group-addon catalog-quantity"  
-                                   type="text" id="@qtyId" name="@qtyId" value="1" >
-                        }
                         @if (!Model.ProductPrice.DisableBuyButton)
                         {
                             var addToCartText = T("ShoppingCart.AddToCart").Text;
@@ -65,48 +59,15 @@
                             {
                                 addToCartText = T("ShoppingCart.PreOrder").Text;
                             }
-                            <button type="button" class="btn btn-primary" onclick="AjaxCart.addproducttocart_catalog('@addtocartlink', '@Model.ShowQty', '@Model.Id');return false;">
+                            <a href="https://docs.google.com/forms/d/e/1FAIpQLScCpEWYI3qyNDLvpxWFQm__b3FIbOnBIuGtKqmyGrjCD5MdWg/viewform?usp=sf_link" target="_blank" class="btn btn-primary">
                                 @if (!Model.ShowQty)
                                 {
-                                    <span class="add-cart-text d-sm-block d-none">@(addToCartText)</span>
+                                    <span class="add-cart-text d-sm-block d-none">Buy</span>
                                     <span class="fas fa-shopping-cart d-sm-none d-block"></span>
                                 }
                                 <span class="sr-only">AddToCart</span>
-                            </button>
+                            </a>
                         }
-                        else
-                        {
-                            if (Model.ProductType == ProductType.Auction)
-                            {
-                                var addToCartText = T("ShoppingCart.Bids").Text;
-                                <button type="button" class="btn btn-primary" onclick="AjaxCart.addproducttocart_catalog('@addtocartlink', 'false', '@Model.Id');return false;">
-                                    <span class="fa fa-gavel"></span>
-                                        <span class="d-none d-xl-block">@(addToCartText)</span>
-                                    <span class="sr-only">AddToCart</span>
-                                </button>
-                            }
-
-                        }
-                        <button type="button" value="@T("Products.QuickView")" title="@T("Products.QuickView")" class="btn btn-secondary" onclick="AjaxCart.quickview_product('@quickviewurl')">
-                            <span class="sr-only">@T("Products.QuickView")</span>
-                            <span class="fas fa-search"></span>
-                        </button>
-                        @if (!Model.ProductPrice.DisableAddToCompareListButton && Model.ProductType == ProductType.SimpleProduct)
-                        {
-                            <button type="button" value="@T("ShoppingCart.AddToCompareList")" title="@T("ShoppingCart.AddToCompareList")" class="btn btn-secondary" onclick="AjaxCart.addproducttocomparelist('@addtocomparelink');return false;">
-                                <span class="sr-only">AddToCompareList</span>
-                                <span class="fa fa-retweet"></span>
-                            </button>
-                        }
-                        @if (!Model.ProductPrice.DisableWishlistButton && Model.ProductType == ProductType.SimpleProduct)
-                        {
-                            <button type="button" value="@T("ShoppingCart.AddToWishlist")" title="@T("ShoppingCart.AddToWishlist")" class="btn btn-secondary" onclick="AjaxCart.addproducttocart_catalog('@addtowishlistlink', '@Model.ShowQty', '@Model.Id');return false;">
-                                <span class="far fa-heart"></span>
-                                <span class="sr-only">AddToWishlist</span>
-                            </button>
-
-                        }
-
                     </div>
                 </div>
             <div class="card-body-content">
