@@ -40,4 +40,12 @@
   <ItemGroup>
     <Folder Include="Themes\DefaultClean\Content\js\" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Update="Views\Shared\_ColumnsOneIndex.cshtml">
+      <Pack>$(IncludeRazorContentInPack)</Pack>
+    </Content>
+    <Content Update="Views\Shared\_RootIndex.cshtml">
+      <Pack>$(IncludeRazorContentInPack)</Pack>
+    </Content>
+  </ItemGroup>
 </Project>
