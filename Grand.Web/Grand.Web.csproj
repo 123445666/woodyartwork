@@ -30,6 +30,14 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="Themes\DefaultClean\Content\css\ext.css" />
+    <None Remove="Themes\DefaultClean\Content\css\js-offcanvas.css" />
+    <None Remove="Themes\DefaultClean\Content\css\linearicons.css" />
+    <None Remove="Themes\DefaultClean\Content\css\magnific-popup.css" />
     <None Remove="Themes\DefaultClean\Content\css\style - Copy.rtl.css" />
+    <None Remove="Themes\DefaultClean\Content\css\swiper.min.css" />
+    <None Remove="Themes\DefaultClean\Content\css\swiperSlider.css" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Themes\DefaultClean\Content\js\" />
   </ItemGroup>
 </Project>

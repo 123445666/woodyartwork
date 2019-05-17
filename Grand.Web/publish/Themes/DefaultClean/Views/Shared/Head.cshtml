@@ -16,6 +16,11 @@
     }
 
     Html.AddCssFileParts("~/content/magnific-popup/magnific-popup.css");
+    Html.AppendCssFileParts(string.Format("~/Themes/{0}/Content/css/js-offcanvas.css", themeName));
+    Html.AppendCssFileParts(string.Format("~/Themes/{0}/Content/css/linearicons.css", themeName));
+    Html.AppendCssFileParts(string.Format("~/Themes/{0}/Content/css/magnific-popup.css", themeName));
+    Html.AppendCssFileParts(string.Format("~/Themes/{0}/Content/css/swiper.min.css", themeName));
+    Html.AppendCssFileParts(string.Format("~/Themes/{0}/Content/css/swiperSlider.css", themeName));
     Html.AppendCssFileParts(string.Format("~/Themes/{0}/Content/css/style.css", themeName));
     Html.AppendCssFileParts(string.Format("~/Themes/{0}/Content/css/fontawesome-all.min.css", themeName));
     Html.AppendCssFileParts("~/content/bootstrap/bootstrap.min.css");
@@ -29,6 +34,11 @@
     Html.AppendScriptParts(ResourceLocation.Footer, "~/scripts/jquery.countdown.min.js");
     Html.AppendScriptParts(ResourceLocation.Footer, "~/scripts/public.common.js");
     Html.AppendScriptParts(ResourceLocation.Footer, "~/scripts/jquery.zoom.min.js");
+    Html.AppendScriptParts(ResourceLocation.Footer, string.Format("~/Themes/{0}/Content/js/public.common.js", themeName));
+    Html.AppendScriptParts(ResourceLocation.Footer, string.Format("~/Themes/{0}/Content/js/swiper.min.js", themeName));
+    Html.AppendScriptParts(ResourceLocation.Footer, string.Format("~/Themes/{0}/Content/js/parallax.min.js", themeName));
+    Html.AppendScriptParts(ResourceLocation.Footer, string.Format("~/Themes/{0}/Content/js/lazysizes.min.js", themeName));
+    Html.AppendScriptParts(ResourceLocation.Footer, string.Format("~/Themes/{0}/Content/js/js-offcanvas.pkgd.min.js", themeName));
     Html.AppendScriptParts(ResourceLocation.Footer, "~/scripts/jquery.smooth-scroll.min.js");
     Html.AppendScriptParts(ResourceLocation.Footer, "~/scripts/jquery-migrate-3.0.1.min.js");
     Html.AppendScriptParts(ResourceLocation.Footer, "~/scripts/jquery-ui-1.12.1.custom/jquery-ui.min.js");

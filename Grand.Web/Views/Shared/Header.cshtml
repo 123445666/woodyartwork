@@ -35,9 +35,14 @@
                 <span class="logo-desktop-holder"></span>
                 @await Component.InvokeAsync("Logo")
             </div>
-            <div class="col-lg-6 col formSearch ml-auto pr-0 d-none d-lg-block">
-                @await Component.InvokeAsync("SearchBox")
-            </div>
+            <nav class="navbar navbar-expand-md mainNav d-none d-lg-flex w-100 mb-1 px-3">
+                <div class="collapse navbar-collapse container" id="collapsing-navbar-2">
+                    <div class="d-none" id="menu_standing"></div>
+                    <ul class="nav navbar-nav">
+                        @await Component.InvokeAsync("TopMenu")
+                    </ul>
+                </div>
+            </nav>
         </div>
     </div>
     <!-- Modal -->
