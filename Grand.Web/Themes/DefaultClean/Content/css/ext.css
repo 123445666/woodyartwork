@@ -10,3 +10,6 @@
 .card-body-content .px-0, .card-body-content .px-3 {
     display: none !important;
 }
+header {
+    margin-top: 0 !important;
+}
