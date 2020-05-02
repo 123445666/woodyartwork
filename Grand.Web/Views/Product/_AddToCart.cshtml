@@ -26,6 +26,24 @@
     if (!Model.DisableBuyButton)
     {
 
+        if (Model.AllowedQuantities.Any())
+        {
+            <select asp-for="EnteredQuantity" asp-items="Model.AllowedQuantities" class="custom-select form-control qty-dropdown mr-2"></select>
+        }
+        else
+        {
+
+            var addId = "addtocart_" + @Model.ProductId + "_EnteredQuantity";
+            <label for="@addId" class="sr-only">@T("ShoppingCart.AddToCart")</label>
+            <input asp-for="EnteredQuantity" class="form-control qty-input text-center" />
+            if (!String.IsNullOrEmpty(Model.MeasureUnit))
+            {
+                <span class="qty-unit mr-2">
+                    @Model.MeasureUnit
+                </span>
+            }
+
+        }
         {
             var addToCartText = "";
             if (!String.IsNullOrEmpty(Model.UpdatedShoppingCartItemId) && Model.UpdateShoppingCartItemType.HasValue && Model.UpdateShoppingCartItemType.Value == ShoppingCartType.ShoppingCart)
@@ -49,12 +67,26 @@
                 }
             }
 
-            @*<button type="button" id="add-to-cart-button-@Model.ProductId" class="btn btn-info add-to-cart-button d-inline-flex" data-productid="@Model.ProductId" onclick="AjaxCart.addproducttocart_details('@Url.RouteUrl("AddProductToCart-Details", new { productId = Model.ProductId, shoppingCartTypeId = (int)ShoppingCartType.ShoppingCart })', '#product-details-form');return false;">
-                    <span class="fa fa-shopping-cart d-sm-block"></span><span class="d-lg-block d-none">@addToCartText</span>
-                </button>*@
-            <a href="https://docs.google.com/forms/d/e/1FAIpQLScCpEWYI3qyNDLvpxWFQm__b3FIbOnBIuGtKqmyGrjCD5MdWg/viewform?usp=sf_link" target="_blank" class="btn btn-primary">
+            //when a customer clicks 'Enter' button we submit the "add to cart" button (if visible)
+            <script asp-location="Footer">
+                $(document).ready(function () {
+                    $("#@Html.IdFor(model => model.EnteredQuantity)").keydown(function (event) {
+                        if (event.keyCode == 13) {
+                            $("#add-to-cart-button-@Model.ProductId").trigger("click");
+                            return false;
+                        }
+                    });
+                    $("#@Html.IdFor(model => model.CustomerEnteredPrice)").keydown(function (event) {
+                        if (event.keyCode == 13) {
+                            $("#add-to-cart-button-@Model.ProductId").trigger("click");
+                            return false;
+                        }
+                    });
+                });
+            </script>
+            <button type="button" id="add-to-cart-button-@Model.ProductId" class="btn btn-info add-to-cart-button d-inline-flex" data-productid="@Model.ProductId" onclick="AjaxCart.addproducttocart_details('@Url.RouteUrl("AddProductToCart-Details", new { productId = Model.ProductId, shoppingCartTypeId = (int)ShoppingCartType.ShoppingCart })', '#product-details-form');return false;">
                 <span class="fa fa-shopping-cart d-sm-block"></span><span class="d-lg-block d-none">@addToCartText</span>
-            </a>
+            </button>
         }
 
     }
