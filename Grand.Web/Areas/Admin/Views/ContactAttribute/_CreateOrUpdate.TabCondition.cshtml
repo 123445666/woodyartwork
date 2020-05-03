@@ -1,5 +1,5 @@
 ﻿@model ContactAttributeModel
-
+<vc:admin-widget widget-zone="contact_attribute_details_condition_top" additional-data="Model" />
 @{
     if (!String.IsNullOrEmpty(Model.Id))
     {
@@ -23,9 +23,9 @@
                 <div class="form-group">
                     <admin-label asp-for="ConditionModel.EnableCondition" />
                     <div class="col-md-9 col-sm-9">
-                        <label class="mt-checkbox mt-checkbox-outline">
+                        <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                             <admin-input asp-for="ConditionModel.EnableCondition" />
-                            <span></span>
+                             <div class="control__indicator"></div>
                         </label>
                         <span asp-validation-for="ConditionModel.EnableCondition"></span>
                     </div>
@@ -81,9 +81,12 @@
                                                 for (var j = 0; j < Model.ConditionModel.ConditionAttributes[i].Values.Count; j++)
                                                 {
                                                     <div>
-                                                        <input type="hidden" asp-for="@Model.ConditionModel.ConditionAttributes[i].Values[j].Value" />
-                                                        <admin-input asp-for="@Model.ConditionModel.ConditionAttributes[i].Values[j].Selected" />
-                                                        <admin-label asp-for="@Model.ConditionModel.ConditionAttributes[i].Values[j].Selected" />
+                                                        <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
+                                                            <input type="hidden" asp-for="@Model.ConditionModel.ConditionAttributes[i].Values[j].Value" />
+                                                            <admin-input asp-for="@Model.ConditionModel.ConditionAttributes[i].Values[j].Selected" />
+                                                            @Model.ConditionModel.ConditionAttributes[i].Values[j].Text
+                                                             <div class="control__indicator"></div>
+                                                        </label>
                                                     </div>
                                                 }
                                                 break;
@@ -118,3 +121,4 @@
         </div>
     }
 }
+<vc:admin-widget widget-zone="contact_attribute_details_condition_bottom" additional-data="Model" />

@@ -4,11 +4,11 @@
     //page title
     ViewBag.Title = T("Admin.Configuration.ActivityLog.ActivityLog").Text;
 }
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
                 <div class="caption">
                     <i class="fa fa-sitemap"></i>
                     @T("Admin.Configuration.ActivityLog.ActivityLog")
@@ -18,11 +18,18 @@
                         <i class="fa fa-trash-o"></i>
                         @T("Admin.Common.Clear")
                     </a>
+                    <vc:admin-widget widget-zone="activity_log_list_buttons" additional-data="null" />
                 </div>
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div class="form-horizontal">
                     <div class="form-body">
+                        <div class="form-group">
+                            <admin-label asp-for="Comment" />
+                            <div class="col-md-4 col-sm-6">
+                                <admin-input asp-for="Comment" />
+                            </div>
+                        </div>
                         <div class="form-group">
                             <admin-label asp-for="CreatedOnFrom" />
                             <div class="col-md-4 col-sm-6">
@@ -59,7 +66,7 @@
                     </div>
                 </div>
             </div>
-            <div class="portlet-body">
+            <div class="x_content">
                 <div id="activityLog-grid"></div>
             </div>
         </div>
@@ -159,10 +166,11 @@
 
     function additionalData() {
         var data = {
+            Comment: $('#@Html.FieldIdFor(model => model.Comment)').val(),
             CreatedOnFrom: $('#@Html.FieldIdFor(model => model.CreatedOnFrom)').val(),
             CreatedOnTo: $('#@Html.FieldIdFor(model => model.CreatedOnTo)').val(),
             IpAddress: $('#@Html.FieldIdFor(model => model.IpAddress)').val(),
-            ActivityLogTypeId: $('#ActivityLogTypeId').val()
+            ActivityLogTypeId: $('#ActivityLogTypeId').val()          
         };
         addAntiForgeryToken(data);
         return data;

@@ -1,7 +1,7 @@
 ﻿using Grand.Core.Domain.Forums;
 using Grand.Core.Html;
-using Grand.Core.Infrastructure;
 using System;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Forums
 {
@@ -19,21 +19,7 @@ namespace Grand.Services.Forums
             if (String.IsNullOrEmpty(text))
                 return string.Empty;
 
-            switch (EngineContext.Current.Resolve<ForumSettings>().ForumEditor)
-            {
-                case EditorType.SimpleTextBox:
-                    {
-                        text = HtmlHelper.FormatText(text, false, true, false, false, false, false);
-                    }
-                    break;
-                case EditorType.BBCodeEditor:
-                    {
-                        text = HtmlHelper.FormatText(text, false, true, false, true, false, false);
-                    }
-                    break;
-                default:
-                    break;
-            }
+            text = HtmlHelper.FormatText(text, false, true, false, true, false, true);
 
             return text;
         }
@@ -43,7 +29,7 @@ namespace Grand.Services.Forums
         /// </summary>
         /// <param name="forumTopic">Forum topic</param>
         /// <returns>Formatted subject</returns>
-        public static string StripTopicSubject(this ForumTopic forumTopic)
+        public static string StripTopicSubject(this ForumTopic forumTopic, ForumSettings forumSettings)
         {
             string subject = forumTopic.Subject;
             if (String.IsNullOrEmpty(subject))
@@ -51,7 +37,7 @@ namespace Grand.Services.Forums
                 return subject;
             }
 
-            int strippedTopicMaxLength = EngineContext.Current.Resolve<ForumSettings>().StrippedTopicMaxLength;
+            int strippedTopicMaxLength = forumSettings.StrippedTopicMaxLength;
             if (strippedTopicMaxLength > 0)
             {
                 if (subject.Length > strippedTopicMaxLength)
@@ -100,64 +86,21 @@ namespace Grand.Services.Forums
         }
         
         /// <summary>
-        /// Get forum last topic
-        /// </summary>
-        /// <param name="forum">Forum</param>
-        /// <param name="forumService">Forum service</param>
-        /// <returns>Forum topic</returns>
-        public static ForumTopic GetLastTopic(this Forum forum, IForumService forumService)
-        {
-            if (forum == null)
-                throw new ArgumentNullException("forum");
-
-            return forumService.GetTopicById(forum.LastTopicId);
-        }
-
-        /// <summary>
-        /// Get forum last post
-        /// </summary>
-        /// <param name="forum">Forum</param>
-        /// <param name="forumService">Forum service</param>
-        /// <returns>Forum topic</returns>
-        public static ForumPost GetLastPost(this Forum forum, IForumService forumService)
-        {
-            if (forum == null)
-                throw new ArgumentNullException("forum");
-
-            return forumService.GetPostById(forum.LastPostId);
-        }
-
-        /// <summary>
         /// Get first post
         /// </summary>
         /// <param name="forumTopic">Forum topic</param>
         /// <param name="forumService">Forum service</param>
         /// <returns>Forum post</returns>
-        public static ForumPost GetFirstPost(this ForumTopic forumTopic, IForumService forumService)
+        public static async Task<ForumPost> GetFirstPost(this ForumTopic forumTopic, IForumService forumService)
         {
             if (forumTopic == null)
                 throw new ArgumentNullException("forumTopic");
 
-            var forumPosts = forumService.GetAllPosts(forumTopic.Id, "", string.Empty, 0, 1);
+            var forumPosts = await forumService.GetAllPosts(forumTopic.Id, "", string.Empty, 0, 1);
             if (forumPosts.Count > 0)
                 return forumPosts[0];
 
             return null;
         }
-
-        /// <summary>
-        /// Get last post
-        /// </summary>
-        /// <param name="forumTopic">Forum topic</param>
-        /// <param name="forumService">Forum service</param>
-        /// <returns>Forum post</returns>
-        public static ForumPost GetLastPost(this ForumTopic forumTopic, IForumService forumService)
-        {
-            if (forumTopic == null)
-                throw new ArgumentNullException("forumTopic");
-
-            return forumService.GetPostById(forumTopic.LastPostId);
-        }
-
     }
 }

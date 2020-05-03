@@ -18,8 +18,7 @@
             }
         }
 </script>
-
-@(Html.LocalizedEditor<SlideModel, SlideLocalizedModel>("slide-info-localized",
+@(await Html.LocalizedEditor<SlideModel, SlideLocalizedModel>("slide-info-localized",
         @<div class="form-horizontal">
             <div class="form-body">
                 <div class="form-group">
@@ -78,11 +77,21 @@
         <div class="form-group">
             <admin-label asp-for="Published" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="Published" />
-                    <span></span>
+                    <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="Published"></span>
+            </div>
+        </div>
+        <div class="form-group">
+            <admin-label asp-for="FullWidth" />
+            <div class="col-md-9 col-sm-9">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
+                    <admin-input asp-for="FullWidth" />
+                    <div class="control__indicator"></div>
+                </label>
+                <span asp-validation-for="FullWidth"></span>
             </div>
         </div>
         <div class="form-group">

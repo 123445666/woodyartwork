@@ -5,10 +5,13 @@ using Grand.Core.Domain.Directory;
 using Grand.Core.Plugins;
 using Grand.Services.Events;
 using Grand.Services.Stores;
+using MediatR;
+using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Directory
 {
@@ -29,6 +32,13 @@ namespace Grand.Services.Directory
         /// Key for caching
         /// </summary>
         /// <remarks>
+        /// {0} : currency code
+        /// </remarks>
+        private const string CURRENCIES_BY_CODE = "Grand.currency.code-{0}";
+        /// <summary>
+        /// Key for caching
+        /// </summary>
+        /// <remarks>
         /// {0} : show hidden records?
         /// </remarks>
         private const string CURRENCIES_ALL_KEY = "Grand.currency.all-{0}";
@@ -44,9 +54,11 @@ namespace Grand.Services.Directory
         private readonly IRepository<Currency> _currencyRepository;
         private readonly IStoreMappingService _storeMappingService;
         private readonly ICacheManager _cacheManager;
-        private readonly CurrencySettings _currencySettings;
         private readonly IPluginFinder _pluginFinder;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
+        private readonly CurrencySettings _currencySettings;
+        private Currency _primaryCurrency;
+        private Currency _primaryExchangeRateCurrency;
 
         #endregion
 
@@ -60,24 +72,24 @@ namespace Grand.Services.Directory
         /// <param name="storeMappingService">Store mapping service</param>
         /// <param name="currencySettings">Currency settings</param>
         /// <param name="pluginFinder">Plugin finder</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public CurrencyService(ICacheManager cacheManager,
             IRepository<Currency> currencyRepository,
             IStoreMappingService storeMappingService,
             CurrencySettings currencySettings,
             IPluginFinder pluginFinder,
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
-            this._cacheManager = cacheManager;
-            this._currencyRepository = currencyRepository;
-            this._storeMappingService = storeMappingService;
-            this._currencySettings = currencySettings;
-            this._pluginFinder = pluginFinder;
-            this._eventPublisher = eventPublisher;
+            _cacheManager = cacheManager;
+            _currencyRepository = currencyRepository;
+            _storeMappingService = storeMappingService;
+            _currencySettings = currencySettings;
+            _pluginFinder = pluginFinder;
+            _mediator = mediator;
         }
 
         #endregion
-        
+
         #region Methods
 
         /// <summary>
@@ -85,7 +97,7 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="exchangeRateCurrencyCode">Exchange rate currency code</param>
         /// <returns>Exchange rates</returns>
-        public virtual IList<ExchangeRate> GetCurrencyLiveRates(string exchangeRateCurrencyCode)
+        public virtual Task<IList<ExchangeRate>> GetCurrencyLiveRates(string exchangeRateCurrencyCode)
         {
             var exchangeRateProvider = LoadActiveExchangeRateProvider();
             if (exchangeRateProvider == null)
@@ -97,17 +109,17 @@ namespace Grand.Services.Directory
         /// Deletes currency
         /// </summary>
         /// <param name="currency">Currency</param>
-        public virtual void DeleteCurrency(Currency currency)
+        public virtual async Task DeleteCurrency(Currency currency)
         {
             if (currency == null)
                 throw new ArgumentNullException("currency");
-            
-            _currencyRepository.Delete(currency);
 
-            _cacheManager.RemoveByPattern(CURRENCIES_PATTERN_KEY);
+            await _currencyRepository.DeleteAsync(currency);
+
+            await _cacheManager.RemoveByPrefix(CURRENCIES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(currency);
+            await _mediator.EntityDeleted(currency);
         }
 
         /// <summary>
@@ -115,10 +127,34 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="currencyId">Currency identifier</param>
         /// <returns>Currency</returns>
-        public virtual Currency GetCurrencyById(string currencyId)
+        public virtual Task<Currency> GetCurrencyById(string currencyId)
         {
             string key = string.Format(CURRENCIES_BY_ID_KEY, currencyId);
-            return _cacheManager.Get(key, () => _currencyRepository.GetById(currencyId));
+            return _cacheManager.GetAsync(key, () => _currencyRepository.GetByIdAsync(currencyId));
+        }
+
+        /// <summary>
+        /// Gets primary store currency
+        /// </summary>
+        /// <returns>Currency</returns>
+        public async Task<Currency> GetPrimaryStoreCurrency()
+        {
+            if (_primaryCurrency == null)
+                _primaryCurrency = await GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
+
+            return _primaryCurrency;
+        }
+
+        /// <summary>
+        /// Gets primary exchange currency
+        /// </summary>
+        /// <returns>Currency</returns>
+        public async Task<Currency> GetPrimaryExchangeRateCurrency()
+        {
+            if (_primaryExchangeRateCurrency == null)
+                _primaryExchangeRateCurrency = await GetCurrencyById(_currencySettings.PrimaryExchangeRateCurrencyId);
+
+            return _primaryExchangeRateCurrency;
         }
 
         /// <summary>
@@ -126,11 +162,19 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="currencyCode">Currency code</param>
         /// <returns>Currency</returns>
-        public virtual Currency GetCurrencyByCode(string currencyCode)
+        public virtual async Task<Currency> GetCurrencyByCode(string currencyCode)
         {
-            if (String.IsNullOrEmpty(currencyCode))
+            if (string.IsNullOrEmpty(currencyCode))
                 return null;
-            return GetAllCurrencies(true).FirstOrDefault(c => c.CurrencyCode.ToLower() == currencyCode.ToLower());
+
+            var key = string.Format(CURRENCIES_BY_CODE, currencyCode);
+            return await _cacheManager.GetAsync(key, () =>
+            {
+                var query = from q in _currencyRepository.Table
+                            where q.CurrencyCode.ToLowerInvariant() == currencyCode.ToLower()
+                            select q;
+                return query.FirstOrDefaultAsync();
+            });
         }
 
         /// <summary>
@@ -139,25 +183,23 @@ namespace Grand.Services.Directory
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <param name="storeId">Load records allowed only in a specified store; pass "" to load all records</param>
         /// <returns>Currencies</returns>
-        public virtual IList<Currency> GetAllCurrencies(bool showHidden = false, string storeId = "")
+        public virtual async Task<IList<Currency>> GetAllCurrencies(bool showHidden = false, string storeId = "")
         {
             string key = string.Format(CURRENCIES_ALL_KEY, showHidden);
-            var currencies = _cacheManager.Get(key, () =>
+            var currencies = await _cacheManager.GetAsync(key, () =>
             {
                 var query = _currencyRepository.Table;
 
                 if (!showHidden)
                     query = query.Where(c => c.Published);
                 query = query.OrderBy(c => c.DisplayOrder);
-                return query.ToList();
+                return query.ToListAsync();
             });
 
             //store mapping
-            if (!String.IsNullOrEmpty(storeId))
+            if (!string.IsNullOrEmpty(storeId))
             {
-                currencies = currencies
-                    .Where(c => _storeMappingService.Authorize(c, storeId))
-                    .ToList();
+                currencies = currencies.Where(c => _storeMappingService.Authorize(c, storeId)).ToList();
             }
             return currencies;
         }
@@ -166,34 +208,34 @@ namespace Grand.Services.Directory
         /// Inserts a currency
         /// </summary>
         /// <param name="currency">Currency</param>
-        public virtual void InsertCurrency(Currency currency)
+        public virtual async Task InsertCurrency(Currency currency)
         {
             if (currency == null)
                 throw new ArgumentNullException("currency");
 
-            _currencyRepository.Insert(currency);
+            await _currencyRepository.InsertAsync(currency);
 
-            _cacheManager.RemoveByPattern(CURRENCIES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(CURRENCIES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(currency);
+            await _mediator.EntityInserted(currency);
         }
 
         /// <summary>
         /// Updates the currency
         /// </summary>
         /// <param name="currency">Currency</param>
-        public virtual void UpdateCurrency(Currency currency)
+        public virtual async Task UpdateCurrency(Currency currency)
         {
             if (currency == null)
                 throw new ArgumentNullException("currency");
 
-            _currencyRepository.Update(currency);
+            await _currencyRepository.UpdateAsync(currency);
 
-            _cacheManager.RemoveByPattern(CURRENCIES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(CURRENCIES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(currency);
+            await _mediator.EntityUpdated(currency);
         }
 
 
@@ -218,23 +260,24 @@ namespace Grand.Services.Directory
         /// <param name="sourceCurrencyCode">Source currency code</param>
         /// <param name="targetCurrencyCode">Target currency code</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertCurrency(decimal amount, Currency sourceCurrencyCode, Currency targetCurrencyCode)
+        public virtual async Task<decimal> ConvertCurrency(decimal amount, Currency sourceCurrencyCode, Currency targetCurrencyCode)
         {
             if (sourceCurrencyCode == null)
-                throw new ArgumentNullException("sourceCurrencyCode");
+                throw new ArgumentNullException(nameof(sourceCurrencyCode));
 
             if (targetCurrencyCode == null)
-                throw new ArgumentNullException("targetCurrencyCode");
+                throw new ArgumentNullException(nameof(targetCurrencyCode));
 
-            decimal result = amount;
-            if (sourceCurrencyCode.Id == targetCurrencyCode.Id)
+            var result = amount;
+
+            if (result == decimal.Zero || sourceCurrencyCode.Id == targetCurrencyCode.Id)
                 return result;
-            if (result != decimal.Zero && sourceCurrencyCode.Id != targetCurrencyCode.Id)
-            {
-                result = ConvertToPrimaryExchangeRateCurrency(result, sourceCurrencyCode);
-                result = ConvertFromPrimaryExchangeRateCurrency(result, targetCurrencyCode);
-            }
+
+            result = await ConvertToPrimaryExchangeRateCurrency(result, sourceCurrencyCode);
+            result = await ConvertFromPrimaryExchangeRateCurrency(result, targetCurrencyCode);
+
             return result;
+
         }
 
         /// <summary>
@@ -243,23 +286,20 @@ namespace Grand.Services.Directory
         /// <param name="amount">Amount</param>
         /// <param name="sourceCurrencyCode">Source currency code</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertToPrimaryExchangeRateCurrency(decimal amount, Currency sourceCurrencyCode)
+        public virtual async Task<decimal> ConvertToPrimaryExchangeRateCurrency(decimal amount, Currency sourceCurrencyCode)
         {
             if (sourceCurrencyCode == null)
                 throw new ArgumentNullException("sourceCurrencyCode");
 
-            var primaryExchangeRateCurrency = GetCurrencyById(_currencySettings.PrimaryExchangeRateCurrencyId);
+            var primaryExchangeRateCurrency = await GetPrimaryExchangeRateCurrency();
             if (primaryExchangeRateCurrency == null)
                 throw new Exception("Primary exchange rate currency cannot be loaded");
 
-            decimal result = amount; 
-            if (result != decimal.Zero && sourceCurrencyCode.Id != primaryExchangeRateCurrency.Id)
-            {
-                decimal exchangeRate = sourceCurrencyCode.Rate;
-                if (exchangeRate == decimal.Zero)
-                    throw new GrandException(string.Format("Exchange rate not found for currency [{0}]", sourceCurrencyCode.Name));
-                result = result / exchangeRate;
-            }
+            decimal result = amount;
+            decimal exchangeRate = sourceCurrencyCode.Rate;
+            if (exchangeRate == decimal.Zero)
+                throw new GrandException(string.Format("Exchange rate not found for currency [{0}]", sourceCurrencyCode.Name));
+            result = result / exchangeRate;
             return result;
         }
 
@@ -269,23 +309,23 @@ namespace Grand.Services.Directory
         /// <param name="amount">Amount</param>
         /// <param name="targetCurrencyCode">Target currency code</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertFromPrimaryExchangeRateCurrency(decimal amount, Currency targetCurrencyCode)
+        public virtual async Task<decimal> ConvertFromPrimaryExchangeRateCurrency(decimal amount, Currency targetCurrencyCode)
         {
             if (targetCurrencyCode == null)
                 throw new ArgumentNullException("targetCurrencyCode");
 
-            var primaryExchangeRateCurrency = GetCurrencyById(_currencySettings.PrimaryExchangeRateCurrencyId);
+            var primaryExchangeRateCurrency = await GetPrimaryExchangeRateCurrency();
             if (primaryExchangeRateCurrency == null)
                 throw new Exception("Primary exchange rate currency cannot be loaded");
 
             decimal result = amount;
-            if (result != decimal.Zero && targetCurrencyCode.Id != primaryExchangeRateCurrency.Id)
-            {
-                decimal exchangeRate = targetCurrencyCode.Rate;
-                if (exchangeRate == decimal.Zero)
-                    throw new GrandException(string.Format("Exchange rate not found for currency [{0}]", targetCurrencyCode.Name));
-                result = result * exchangeRate;
-            }
+
+            decimal exchangeRate = targetCurrencyCode.Rate;
+            if (exchangeRate == decimal.Zero)
+                throw new GrandException(string.Format("Exchange rate not found for currency [{0}]", targetCurrencyCode.Name));
+
+            result = result * exchangeRate;
+
             return result;
         }
 
@@ -295,14 +335,14 @@ namespace Grand.Services.Directory
         /// <param name="amount">Amount</param>
         /// <param name="sourceCurrencyCode">Source currency code</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertToPrimaryStoreCurrency(decimal amount, Currency sourceCurrencyCode)
+        public virtual async Task<decimal> ConvertToPrimaryStoreCurrency(decimal amount, Currency sourceCurrencyCode)
         {
             if (sourceCurrencyCode == null)
                 throw new ArgumentNullException("sourceCurrencyCode");
 
-            var primaryStoreCurrency = GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
-            var result = ConvertCurrency(amount, sourceCurrencyCode, primaryStoreCurrency);
-            
+            var primaryStoreCurrency = await GetPrimaryStoreCurrency();
+            var result = await ConvertCurrency(amount, sourceCurrencyCode, primaryStoreCurrency);
+
             return result;
         }
 
@@ -312,13 +352,15 @@ namespace Grand.Services.Directory
         /// <param name="amount">Amount</param>
         /// <param name="targetCurrencyCode">Target currency code</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertFromPrimaryStoreCurrency(decimal amount, Currency targetCurrencyCode)
+        public virtual async Task<decimal> ConvertFromPrimaryStoreCurrency(decimal amount, Currency targetCurrencyCode)
         {
-            var primaryStoreCurrency = GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
-            var result = ConvertCurrency(amount, primaryStoreCurrency, targetCurrencyCode);
+            if (targetCurrencyCode == null)
+                return amount;
+
+            var result = await ConvertCurrency(amount, await GetPrimaryStoreCurrency(), targetCurrencyCode);
             return result;
         }
-       
+
 
         /// <summary>
         /// Load active exchange rate provider
@@ -341,7 +383,7 @@ namespace Grand.Services.Directory
         {
             var descriptor = _pluginFinder.GetPluginDescriptorBySystemName<IExchangeRateProvider>(systemName);
             if (descriptor != null)
-                return descriptor.Instance<IExchangeRateProvider>();
+                return descriptor.Instance<IExchangeRateProvider>(_pluginFinder.ServiceProvider);
 
             return null;
         }

@@ -4,11 +4,11 @@
     ViewBag.Title = T("Admin.Catalog.Products.EditProductDetails").Text;
 }
 <form asp-controller="Product" asp-action="Edit" method="post" id="product-form">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-cube"></i>
                         @T("Admin.Catalog.Products.EditProductDetails") - @Model.Name
@@ -27,40 +27,42 @@
                                 @T("Admin.Catalog.Products.Copy")
                             </button>
                             <span id="product-delete" class="btn red"><i class="fa fa-trash-o"></i> @T("Admin.Common.Delete")</span>
+                            <vc:admin-widget widget-zone="product_details_buttons" additional-data="Model" />
                         </div>
                     </div>
                 </div>
-                <div class="portlet-body form">
-                    @Html.Partial("_CreateOrUpdate", Model)
+                <div class="x_content form">
+                   <partial name="_CreateOrUpdate" model="Model" />
                 </div>
             </div>
         </div>
     </div>
 </form>
 
-    @Html.DeleteConfirmation("product-delete")
+<admin-delete-confirmation button-id="product-delete"/>
+
     @*copy product form*@
     <div id="copyproduct-window" style="display:none;">
         <form asp-controller="Product" asp-action="CopyProduct" method="post">
-            <antiforgery-token />
+            
             <input asp-for="CopyProductModel.Id" type="hidden" />
             <div class="form-horizontal">
                 <div class="form-body">
                     <div class="form-group">
-                        <admin-label asp-for="CopyProductModel.Name" class="control-label col-md-4 col-sm-4" />
-                        <div class="col-md-8 col-sm-8">
+                        <admin-label asp-for="CopyProductModel.Name" class="control-label col-xs-8 col-md-4 col-sm-4" />
+                        <div class="col-xs-4 col-md-8 col-sm-8">
                             <admin-input asp-for="CopyProductModel.Name" />
                         </div>
                     </div>
                     <div class="form-group">
-                        <admin-label asp-for="CopyProductModel.Published" class="control-label col-md-4 col-sm-4" />
-                        <div class="col-md-8 col-sm-8">
+                        <admin-label asp-for="CopyProductModel.Published" class="control-label col-xs-8 col-md-4 col-sm-4" />
+                        <div class="col-xs-4 col-md-8 col-sm-8">
                             <admin-input asp-for="CopyProductModel.Published" />
                         </div>
                     </div>
                     <div class="form-group">
-                        <admin-label asp-for="CopyProductModel.CopyImages" class="control-label col-md-4 col-sm-4" />
-                        <div class="col-md-8 col-sm-8">
+                        <admin-label asp-for="CopyProductModel.CopyImages" class="control-label col-xs-8 col-md-4 col-sm-4" />
+                        <div class="col-xs-4 col-md-8 col-sm-8">
                             <admin-input asp-for="CopyProductModel.CopyImages" />
                         </div>
                     </div>

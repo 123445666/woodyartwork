@@ -1,13 +1,16 @@
 using Grand.Core;
 using Grand.Core.Caching;
 using Grand.Core.Data;
-using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Directory;
+using Grand.Services.Commands.Models.Catalog;
 using Grand.Services.Events;
+using MediatR;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Directory
 {
@@ -66,6 +69,10 @@ namespace Grand.Services.Directory
         /// </summary>
         private const string MEASUREUNITS_PATTERN_KEY = "Grand.measureunit.";
 
+        /// <summary>
+        /// Key pattern to clear cache
+        /// </summary>
+        private const string PRODUCTS_PATTERN_KEY = "Grand.product.";
         #endregion
 
         #region Fields
@@ -75,7 +82,7 @@ namespace Grand.Services.Directory
         private readonly IRepository<MeasureUnit> _measureUnitRepository;
         private readonly ICacheManager _cacheManager;
         private readonly MeasureSettings _measureSettings;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         #endregion
 
@@ -89,20 +96,20 @@ namespace Grand.Services.Directory
         /// <param name="measureWeightRepository">Weight repository</param>
         /// <param name="measureUnitRepository">Unit repository</param>
         /// <param name="measureSettings">Measure settings</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public MeasureService(ICacheManager cacheManager,
             IRepository<MeasureDimension> measureDimensionRepository,
             IRepository<MeasureWeight> measureWeightRepository,
             IRepository<MeasureUnit> measureUnitRepository,
             MeasureSettings measureSettings,
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
             _cacheManager = cacheManager;
             _measureDimensionRepository = measureDimensionRepository;
             _measureWeightRepository = measureWeightRepository;
             _measureUnitRepository = measureUnitRepository;
             _measureSettings = measureSettings;
-           _eventPublisher = eventPublisher;
+            _mediator = mediator;
         }
 
         #endregion
@@ -115,28 +122,28 @@ namespace Grand.Services.Directory
         /// Deletes measure dimension
         /// </summary>
         /// <param name="measureDimension">Measure dimension</param>
-        public virtual void DeleteMeasureDimension(MeasureDimension measureDimension)
+        public virtual async Task DeleteMeasureDimension(MeasureDimension measureDimension)
         {
             if (measureDimension == null)
                 throw new ArgumentNullException("measureDimension");
 
-            _measureDimensionRepository.Delete(measureDimension);
+            await _measureDimensionRepository.DeleteAsync(measureDimension);
 
-            _cacheManager.RemoveByPattern(MEASUREDIMENSIONS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(MEASUREDIMENSIONS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(measureDimension);
+            await _mediator.EntityDeleted(measureDimension);
         }
-        
+
         /// <summary>
         /// Gets a measure dimension by identifier
         /// </summary>
         /// <param name="measureDimensionId">Measure dimension identifier</param>
         /// <returns>Measure dimension</returns>
-        public virtual MeasureDimension GetMeasureDimensionById(string measureDimensionId)
+        public virtual Task<MeasureDimension> GetMeasureDimensionById(string measureDimensionId)
         {
             string key = string.Format(MEASUREDIMENSIONS_BY_ID_KEY, measureDimensionId);
-            return _cacheManager.Get(key, () => _measureDimensionRepository.GetById(measureDimensionId));
+            return _cacheManager.GetAsync(key, () => _measureDimensionRepository.GetByIdAsync(measureDimensionId));
         }
 
         /// <summary>
@@ -144,12 +151,12 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="systemKeyword">The system keyword</param>
         /// <returns>Measure dimension</returns>
-        public virtual MeasureDimension GetMeasureDimensionBySystemKeyword(string systemKeyword)
+        public virtual async Task<MeasureDimension> GetMeasureDimensionBySystemKeyword(string systemKeyword)
         {
             if (String.IsNullOrEmpty(systemKeyword))
                 return null;
 
-            var measureDimensions = GetAllMeasureDimensions();
+            var measureDimensions = await GetAllMeasureDimensions();
             foreach (var measureDimension in measureDimensions)
                 if (measureDimension.SystemKeyword.ToLowerInvariant() == systemKeyword.ToLowerInvariant())
                     return measureDimension;
@@ -160,17 +167,15 @@ namespace Grand.Services.Directory
         /// Gets all measure dimensions
         /// </summary>
         /// <returns>Measure dimensions</returns>
-        public virtual IList<MeasureDimension> GetAllMeasureDimensions()
+        public virtual async Task<IList<MeasureDimension>> GetAllMeasureDimensions()
         {
             string key = MEASUREDIMENSIONS_ALL_KEY;
-            return _cacheManager.Get(key, () =>
+            return await _cacheManager.GetAsync(key, () =>
             {
                 var query = from md in _measureDimensionRepository.Table
                             orderby md.DisplayOrder
                             select md;
-                var measureDimensions = query.ToList();
-                return measureDimensions;
-
+                return query.ToListAsync();
             });
         }
 
@@ -178,34 +183,34 @@ namespace Grand.Services.Directory
         /// Inserts a measure dimension
         /// </summary>
         /// <param name="measure">Measure dimension</param>
-        public virtual void InsertMeasureDimension(MeasureDimension measure)
+        public virtual async Task InsertMeasureDimension(MeasureDimension measure)
         {
             if (measure == null)
                 throw new ArgumentNullException("measure");
 
-            _measureDimensionRepository.Insert(measure);
+            await _measureDimensionRepository.InsertAsync(measure);
 
-            _cacheManager.RemoveByPattern(MEASUREDIMENSIONS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(MEASUREDIMENSIONS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(measure);
+            await _mediator.EntityInserted(measure);
         }
 
         /// <summary>
         /// Updates the measure dimension
         /// </summary>
         /// <param name="measure">Measure dimension</param>
-        public virtual void UpdateMeasureDimension(MeasureDimension measure)
+        public virtual async Task UpdateMeasureDimension(MeasureDimension measure)
         {
             if (measure == null)
                 throw new ArgumentNullException("measure");
 
-            _measureDimensionRepository.Update(measure);
+            await _measureDimensionRepository.UpdateAsync(measure);
 
-            _cacheManager.RemoveByPattern(MEASUREDIMENSIONS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(MEASUREDIMENSIONS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(measure);
+            await _mediator.EntityUpdated(measure);
         }
 
         /// <summary>
@@ -216,7 +221,7 @@ namespace Grand.Services.Directory
         /// <param name="targetMeasureDimension">Target dimension</param>
         /// <param name="round">A value indicating whether a result should be rounded</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertDimension(decimal value, 
+        public virtual async Task<decimal> ConvertDimension(decimal value,
             MeasureDimension sourceMeasureDimension, MeasureDimension targetMeasureDimension, bool round = true)
         {
             if (sourceMeasureDimension == null)
@@ -228,8 +233,8 @@ namespace Grand.Services.Directory
             decimal result = value;
             if (result != decimal.Zero && sourceMeasureDimension.Id != targetMeasureDimension.Id)
             {
-                result = ConvertToPrimaryMeasureDimension(result, sourceMeasureDimension);
-                result = ConvertFromPrimaryMeasureDimension(result, targetMeasureDimension);
+                result = await ConvertToPrimaryMeasureDimension(result, sourceMeasureDimension);
+                result = await ConvertFromPrimaryMeasureDimension(result, targetMeasureDimension);
             }
             if (round)
                 result = Math.Round(result, 2);
@@ -242,14 +247,14 @@ namespace Grand.Services.Directory
         /// <param name="value">Value to convert</param>
         /// <param name="sourceMeasureDimension">Source dimension</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertToPrimaryMeasureDimension(decimal value,
+        public virtual async Task<decimal> ConvertToPrimaryMeasureDimension(decimal value,
             MeasureDimension sourceMeasureDimension)
         {
             if (sourceMeasureDimension == null)
                 throw new ArgumentNullException("sourceMeasureDimension");
 
             decimal result = value;
-            var baseDimensionIn = GetMeasureDimensionById(_measureSettings.BaseDimensionId);
+            var baseDimensionIn = await GetMeasureDimensionById(_measureSettings.BaseDimensionId);
             if (result != decimal.Zero && sourceMeasureDimension.Id != baseDimensionIn.Id)
             {
                 decimal exchangeRatio = sourceMeasureDimension.Ratio;
@@ -266,14 +271,14 @@ namespace Grand.Services.Directory
         /// <param name="value">Value to convert</param>
         /// <param name="targetMeasureDimension">Target dimension</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertFromPrimaryMeasureDimension(decimal value,
+        public virtual async Task<decimal> ConvertFromPrimaryMeasureDimension(decimal value,
             MeasureDimension targetMeasureDimension)
         {
             if (targetMeasureDimension == null)
                 throw new ArgumentNullException("targetMeasureDimension");
 
             decimal result = value;
-            var baseDimensionIn = GetMeasureDimensionById(_measureSettings.BaseDimensionId);
+            var baseDimensionIn = await GetMeasureDimensionById(_measureSettings.BaseDimensionId);
             if (result != decimal.Zero && targetMeasureDimension.Id != baseDimensionIn.Id)
             {
                 decimal exchangeRatio = targetMeasureDimension.Ratio;
@@ -292,17 +297,17 @@ namespace Grand.Services.Directory
         /// Deletes measure weight
         /// </summary>
         /// <param name="measureWeight">Measure weight</param>
-        public virtual void DeleteMeasureWeight(MeasureWeight measureWeight)
+        public virtual async Task DeleteMeasureWeight(MeasureWeight measureWeight)
         {
             if (measureWeight == null)
                 throw new ArgumentNullException("measureWeight");
 
-            _measureWeightRepository.Delete(measureWeight);
+            await _measureWeightRepository.DeleteAsync(measureWeight);
 
-            _cacheManager.RemoveByPattern(MEASUREWEIGHTS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(MEASUREWEIGHTS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(measureWeight);
+            await _mediator.EntityDeleted(measureWeight);
         }
 
         /// <summary>
@@ -310,10 +315,10 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="measureWeightId">Measure weight identifier</param>
         /// <returns>Measure weight</returns>
-        public virtual MeasureWeight GetMeasureWeightById(string measureWeightId)
+        public virtual Task<MeasureWeight> GetMeasureWeightById(string measureWeightId)
         {
             string key = string.Format(MEASUREWEIGHTS_BY_ID_KEY, measureWeightId);
-            return _cacheManager.Get(key, () => _measureWeightRepository.GetById(measureWeightId));
+            return _cacheManager.GetAsync(key, () => _measureWeightRepository.GetByIdAsync(measureWeightId));
         }
 
         /// <summary>
@@ -321,12 +326,12 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="systemKeyword">The system keyword</param>
         /// <returns>Measure weight</returns>
-        public virtual MeasureWeight GetMeasureWeightBySystemKeyword(string systemKeyword)
+        public virtual async Task<MeasureWeight> GetMeasureWeightBySystemKeyword(string systemKeyword)
         {
             if (String.IsNullOrEmpty(systemKeyword))
                 return null;
 
-            var measureWeights = GetAllMeasureWeights();
+            var measureWeights = await GetAllMeasureWeights();
             foreach (var measureWeight in measureWeights)
                 if (measureWeight.SystemKeyword.ToLowerInvariant() == systemKeyword.ToLowerInvariant())
                     return measureWeight;
@@ -337,16 +342,15 @@ namespace Grand.Services.Directory
         /// Gets all measure weights
         /// </summary>
         /// <returns>Measure weights</returns>
-        public virtual IList<MeasureWeight> GetAllMeasureWeights()
+        public virtual async Task<IList<MeasureWeight>> GetAllMeasureWeights()
         {
             string key = MEASUREWEIGHTS_ALL_KEY;
-            return _cacheManager.Get(key, () =>
+            return await _cacheManager.GetAsync(key, () =>
             {
                 var query = from mw in _measureWeightRepository.Table
                             orderby mw.DisplayOrder
                             select mw;
-                var measureWeights = query.ToList();
-                return measureWeights;
+                return query.ToListAsync();
             });
         }
 
@@ -354,34 +358,34 @@ namespace Grand.Services.Directory
         /// Inserts a measure weight
         /// </summary>
         /// <param name="measure">Measure weight</param>
-        public virtual void InsertMeasureWeight(MeasureWeight measure)
+        public virtual async Task InsertMeasureWeight(MeasureWeight measure)
         {
             if (measure == null)
                 throw new ArgumentNullException("measure");
 
-            _measureWeightRepository.Insert(measure);
+            await _measureWeightRepository.InsertAsync(measure);
 
-            _cacheManager.RemoveByPattern(MEASUREWEIGHTS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(MEASUREWEIGHTS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(measure);
+            await _mediator.EntityInserted(measure);
         }
 
         /// <summary>
         /// Updates the measure weight
         /// </summary>
         /// <param name="measure">Measure weight</param>
-        public virtual void UpdateMeasureWeight(MeasureWeight measure)
+        public virtual async Task UpdateMeasureWeight(MeasureWeight measure)
         {
             if (measure == null)
                 throw new ArgumentNullException("measure");
 
-            _measureWeightRepository.Update(measure);
-            
-            _cacheManager.RemoveByPattern(MEASUREWEIGHTS_PATTERN_KEY);
+            await _measureWeightRepository.UpdateAsync(measure);
+
+            await _cacheManager.RemoveByPrefix(MEASUREWEIGHTS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(measure);
+            await _mediator.EntityUpdated(measure);
         }
 
         /// <summary>
@@ -392,7 +396,7 @@ namespace Grand.Services.Directory
         /// <param name="targetMeasureWeight">Target weight</param>
         /// <param name="round">A value indicating whether a result should be rounded</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertWeight(decimal value,
+        public virtual async Task<decimal> ConvertWeight(decimal value,
             MeasureWeight sourceMeasureWeight, MeasureWeight targetMeasureWeight, bool round = true)
         {
             if (sourceMeasureWeight == null)
@@ -404,8 +408,8 @@ namespace Grand.Services.Directory
             decimal result = value;
             if (result != decimal.Zero && sourceMeasureWeight.Id != targetMeasureWeight.Id)
             {
-                result = ConvertToPrimaryMeasureWeight(result, sourceMeasureWeight);
-                result = ConvertFromPrimaryMeasureWeight(result, targetMeasureWeight);
+                result = await ConvertToPrimaryMeasureWeight(result, sourceMeasureWeight);
+                result = await ConvertFromPrimaryMeasureWeight(result, targetMeasureWeight);
             }
             if (round)
                 result = Math.Round(result, 2);
@@ -418,13 +422,13 @@ namespace Grand.Services.Directory
         /// <param name="value">Value to convert</param>
         /// <param name="sourceMeasureWeight">Source weight</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertToPrimaryMeasureWeight(decimal value, MeasureWeight sourceMeasureWeight)
+        public virtual async Task<decimal> ConvertToPrimaryMeasureWeight(decimal value, MeasureWeight sourceMeasureWeight)
         {
             if (sourceMeasureWeight == null)
                 throw new ArgumentNullException("sourceMeasureWeight");
 
             decimal result = value;
-            var baseWeightIn = GetMeasureWeightById(_measureSettings.BaseWeightId);
+            var baseWeightIn = await GetMeasureWeightById(_measureSettings.BaseWeightId);
             if (result != decimal.Zero && sourceMeasureWeight.Id != baseWeightIn.Id)
             {
                 decimal exchangeRatio = sourceMeasureWeight.Ratio;
@@ -441,14 +445,14 @@ namespace Grand.Services.Directory
         /// <param name="value">Value to convert</param>
         /// <param name="targetMeasureWeight">Target weight</param>
         /// <returns>Converted value</returns>
-        public virtual decimal ConvertFromPrimaryMeasureWeight(decimal value,
+        public virtual async Task<decimal> ConvertFromPrimaryMeasureWeight(decimal value,
             MeasureWeight targetMeasureWeight)
         {
             if (targetMeasureWeight == null)
                 throw new ArgumentNullException("targetMeasureWeight");
 
             decimal result = value;
-            var baseWeightIn = GetMeasureWeightById(_measureSettings.BaseWeightId);
+            var baseWeightIn = await GetMeasureWeightById(_measureSettings.BaseWeightId);
             if (result != decimal.Zero && targetMeasureWeight.Id != baseWeightIn.Id)
             {
                 decimal exchangeRatio = targetMeasureWeight.Ratio;
@@ -467,24 +471,23 @@ namespace Grand.Services.Directory
         /// Deletes measure unit
         /// </summary>
         /// <param name="measureUnit">Measure unit</param>
-        public virtual void DeleteMeasureUnit(MeasureUnit measureUnit)
+        public virtual async Task DeleteMeasureUnit(MeasureUnit measureUnit)
         {
             if (measureUnit == null)
                 throw new ArgumentNullException("measureUnit");
 
-            var builder = Builders<Product>.Filter;
-            var filter = builder.Eq(x => x.UnitId, measureUnit.Id);
-            var update = Builders<Product>.Update
-                .Set(x => x.UnitId, "");
-            var result = Grand.Core.Infrastructure.EngineContext.Current.Resolve<IRepository<Product>>()
-                .Collection.UpdateManyAsync(filter, update).Result;
+            //remove unit from products
+            await _mediator.Send(new DeleteMeasureUnitOnProductCommand() { MeasureUnitId = measureUnit.Id });
 
-            _measureUnitRepository.Delete(measureUnit);
+            //delete
+            await _measureUnitRepository.DeleteAsync(measureUnit);
 
-            _cacheManager.RemoveByPattern(MEASUREUNITS_PATTERN_KEY);
+            //clear cache
+            await _cacheManager.RemoveByPrefix(MEASUREUNITS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(measureUnit);
+            await _mediator.EntityDeleted(measureUnit);
         }
 
         /// <summary>
@@ -492,28 +495,26 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="measureUnitId">Measure unit identifier</param>
         /// <returns>Measure dimension</returns>
-        public virtual MeasureUnit GetMeasureUnitById(string measureUnitId)
+        public virtual Task<MeasureUnit> GetMeasureUnitById(string measureUnitId)
         {
             string key = string.Format(MEASUREUNITS_BY_ID_KEY, measureUnitId);
-            return _cacheManager.Get(key, () => _measureUnitRepository.GetById(measureUnitId));
+            return _cacheManager.GetAsync(key, () => _measureUnitRepository.GetByIdAsync(measureUnitId));
         }
 
-        
+
         /// <summary>
         /// Gets all measure units
         /// </summary>
         /// <returns>Measure unit</returns>
-        public virtual IList<MeasureUnit> GetAllMeasureUnits()
+        public virtual async Task<IList<MeasureUnit>> GetAllMeasureUnits()
         {
             string key = MEASUREUNITS_ALL_KEY;
-            return _cacheManager.Get(key, () =>
+            return await _cacheManager.GetAsync(key, () =>
             {
                 var query = from md in _measureUnitRepository.Table
                             orderby md.DisplayOrder
                             select md;
-                var measureUnits = query.ToList();
-                return measureUnits;
-
+                return query.ToListAsync();
             });
         }
 
@@ -521,34 +522,34 @@ namespace Grand.Services.Directory
         /// Inserts a measure unit
         /// </summary>
         /// <param name="measure">Measure unit</param>
-        public virtual void InsertMeasureUnit(MeasureUnit measure)
+        public virtual async Task InsertMeasureUnit(MeasureUnit measure)
         {
             if (measure == null)
                 throw new ArgumentNullException("measure");
 
-            _measureUnitRepository.Insert(measure);
+            await _measureUnitRepository.InsertAsync(measure);
 
-            _cacheManager.RemoveByPattern(MEASUREUNITS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(MEASUREUNITS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(measure);
+            await _mediator.EntityInserted(measure);
         }
 
         /// <summary>
         /// Updates the measure unit
         /// </summary>
         /// <param name="measure">Measure unit</param>
-        public virtual void UpdateMeasureUnit(MeasureUnit measure)
+        public virtual async Task UpdateMeasureUnit(MeasureUnit measure)
         {
             if (measure == null)
                 throw new ArgumentNullException("measure");
 
-            _measureUnitRepository.Update(measure);
+            await _measureUnitRepository.UpdateAsync(measure);
 
-            _cacheManager.RemoveByPattern(MEASUREUNITS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(MEASUREUNITS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(measure);
+            await _mediator.EntityUpdated(measure);
         }
         #endregion
 

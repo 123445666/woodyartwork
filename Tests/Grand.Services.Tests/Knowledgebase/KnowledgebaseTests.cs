@@ -9,11 +9,13 @@ using Grand.Core.Domain.Localization;
 using Grand.Core.Domain.Stores;
 using Grand.Services.Events;
 using Grand.Services.Knowledgebase;
+using MediatR;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Tests.Knowledgebase
 {
@@ -24,7 +26,7 @@ namespace Grand.Services.Tests.Knowledgebase
         private IRepository<KnowledgebaseArticleComment> _articleCommentRepository;
         private IRepository<KnowledgebaseCategory> _categoryRepository;
         private IKnowledgebaseService _knowledgebaseService;
-        private IEventPublisher _eventPublisher;
+        private IMediator _eventPublisher;
         private IWorkContext _workContext;
         private IStoreContext _storeContext;
         private ICacheManager _cacheManager;
@@ -38,8 +40,8 @@ namespace Grand.Services.Tests.Knowledgebase
             _categoryRepository = new MongoDBRepositoryTest<KnowledgebaseCategory>();
             _articleCommentRepository = new MongoDBRepositoryTest<KnowledgebaseArticleComment>();
 
-            var eventPublisher = new Mock<IEventPublisher>();
-            eventPublisher.Setup(x => x.Publish(new object()));
+            var eventPublisher = new Mock<IMediator>();
+            //eventPublisher.Setup(x => x.PublishAsync(new object()));
             _eventPublisher = eventPublisher.Object;
 
             var customer = new Customer() { Username = "username" };
@@ -70,11 +72,11 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanInsertKnowledgebaseArticle()
+        public async Task CanInsertKnowledgebaseArticle()
         {
             DateTime date = DateTime.UtcNow;
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(new KnowledgebaseArticle
+            await _knowledgebaseService.InsertKnowledgebaseArticle(new KnowledgebaseArticle
             {
                 Content = "Content",
                 CustomerRoles = new List<string> { "Role" },
@@ -123,11 +125,11 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanInsertKnowledgebaseCategory()
+        public async Task CanInsertKnowledgebaseCategory()
         {
             DateTime date = DateTime.UtcNow;
 
-            _knowledgebaseService.InsertKnowledgebaseCategory(new KnowledgebaseCategory
+            await _knowledgebaseService.InsertKnowledgebaseCategory(new KnowledgebaseCategory
             {
                 CustomerRoles = new List<string> { "Role" },
                 DisplayOrder = 1,
@@ -187,65 +189,65 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanDeleteKnowledgebaseArticle()
+        public async Task CanDeleteKnowledgebaseArticle()
         {
             ClearArticleRepository();
 
             var toDelete = new KnowledgebaseArticle();
-            _knowledgebaseService.InsertKnowledgebaseArticle(toDelete);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(toDelete);
 
             Assert.AreEqual(1, _articleRepository.Table.Count());
-            _knowledgebaseService.DeleteKnowledgebaseArticle(toDelete);
+            await _knowledgebaseService.DeleteKnowledgebaseArticle(toDelete);
             Assert.AreEqual(0, _articleRepository.Table.Count());
         }
 
         [TestMethod()]
-        public void CanDeleteKnowledgebaseCategory()
+        public async Task CanDeleteKnowledgebaseCategory()
         {
             ClearCategoryRepository();
 
             var toDelete = new KnowledgebaseCategory();
-            _knowledgebaseService.InsertKnowledgebaseCategory(toDelete);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(toDelete);
 
             Assert.AreEqual(1, _categoryRepository.Table.Count());
-            _knowledgebaseService.DeleteKnowledgebaseCategory(toDelete);
+            await _knowledgebaseService.DeleteKnowledgebaseCategory(toDelete);
             Assert.AreEqual(0, _categoryRepository.Table.Count());
         }
 
         [TestMethod()]
-        public void CanGetKnowledgebaseArticle()
+        public async Task CanGetKnowledgebaseArticle()
         {
             var article = new KnowledgebaseArticle() { Name = "CanGetKnowledgebaseArticle" };
-            _knowledgebaseService.InsertKnowledgebaseArticle(article);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article);
 
             var actual = _articleRepository.Table.Where(x => x.Name == "CanGetKnowledgebaseArticle").First();
-            var found = _knowledgebaseService.GetKnowledgebaseArticle(actual.Id);
+            var found = await _knowledgebaseService.GetKnowledgebaseArticle(actual.Id);
 
             Assert.AreEqual(actual.Name, found.Name);
         }
 
         [TestMethod()]
-        public void CanGetKnowledgebaseCategory()
+        public async Task CanGetKnowledgebaseCategory()
         {
             var category = new KnowledgebaseCategory() { Name = "CanGetKnowledgebaseCategory" };
-            _knowledgebaseService.InsertKnowledgebaseCategory(category);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category);
 
             var actual = _categoryRepository.Table.Where(x => x.Name == "CanGetKnowledgebaseCategory").First();
-            var found = _knowledgebaseService.GetKnowledgebaseCategory(actual.Id);
+            var found = await _knowledgebaseService.GetKnowledgebaseCategory(actual.Id);
 
             Assert.AreEqual(actual.Name, found.Name);
         }
 
         [TestMethod()]
-        public void CanUpdateKnowledgebaseArticle()
+        public async Task CanUpdateKnowledgebaseArticle()
         {
             ClearArticleRepository();
 
             var article = new KnowledgebaseArticle() { Name = "CanUpdateKnowledgebaseArticle" };
-            _knowledgebaseService.InsertKnowledgebaseArticle(article);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article);
 
             article.Name = "CanUpdateKnowledgebaseArticle1";
-            _knowledgebaseService.UpdateKnowledgebaseArticle(article);
+            await _knowledgebaseService.UpdateKnowledgebaseArticle(article);
 
             var found = _articleRepository.Table.Where(x => x.Name == "CanUpdateKnowledgebaseArticle1");
 
@@ -253,15 +255,15 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanUpdateKnowledgebaseCategory()
+        public async Task CanUpdateKnowledgebaseCategory()
         {
             ClearCategoryRepository();
 
             var category = new KnowledgebaseCategory() { Name = "CanUpdateKnowledgebaseCategory" };
-            _knowledgebaseService.InsertKnowledgebaseCategory(category);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category);
 
             category.Name = "CanUpdateKnowledgebaseCategory1";
-            _knowledgebaseService.UpdateKnowledgebaseCategory(category);
+            await _knowledgebaseService.UpdateKnowledgebaseCategory(category);
 
             var found = _categoryRepository.Table.Where(x => x.Name == "CanUpdateKnowledgebaseCategory1");
 
@@ -269,24 +271,24 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanGetHomepageKnowledgebaseArticles()
+        public async Task CanGetHomepageKnowledgebaseArticles()
         {
             ClearArticleRepository();
 
             var article1 = new KnowledgebaseArticle { ShowOnHomepage = true, Published = true, Name = "homepage" };
             var article2 = new KnowledgebaseArticle { ShowOnHomepage = false, Published = true, Name = "not homepage" };
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article1);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article2);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article2);
 
-            var homepage = _knowledgebaseService.GetHomepageKnowledgebaseArticles();
+            var homepage = await _knowledgebaseService.GetHomepageKnowledgebaseArticles();
 
             Assert.AreEqual(1, homepage.Count);
             Assert.AreEqual("homepage", homepage.First().Name);
         }
 
         [TestMethod()]
-        public void CanGetKnowledgebaseArticles()
+        public async Task CanGetKnowledgebaseArticles()
         {
             ClearArticleRepository();
 
@@ -294,17 +296,17 @@ namespace Grand.Services.Tests.Knowledgebase
             var article2 = new KnowledgebaseArticle();
             var article3 = new KnowledgebaseArticle();
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article1);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article2);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article3);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article2);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article3);
 
-            var all = _knowledgebaseService.GetKnowledgebaseArticles();
+            var all = await _knowledgebaseService.GetKnowledgebaseArticles();
 
             Assert.AreEqual(3, all.Count());
         }
 
         [TestMethod()]
-        public void CanGetKnowledgebaseCategories()
+        public async Task CanGetKnowledgebaseCategories()
         {
             ClearCategoryRepository();
 
@@ -312,17 +314,17 @@ namespace Grand.Services.Tests.Knowledgebase
             var category2 = new KnowledgebaseCategory();
             var category3 = new KnowledgebaseCategory();
 
-            _knowledgebaseService.InsertKnowledgebaseCategory(category1);
-            _knowledgebaseService.InsertKnowledgebaseCategory(category2);
-            _knowledgebaseService.InsertKnowledgebaseCategory(category3);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category1);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category2);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category3);
 
-            var all = _knowledgebaseService.GetKnowledgebaseCategories();
+            var all = await _knowledgebaseService.GetKnowledgebaseCategories();
 
             Assert.AreEqual(3, all.Count());
         }
 
         [TestMethod()]
-        public void GetKnowledgebaseArticlesByCategoryId()
+        public async Task GetKnowledgebaseArticlesByCategoryId()
         {
             ClearArticleRepository();
 
@@ -330,50 +332,50 @@ namespace Grand.Services.Tests.Knowledgebase
             var article2 = new KnowledgebaseArticle { ParentCategoryId = "GetKnowledgebaseArticlesByCategoryId1" };
             var article3 = new KnowledgebaseArticle { ParentCategoryId = "GetKnowledgebaseArticlesByCategoryId2" };
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article1);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article2);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article3);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article2);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article3);
 
-            var found = _knowledgebaseService.GetKnowledgebaseArticlesByCategoryId("GetKnowledgebaseArticlesByCategoryId1");
+            var found = await _knowledgebaseService.GetKnowledgebaseArticlesByCategoryId("GetKnowledgebaseArticlesByCategoryId1");
 
             Assert.AreEqual(2, found.Count);
         }
 
         [TestMethod()]
-        public void GetKnowledgebaseArticlesByName()
+        public async Task GetKnowledgebaseArticlesByName()
         {
             ClearArticleRepository();
 
             var article1 = new KnowledgebaseArticle { Name = "GetKnowledgebaseArticlesByName1", Published = true };
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article1);
 
-            var found = _knowledgebaseService.GetKnowledgebaseArticlesByName("GetKnowledgebaseArticlesByName1");
+            var found = await _knowledgebaseService.GetKnowledgebaseArticlesByName("GetKnowledgebaseArticlesByName1");
 
             Assert.AreEqual(1, found.Count);
             Assert.AreEqual("GetKnowledgebaseArticlesByName1", found.First().Name);
         }
 
         [TestMethod()]
-        public void CanGetPublicKnowledgebaseArticle()
+        public async Task CanGetPublicKnowledgebaseArticle()
         {
             ClearArticleRepository();
 
             var article1 = new KnowledgebaseArticle { Name = "CanGetPublicKnowledgebaseArticlePublic", Published = true };
             var article2 = new KnowledgebaseArticle { Name = "CanGetPublicKnowledgebaseArticleNotPublic", Published = false };
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article1);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article2);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article2);
 
-            var found1 = _knowledgebaseService.GetPublicKnowledgebaseArticle(article1.Id);
-            var found2 = _knowledgebaseService.GetPublicKnowledgebaseArticle(article2.Id);
+            var found1 = await _knowledgebaseService.GetPublicKnowledgebaseArticle(article1.Id);
+            var found2 = await _knowledgebaseService.GetPublicKnowledgebaseArticle(article2.Id);
 
             Assert.AreEqual("CanGetPublicKnowledgebaseArticlePublic", found1.Name);
             Assert.AreEqual(null, found2);
         }
 
         [TestMethod()]
-        public void CanGetPublicKnowledgebaseArticles()
+        public async Task CanGetPublicKnowledgebaseArticles()
         {
             ClearArticleRepository();
 
@@ -381,10 +383,10 @@ namespace Grand.Services.Tests.Knowledgebase
             var article2 = new KnowledgebaseArticle { Name = "CanGetPublicKnowledgebaseArticlesPublic2", Published = true };
             var article3 = new KnowledgebaseArticle { Name = "CanGetPublicKnowledgebaseArticlesNotPublic", Published = false };
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article1);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article2);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article2);
 
-            var found = _knowledgebaseService.GetPublicKnowledgebaseArticles();
+            var found = await _knowledgebaseService.GetPublicKnowledgebaseArticles();
 
             Assert.AreEqual(2, found.Count);
             Assert.AreEqual(true, found.Any(x => x.Name == "CanGetPublicKnowledgebaseArticlesPublic1"));
@@ -393,25 +395,25 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanGetPublicKnowledgebaseCategory()
+        public async Task CanGetPublicKnowledgebaseCategory()
         {
             ClearCategoryRepository();
 
             var category1 = new KnowledgebaseCategory { Name = "CanGetPublicKnowledgebaseCategoryPublic", Published = true };
             var category2 = new KnowledgebaseCategory { Name = "CanGetPublicKnowledgebaseCategoryNotPublic", Published = false };
 
-            _knowledgebaseService.InsertKnowledgebaseCategory(category1);
-            _knowledgebaseService.InsertKnowledgebaseCategory(category2);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category1);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category2);
 
-            var found1 = _knowledgebaseService.GetPublicKnowledgebaseCategory(category1.Id);
-            var found2 = _knowledgebaseService.GetPublicKnowledgebaseCategory(category2.Id);
+            var found1 = await _knowledgebaseService.GetPublicKnowledgebaseCategory(category1.Id);
+            var found2 = await _knowledgebaseService.GetPublicKnowledgebaseCategory(category2.Id);
 
             Assert.AreEqual("CanGetPublicKnowledgebaseCategoryPublic", found1.Name);
             Assert.AreEqual(null, found2);
         }
 
         [TestMethod()]
-        public void CanGetPublicKnowledgebaseCategories()
+        public async Task CanGetPublicKnowledgebaseCategories()
         {
             ClearCategoryRepository();
 
@@ -419,10 +421,10 @@ namespace Grand.Services.Tests.Knowledgebase
             var category2 = new KnowledgebaseCategory { Name = "CanGetPublicKnowledgebaseCategoriesPublic2", Published = true };
             var category3 = new KnowledgebaseCategory { Name = "CanGetPublicKnowledgebaseCategoriesNotPublic", Published = false };
 
-            _knowledgebaseService.InsertKnowledgebaseCategory(category1);
-            _knowledgebaseService.InsertKnowledgebaseCategory(category2);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category1);
+            await _knowledgebaseService.InsertKnowledgebaseCategory(category2);
 
-            var found = _knowledgebaseService.GetPublicKnowledgebaseCategories();
+            var found = await _knowledgebaseService.GetPublicKnowledgebaseCategories();
 
             Assert.AreEqual(2, found.Count);
             Assert.AreEqual(true, found.Any(x => x.Name == "CanGetPublicKnowledgebaseCategoriesPublic1"));
@@ -431,7 +433,7 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanGetPublicKnowledgebaseArticlesByCategory()
+        public async Task CanGetPublicKnowledgebaseArticlesByCategory()
         {
             ClearArticleRepository();
 
@@ -456,11 +458,11 @@ namespace Grand.Services.Tests.Knowledgebase
                 ParentCategoryId = "CanGetPublicKnowledgebaseArticlesByCategory3"
             };
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article1);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article2);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article3);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article2);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article3);
 
-            var found = _knowledgebaseService.GetPublicKnowledgebaseArticlesByCategory("CanGetPublicKnowledgebaseArticlesByCategory1");
+            var found = await _knowledgebaseService.GetPublicKnowledgebaseArticlesByCategory("CanGetPublicKnowledgebaseArticlesByCategory1");
 
             Assert.AreEqual(2, found.Count);
             Assert.AreEqual(true, found.Any(x => x.Name == "CanGetPublicKnowledgebaseArticlesByCategory1"));
@@ -469,7 +471,7 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanGetPublicKnowledgebaseArticlesByKeyword()
+        public async Task CanGetPublicKnowledgebaseArticlesByKeyword()
         {
             ClearArticleRepository();
 
@@ -493,11 +495,11 @@ namespace Grand.Services.Tests.Knowledgebase
                 Published = true,
             };
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article1);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article2);
-            _knowledgebaseService.InsertKnowledgebaseArticle(article3);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article2);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article3);
 
-            var found = _knowledgebaseService.GetPublicKnowledgebaseArticlesByKeyword("keyword");
+            var found = await _knowledgebaseService.GetPublicKnowledgebaseArticlesByKeyword("keyword");
 
             Assert.AreEqual(2, found.Count);
             Assert.AreEqual(true, found.Any(x => x.Name == "CanGetPublicKnowledgebaseArticlesByKeyword1"));
@@ -506,7 +508,7 @@ namespace Grand.Services.Tests.Knowledgebase
         }
 
         [TestMethod()]
-        public void CanGetRelatedKnowledgebaseArticles()
+        public async Task CanGetRelatedKnowledgebaseArticles()
         {
             ClearArticleRepository();
 
@@ -528,15 +530,15 @@ namespace Grand.Services.Tests.Knowledgebase
                 Published = true
             };
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(related1);
-            _knowledgebaseService.InsertKnowledgebaseArticle(related2);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(related1);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(related2);
 
             article.RelatedArticles.Add(related1.Id);
             article.RelatedArticles.Add(related2.Id);
 
-            _knowledgebaseService.InsertKnowledgebaseArticle(article);
+            await _knowledgebaseService.InsertKnowledgebaseArticle(article);
 
-            var found = _knowledgebaseService.GetRelatedKnowledgebaseArticles(article.Id);
+            var found = await _knowledgebaseService.GetRelatedKnowledgebaseArticles(article.Id);
 
             Assert.AreEqual(2, found.Count);
             Assert.AreEqual(true, found.Any(x=>x.Name == "CanGetRelatedKnowledgebaseArticlesRelated1"));

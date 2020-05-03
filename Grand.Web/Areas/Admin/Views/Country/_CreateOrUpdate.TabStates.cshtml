@@ -1,4 +1,5 @@
 ﻿@model CountryModel
+<vc:admin-widget widget-zone="country_details_states_top" additional-data="Model" />
 @{
     if (!String.IsNullOrEmpty(Model.Id))
     {
@@ -7,7 +8,7 @@
                 <div id="states-grid"></div>
             </div>
             <div class="panel-footer">
-                <input type="submit" id="btnAddNewState" value="@T("Admin.Configuration.Countries.States.AddNew")" onclick="javascript:OpenWindow('@(Url.Action("StateCreatePopup", "Country", new { countryId = Model.Id, btnId = "btnRefresh", formId = "country-form" }))', 800, 500, true); return false;" class="btn default" />
+                <button type="submit" id="btnAddNewState" onclick="javascript:OpenWindow('@(Url.Action("StateCreatePopup", "Country", new { countryId = Model.Id, btnId = "btnRefresh", formId = "country-form" }))', 800, 500, true); return false;" class="k-button"><i class="fa fa-plus"></i>&nbsp;@T("Admin.Configuration.Countries.States.AddNew")</button>
                 <input type="submit" id="btnRefresh" style="display: none" />
             </div>
         </div>
@@ -62,7 +63,7 @@
                         field: "Name",
                         title: "@T("Admin.Configuration.Countries.States.Fields.Name")",
                         width: 300,
-                        template: "<a class'k-link' onclick=\"javascript:OpenWindow('@Url.Content("~/Admin/Country/StateEditPopup/")#=Id#?btnId=btnRefresh&formId=country-form', 800, 500, true); return false;\">#=Name#</a>",
+                        template: "<a class=\"k-link\" onclick=\"javascript:OpenWindow('@Url.Content("~/Admin/Country/StateEditPopup/")#=Id#?btnId=btnRefresh&formId=country-form', 800, 500, true); return false;\">#=Name#</a>",
                     }, {
                         field: "Abbreviation",
                         title: "@T("Admin.Configuration.Countries.States.Fields.Abbreviation")",
@@ -107,3 +108,4 @@
         </div>
     }
 }
+<vc:admin-widget widget-zone="country_details_states_bottom" additional-data="Model" />

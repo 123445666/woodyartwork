@@ -1,7 +1,5 @@
-using Grand.Core;
 using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Customers;
-using Grand.Services.Directory;
 using Grand.Services.Localization;
 using System;
 using System.Collections.Generic;
@@ -24,7 +22,7 @@ namespace Grand.Services.Catalog
         /// <returns>Price</returns>
         public static TierPrice GetPreferredTierPrice(this Product product, Customer customer, string storeId, int quantity)
         {
-            if (!product.HasTierPrices)
+            if (!product.TierPrices.Any())
                 return null;
 
             //get actual tier prices
@@ -38,7 +36,7 @@ namespace Grand.Services.Catalog
             var tierPrice = actualTierPrices.LastOrDefault(price => quantity >= price.Quantity);
 
             return tierPrice;
-        }        
+        }
 
         /// <summary>
         /// Formats the stock availability/quantity message
@@ -48,8 +46,8 @@ namespace Grand.Services.Catalog
         /// <param name="localizationService">Localization service</param>
         /// <param name="productAttributeParser">Product attribute parser</param>
         /// <returns>The stock message</returns>
-        public static string FormatStockMessage(this Product product, string attributesXml,
-            ILocalizationService localizationService, IProductAttributeParser productAttributeParser, IStoreContext storeContext)
+        public static string FormatStockMessage(this Product product, string warehouseId, string attributesXml,
+            ILocalizationService localizationService, IProductAttributeParser productAttributeParser)
         {
             if (product == null)
                 throw new ArgumentNullException("product");
@@ -71,7 +69,7 @@ namespace Grand.Services.Catalog
                         if (!product.DisplayStockAvailability)
                             return stockMessage;
 
-                        var stockQuantity = product.GetTotalStockQuantity(warehouseId: storeContext.CurrentStore.DefaultWarehouseId);
+                        var stockQuantity = product.GetTotalStockQuantity(warehouseId: warehouseId);
                         if (stockQuantity > 0)
                         {
                             stockMessage = product.DisplayStockQuantity ?
@@ -113,7 +111,7 @@ namespace Grand.Services.Catalog
                         if (combination != null)
                         {
                             //combination exists
-                            var stockQuantity = product.GetTotalStockQuantityForCombination(combination, warehouseId: storeContext.CurrentStore.DefaultWarehouseId);
+                            var stockQuantity = product.GetTotalStockQuantityForCombination(combination, warehouseId: warehouseId);
                             if (stockQuantity > 0)
                             {
                                 stockMessage = product.DisplayStockQuantity ?
@@ -122,13 +120,25 @@ namespace Grand.Services.Catalog
                                     //display "in stock" without stock quantity
                                     localizationService.GetResource("Products.Availability.InStock");
                             }
-                            else if (combination.AllowOutOfStockOrders)
-                            {
-                                stockMessage = localizationService.GetResource("Products.Availability.InStock");
-                            }
                             else
                             {
-                                stockMessage = localizationService.GetResource("Products.Availability.OutOfStock");
+                                //out of stock
+                                switch (product.BackorderMode)
+                                {
+                                    case BackorderMode.NoBackorders:
+                                        stockMessage = localizationService.GetResource("Products.Availability.Attributes.OutOfStock");
+                                        break;
+                                    case BackorderMode.AllowQtyBelow0:
+                                        stockMessage = localizationService.GetResource("Products.Availability.Attributes.InStock");
+                                        break;
+                                    case BackorderMode.AllowQtyBelow0AndNotifyCustomer:
+                                        stockMessage = localizationService.GetResource("Products.Availability.Attributes.Backordering");
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                if (!combination.AllowOutOfStockOrders)
+                                    stockMessage = localizationService.GetResource("Products.Availability.Attributes.OutOfStock");
                             }
                         }
                         else
@@ -137,11 +147,11 @@ namespace Grand.Services.Catalog
                             stockMessage = localizationService.GetResource("Products.Availability.InStock");
                             if (product.AllowAddingOnlyExistingAttributeCombinations)
                             {
-                                stockMessage = localizationService.GetResource("Products.Availability.OutOfStock");
+                                stockMessage = localizationService.GetResource("Products.Availability.AllowAddingOnlyExistingAttributeCombinations.Yes");
                             }
                             else
                             {
-                                stockMessage = localizationService.GetResource("Products.Availability.InStock");
+                                stockMessage = localizationService.GetResource("Products.Availability.AllowAddingOnlyExistingAttributeCombinations.No");
                             }
                         }
 
@@ -163,12 +173,12 @@ namespace Grand.Services.Catalog
         /// <param name="productTagId">Product tag identifier</param>
         /// <returns>Result</returns>
         public static bool ProductTagExists(this Product product,
-            string productTagId)
+            string productTagName)
         {
             if (product == null)
                 throw new ArgumentNullException("product");
 
-            bool result = product.ProductTags.FirstOrDefault(pt => pt == productTagId) != null;
+            bool result = product.ProductTags.FirstOrDefault(pt => pt == productTagName) != null;
             return result;
         }
 
@@ -186,7 +196,7 @@ namespace Grand.Services.Catalog
             if (!String.IsNullOrWhiteSpace(product.AllowedQuantities))
             {
                 product.AllowedQuantities
-                    .Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
+                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                     .ToList()
                     .ForEach(qtyStr =>
                     {
@@ -214,7 +224,7 @@ namespace Grand.Services.Catalog
         /// Used only with "multiple warehouses" enabled.
         /// </param>
         /// <returns>Result</returns>
-        public static int GetTotalStockQuantity(this Product product, 
+        public static int GetTotalStockQuantity(this Product product,
             bool useReservedQuantity = true, string warehouseId = "")
         {
             if (product == null)
@@ -307,7 +317,7 @@ namespace Grand.Services.Catalog
 
         }
 
-        
+
 
         /// <summary>
         /// Gets SKU, Manufacturer part number and GTIN
@@ -328,7 +338,7 @@ namespace Grand.Services.Catalog
             manufacturerPartNumber = null;
             gtin = null;
 
-            if (!String.IsNullOrEmpty(attributesXml) && 
+            if (!String.IsNullOrEmpty(attributesXml) &&
                 product.ManageInventoryMethod == ManageInventoryMethod.ManageStockByAttributes)
             {
                 //manage stock by attribute combinations
@@ -417,71 +427,6 @@ namespace Grand.Services.Catalog
                 out sku, out manufacturerPartNumber, out gtin);
 
             return gtin;
-        }
-
-        
-        /// <summary>
-        /// Format base price (PAngV)
-        /// </summary>
-        /// <param name="product">Product</param>
-        /// <param name="productPrice">Product price (in primary currency). Pass null if you want to use a default produce price</param>
-        /// <param name="localizationService">Localization service</param>
-        /// <param name="measureService">Measure service</param>
-        /// <param name="currencyService">Currency service</param>
-        /// <param name="workContext">Work context</param>
-        /// <param name="priceFormatter">Price formatter</param>
-        /// <returns>Base price</returns>
-        public static string FormatBasePrice(this Product product, decimal? productPrice, ILocalizationService localizationService,
-            IMeasureService measureService, ICurrencyService currencyService,
-            IWorkContext workContext, IPriceFormatter priceFormatter)
-        {
-            if (product == null)
-                throw new ArgumentNullException("product");
-
-            if (localizationService == null)
-                throw new ArgumentNullException("localizationService");
-            
-            if (measureService == null)
-                throw new ArgumentNullException("measureService");
-
-            if (currencyService == null)
-                throw new ArgumentNullException("currencyService");
-
-            if (workContext == null)
-                throw new ArgumentNullException("workContext");
-
-            if (priceFormatter == null)
-                throw new ArgumentNullException("priceFormatter");
-
-            if (!product.BasepriceEnabled)
-                return null;
-
-            var productAmount = product.BasepriceAmount;
-            //Amount in product cannot be 0
-            if (productAmount == 0)
-                return null;
-            var referenceAmount = product.BasepriceBaseAmount;
-            var productUnit = measureService.GetMeasureWeightById(product.BasepriceUnitId);
-            //measure weight cannot be loaded
-            if (productUnit == null)
-                return null;
-            var referenceUnit = measureService.GetMeasureWeightById(product.BasepriceBaseUnitId);
-            //measure weight cannot be loaded
-            if (referenceUnit == null)
-                return null;
-
-            productPrice = productPrice.HasValue ? productPrice.Value : product.Price;
-
-            decimal basePrice = productPrice.Value /
-                //do not round. otherwise, it can cause issues
-                measureService.ConvertWeight(productAmount, productUnit, referenceUnit, false) * 
-                referenceAmount;
-            decimal basePriceInCurrentCurrency = currencyService.ConvertFromPrimaryStoreCurrency(basePrice, workContext.WorkingCurrency);
-            string basePriceStr = priceFormatter.FormatPrice(basePriceInCurrentCurrency, true, false);
-
-            var result = string.Format(localizationService.GetResource("Products.BasePrice"),
-                basePriceStr, referenceAmount.ToString("G29"), referenceUnit.Name);
-            return result;
         }
     }
 }

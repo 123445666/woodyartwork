@@ -3,7 +3,8 @@ using Grand.Core.Caching;
 using Grand.Core.Configuration;
 using Grand.Core.Data;
 using Grand.Core.Domain.Configuration;
-using Grand.Services.Events;
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
@@ -12,6 +13,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Configuration
 {
@@ -36,8 +38,11 @@ namespace Grand.Services.Configuration
         #region Fields
 
         private readonly IRepository<Setting> _settingRepository;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
         private readonly ICacheManager _cacheManager;
+        private readonly IServiceProvider _serviceProvider;
+
+        private IDictionary<string, IList<SettingForCaching>> _allSettings = null;
 
         #endregion
 
@@ -47,14 +52,15 @@ namespace Grand.Services.Configuration
         /// Ctor
         /// </summary>
         /// <param name="cacheManager">Cache manager</param>
-        /// <param name="eventPublisher">Event publisher</param>
+        /// <param name="mediator">Mediator</param>
         /// <param name="settingRepository">Setting repository</param>
-        public SettingService(ICacheManager cacheManager, IEventPublisher eventPublisher,
-            IRepository<Setting> settingRepository)
+        public SettingService(ICacheManager cacheManager, IMediator mediator,
+            IRepository<Setting> settingRepository, IServiceProvider serviceProvider)
         {
-            this._cacheManager = cacheManager;
-            this._eventPublisher = eventPublisher;
-            this._settingRepository = settingRepository;
+            _cacheManager = cacheManager;
+            _mediator = mediator;
+            _settingRepository = settingRepository;
+            _serviceProvider = serviceProvider;
         }
 
         #endregion
@@ -80,9 +86,12 @@ namespace Grand.Services.Configuration
         /// <returns>Settings</returns>
         protected virtual IDictionary<string, IList<SettingForCaching>> GetAllSettingsCached()
         {
+            if (_allSettings != null)
+                return _allSettings;
+
             //cache
             string key = string.Format(SETTINGS_ALL_KEY);
-            return _cacheManager.Get(key, () =>
+            _allSettings = _cacheManager.Get(key, () =>
             {
                 //we use no tracking here for performance optimization
                 //anyway records are loaded only for read-only operations
@@ -94,8 +103,7 @@ namespace Grand.Services.Configuration
                 foreach (var s in settings)
                 {
                     var resourceName = s.Name.ToLowerInvariant();
-                    var settingForCaching = new SettingForCaching
-                    {
+                    var settingForCaching = new SettingForCaching {
                         Id = s.Id,
                         Name = s.Name,
                         Value = s.Value,
@@ -118,6 +126,7 @@ namespace Grand.Services.Configuration
                 }
                 return dictionary;
             });
+            return _allSettings;
         }
 
         #endregion
@@ -129,16 +138,16 @@ namespace Grand.Services.Configuration
         /// </summary>
         /// <param name="setting">Setting</param>
         /// <param name="clearCache">A value indicating whether to clear cache after setting update</param>
-        public virtual void InsertSetting(Setting setting, bool clearCache = true)
+        public virtual async Task InsertSetting(Setting setting, bool clearCache = true)
         {
             if (setting == null)
                 throw new ArgumentNullException("setting");
 
-            _settingRepository.Insert(setting);
+            await _settingRepository.InsertAsync(setting);
 
             //cache
             if (clearCache)
-                _cacheManager.RemoveByPattern(SETTINGS_PATTERN_KEY);
+                await _cacheManager.RemoveByPrefix(SETTINGS_PATTERN_KEY);
 
         }
 
@@ -147,16 +156,16 @@ namespace Grand.Services.Configuration
         /// </summary>
         /// <param name="setting">Setting</param>
         /// <param name="clearCache">A value indicating whether to clear cache after setting update</param>
-        public virtual void UpdateSetting(Setting setting, bool clearCache = true)
+        public virtual async Task UpdateSetting(Setting setting, bool clearCache = true)
         {
             if (setting == null)
                 throw new ArgumentNullException("setting");
 
-            _settingRepository.Update(setting);
+            await _settingRepository.UpdateAsync(setting);
 
             //cache
             if (clearCache)
-                _cacheManager.RemoveByPattern(SETTINGS_PATTERN_KEY);
+                await _cacheManager.RemoveByPrefix(SETTINGS_PATTERN_KEY);
 
         }
 
@@ -164,15 +173,15 @@ namespace Grand.Services.Configuration
         /// Deletes a setting
         /// </summary>
         /// <param name="setting">Setting</param>
-        public virtual void DeleteSetting(Setting setting)
+        public virtual async Task DeleteSetting(Setting setting)
         {
             if (setting == null)
                 throw new ArgumentNullException("setting");
 
-            _settingRepository.Delete(setting);
+            await _settingRepository.DeleteAsync(setting);
 
             //cache
-            _cacheManager.RemoveByPattern(SETTINGS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(SETTINGS_PATTERN_KEY);
 
         }
 
@@ -184,6 +193,16 @@ namespace Grand.Services.Configuration
         public virtual Setting GetSettingById(string settingId)
         {
             return _settingRepository.GetById(settingId);
+        }
+
+        /// <summary>
+        /// Gets a setting by identifier
+        /// </summary>
+        /// <param name="settingId">Setting identifier</param>
+        /// <returns>Setting</returns>
+        public virtual Task<Setting> GetSettingByIdAsync(string settingId)
+        {
+            return _settingRepository.GetByIdAsync(settingId);
         }
 
         /// <summary>
@@ -257,7 +276,7 @@ namespace Grand.Services.Configuration
         /// <param name="value">Value</param>
         /// <param name="storeId">Store identifier</param>
         /// <param name="clearCache">A value indicating whether to clear cache after setting update</param>
-        public virtual void SetSetting<T>(string key, T value, string storeId = "", bool clearCache = true)
+        public virtual async Task SetSetting<T>(string key, T value, string storeId = "", bool clearCache = true)
         {
             if (key == null)
                 throw new ArgumentNullException("key");
@@ -270,20 +289,19 @@ namespace Grand.Services.Configuration
             if (settingForCaching != null)
             {
                 //update
-                var setting = GetSettingById(settingForCaching.Id);
+                var setting = await GetSettingByIdAsync(settingForCaching.Id);
                 setting.Value = valueStr;
-                UpdateSetting(setting, clearCache);
+                await UpdateSetting(setting, clearCache);
             }
             else
             {
                 //insert
-                var setting = new Setting
-                {
+                var setting = new Setting {
                     Name = key,
                     Value = valueStr,
                     StoreId = storeId
                 };
-                InsertSetting(setting, clearCache);
+                await InsertSetting(setting, clearCache);
             }
         }
 
@@ -322,11 +340,7 @@ namespace Grand.Services.Configuration
         /// <param name="storeId">Store identifier for which settings should be loaded</param>
         public virtual T LoadSetting<T>(string storeId = "") where T : ISettings, new()
         {
-            string cachekey = string.Format("{0}{1}.{2}", SETTINGS_PATTERN_KEY, typeof(T).Name, storeId);
-            return _cacheManager.Get<T>(cachekey, () =>
-            {
-                return (T)LoadSetting(typeof(T), storeId);
-            });
+            return (T)LoadSetting(typeof(T), storeId);
         }
 
         /// <summary>
@@ -347,19 +361,24 @@ namespace Grand.Services.Configuration
                 var key = type.Name + "." + prop.Name;
                 //load by store
                 var setting = GetSettingByKey<string>(key, storeId: storeId, loadSharedValueIfNotFound: true);
-                if (setting == null)
+                if (setting == null || setting.Length == 0)
                     continue;
 
-                if (!TypeDescriptor.GetConverter(prop.PropertyType).CanConvertFrom(typeof(string)))
+                var converter = TypeDescriptor.GetConverter(prop.PropertyType);
+
+                if (!converter.CanConvertFrom(typeof(string)))
                     continue;
-
-                if (!TypeDescriptor.GetConverter(prop.PropertyType).IsValid(setting))
-                    continue;
-
-                var value = TypeDescriptor.GetConverter(prop.PropertyType).ConvertFromInvariantString(setting);
-
-                //set property
-                prop.SetValue(settings, value, null);
+                try
+                {
+                    var value = converter.ConvertFromInvariantString(setting);
+                    //set property
+                    prop.SetValue(settings, value, null);
+                }
+                catch (Exception ex)
+                {
+                    var msg = $"Could not convert setting {key} to type {prop.PropertyType.FullName}";
+                    _serviceProvider.GetRequiredService<Logging.ILogger>().InsertLog(Core.Domain.Logging.LogLevel.Error, msg, ex.Message);
+                }
             }
 
             return settings as ISettings;
@@ -371,7 +390,7 @@ namespace Grand.Services.Configuration
         /// <typeparam name="T">Type</typeparam>
         /// <param name="storeId">Store identifier</param>
         /// <param name="settings">Setting instance</param>
-        public virtual void SaveSetting<T>(T settings, string storeId = "") where T : ISettings, new()
+        public virtual async Task SaveSetting<T>(T settings, string storeId = "") where T : ISettings, new()
         {
             foreach (var prop in typeof(T).GetProperties())
             {
@@ -386,13 +405,13 @@ namespace Grand.Services.Configuration
                 //Duck typing is not supported in C#. That's why we're using dynamic type
                 dynamic value = prop.GetValue(settings, null);
                 if (value != null)
-                    SetSetting(key, value, storeId, false);
+                    await SetSetting(key, value, storeId, false);
                 else
-                    SetSetting(key, "", storeId, false);
+                    await SetSetting(key, "", storeId, false);
             }
 
             //and now clear cache
-            ClearCache();
+            await ClearCache();
         }
 
         /// <summary>
@@ -404,7 +423,7 @@ namespace Grand.Services.Configuration
         /// <param name="keySelector">Key selector</param>
         /// <param name="storeId">Store ID</param>
         /// <param name="clearCache">A value indicating whether to clear cache after setting update</param>
-        public virtual void SaveSetting<T, TPropType>(T settings,
+        public virtual async Task SaveSetting<T, TPropType>(T settings,
             Expression<Func<T, TPropType>> keySelector,
             string storeId = "", bool clearCache = true) where T : ISettings, new()
         {
@@ -428,16 +447,16 @@ namespace Grand.Services.Configuration
             //Duck typing is not supported in C#. That's why we're using dynamic type
             dynamic value = propInfo.GetValue(settings, null);
             if (value != null)
-                SetSetting(key, value, storeId, clearCache);
+                await SetSetting(key, value, storeId, clearCache);
             else
-                SetSetting(key, "", storeId, clearCache);
+                await SetSetting(key, "", storeId, clearCache);
         }
 
         /// <summary>
         /// Delete all settings
         /// </summary>
         /// <typeparam name="T">Type</typeparam>
-        public virtual void DeleteSetting<T>() where T : ISettings, new()
+        public virtual async Task DeleteSetting<T>() where T : ISettings, new()
         {
             var settingsToDelete = new List<Setting>();
             var allSettings = GetAllSettings();
@@ -448,7 +467,7 @@ namespace Grand.Services.Configuration
             }
 
             foreach (var setting in settingsToDelete)
-                DeleteSetting(setting);
+                await DeleteSetting(setting);
         }
 
         /// <summary>
@@ -459,7 +478,7 @@ namespace Grand.Services.Configuration
         /// <param name="settings">Settings</param>
         /// <param name="keySelector">Key selector</param>
         /// <param name="storeId">Store ID</param>
-        public virtual void DeleteSetting<T, TPropType>(T settings,
+        public virtual async Task DeleteSetting<T, TPropType>(T settings,
             Expression<Func<T, TPropType>> keySelector, string storeId = "") where T : ISettings, new()
         {
             string key = settings.GetSettingKey(keySelector);
@@ -471,17 +490,17 @@ namespace Grand.Services.Configuration
             if (settingForCaching != null)
             {
                 //update
-                var setting = GetSettingById(settingForCaching.Id);
-                DeleteSetting(setting);
+                var setting = await GetSettingByIdAsync(settingForCaching.Id);
+                await DeleteSetting(setting);
             }
         }
 
         /// <summary>
         /// Clear cache
         /// </summary>
-        public virtual void ClearCache()
+        public virtual async Task ClearCache()
         {
-            _cacheManager.RemoveByPattern(SETTINGS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(SETTINGS_PATTERN_KEY);
         }
 
         #endregion

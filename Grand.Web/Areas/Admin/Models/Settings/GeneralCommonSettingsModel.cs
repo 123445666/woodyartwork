@@ -33,11 +33,6 @@ namespace Grand.Web.Areas.Admin.Models.Settings
         public DisplayMenuSettingsModel DisplayMenuSettings { get; set; }
         public KnowledgebaseSettingsModel KnowledgebaseSettings { get; set; }
 
-        [GrandResourceDisplayName("Admin.Configuration.Settings.AdminLayout")]
-        public AdminLayout Layout { get; set; }
-        [GrandResourceDisplayName("Admin.Configuration.Settings.GridLayout")]
-        public KendoLayout GridLayout { get; set; }
-
         #region Nested classes
 
         public partial class StoreInformationSettingsModel : BaseGrandModel
@@ -81,10 +76,6 @@ namespace Grand.Web.Areas.Admin.Models.Settings
             [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.YoutubeLink")]
             public string YoutubeLink { get; set; }
             public bool YoutubeLink_OverrideForStore { get; set; }
-
-            [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.GooglePlusLink")]
-            public string GooglePlusLink { get; set; }
-            public bool GooglePlusLink_OverrideForStore { get; set; }
 
             [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.InstagramLink")]
             public string InstagramLink { get; set; }
@@ -161,14 +152,13 @@ namespace Grand.Web.Areas.Admin.Models.Settings
             public bool ConvertNonWesternChars { get; set; }
             public bool ConvertNonWesternChars_OverrideForStore { get; set; }
 
+            [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.SeoCharConversion")]
+            public string SeoCharConversion { get; set; }
+            public bool SeoCharConversion_OverrideForStore { get; set; }
+
             [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.CanonicalUrlsEnabled")]
             public bool CanonicalUrlsEnabled { get; set; }
             public bool CanonicalUrlsEnabled_OverrideForStore { get; set; }
-
-            [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.WwwRequirement")]
-            public int WwwRequirement { get; set; }
-            public bool WwwRequirement_OverrideForStore { get; set; }
-            public SelectList WwwRequirementValues { get; set; }
 
             [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.EnableJsBundling")]
             public bool EnableJsBundling { get; set; }
@@ -218,6 +208,9 @@ namespace Grand.Web.Areas.Admin.Models.Settings
 
             [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.CaptchaShowOnRegistrationPage")]
             public bool CaptchaShowOnRegistrationPage { get; set; }
+
+            [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.CaptchaShowOnPasswordRecoveryPage")]
+            public bool CaptchaShowOnPasswordRecoveryPage { get; set; }
 
             [GrandResourceDisplayName("Admin.Configuration.Settings.GeneralCommon.CaptchaShowOnContactUsPage")]
             public bool CaptchaShowOnContactUsPage { get; set; }

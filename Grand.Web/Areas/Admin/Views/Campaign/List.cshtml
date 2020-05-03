@@ -2,11 +2,11 @@
     //page title
     ViewBag.Title = T("Admin.Promotions.Campaigns").Text;
 }
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
                 <div class="caption">
                     <i class="fa fa-envelope"></i>
                     @T("Admin.Promotions.Campaigns")
@@ -14,12 +14,12 @@
                 <div class="actions btn-group btn-group-devided">
                     <a href="@Url.Action("Create")" class="btn green"><i class="fa fa-plus"></i><span class="hidden-xs"> @T("Admin.Common.AddNew") </span></a>
                 </div>
-
+                <vc:admin-widget widget-zone="campaign_list_buttons" additional-data="null" />
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div class="form-horizontal">
                     <div class="form-body">
-                        <div class="portlet-body">
+                        <div class="x_content">
                             <div id="campaigns-grid"></div>
                         </div>
                     </div>
@@ -69,7 +69,7 @@ $(document).ready(function () {
         columns: [{
             field: "Name",
             title: "@T("Admin.Promotions.Campaigns.Fields.Name")",
-            template: '<a class="k-link" href="Edit/#=Id#">#=Name#</a>',
+            template: '<a class="k-link" href="Edit/#=Id#">#=kendo.htmlEncode(Name)#</a>',
         }, {
             field: "CreatedOn",
             title: "@T("Admin.Promotions.Campaigns.Fields.CreatedOn")",

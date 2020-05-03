@@ -23,11 +23,13 @@
                 <div class="form-fields">
                     <div class="form-group">
                         <label asp-for="Name" class="col-form-label">@T("Vendors.ApplyAccount.Name"):</label>
+                        <span class="required">*</span>
                         <input asp-for="Name" class="form-control name" placeholder="@T("Vendors.ApplyAccount.Name.Hint")" />
                         <span asp-validation-for="Name"></span>
                     </div>
                     <div class="form-group">
                         <label asp-for="Email" class="col-form-label">@T("Vendors.ApplyAccount.Email"):</label>
+                        <span class="required">*</span>
                         <input asp-for="Email" class="form-control name" placeholder="@T("Vendors.ApplyAccount.Email.Hint")" />
                         <span asp-validation-for="Email"></span>
                     </div>
@@ -35,9 +37,13 @@
                         <label asp-for="Description" class="col-form-label">@T("Vendors.ApplyAccount.Description"):</label>
                         <textarea asp-for="Description" class="form-control description"></textarea>
                     </div>
+
                     <div class="form-group">
-                        <label>@T("Vendors.ApplyAccount.Picture"):</label>
-                        <input class="form-control-file" name="uploadedFile" type="file" />
+                        <label class="col-form-label">@T("Vendors.ApplyAccount.Picture"):</label>
+                        <div class="custom-file">
+                            <input class="form-control-file custom-file-input" name="uploadedFile" accept="image/*" aria-describedby="uploadedFileAddon01" type="file" />
+                            <label class="custom-file-label" for="uploadedFile"></label>
+                        </div>
                     </div>
                     @if (Model.DisplayCaptcha)
                     {
@@ -59,6 +65,12 @@
                                             return false;
                                         }
                                     });
+                                    $('#uploadedFile').on('change',function(){
+                                        //get the file name
+                                        var fileName = $(this).val();
+                                        //replace the "Choose a file" label
+                                        $(this).next('.custom-file-label').html(fileName);
+                                    })
                                 });
                         </script>
                         <div class="form-group">
@@ -72,7 +84,7 @@
                                 }
                                 else
                                 {
-                                    <a class="read" id="read-acceptterms" href="@Url.RouteUrl("Topic", new {SeName = Html.GetTopicSeName("VendorTermsOfService") })">@T("Vendors.ApplyAccount.AcceptTermsOfService.Read")</a>
+                                    <a class="read" id="read-acceptterms" href="@Url.RouteUrl("Topic", new {SeName = await Html.GetTopicSeName("VendorTermsOfService", Context) })">@T("Vendors.ApplyAccount.AcceptTermsOfService.Read")</a>
                                 }
                             </label>
 
@@ -85,8 +97,10 @@
                         <partial name="_CreateOrUpdateVendorAddress" model="Model.Address" view-data="dataDictAddress" />
                     }
                 </div>
-                <div class="col-12 buttons pt-1 pb-1">
-                    <input type="submit" id="apply-vendor" class="btn btn-success apply-vendor-button" value="@T("Vendors.ApplyAccount.Button")" />
+                <div class="row">
+                    <div class="col-12 buttons pt-1 pb-1">
+                        <input type="submit" id="apply-vendor" class="btn btn-info apply-vendor-button" value="@T("Vendors.ApplyAccount.Button")" />
+                    </div>
                 </div>
             </form>
         }

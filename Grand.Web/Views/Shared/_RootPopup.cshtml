@@ -5,16 +5,6 @@
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
     <meta name="description" content="@(Html.GrandMetaDescription())" />
     <meta name="keywords" content="@(Html.GrandMetaKeywords())" />
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-136840213-1"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
-
-        gtag('config', 'UA-136840213-1');
-    </script>
-
     @Html.GrandHeadCustom()
     @*This is used so that themes can inject content into the header*@
     <partial name="Head" />

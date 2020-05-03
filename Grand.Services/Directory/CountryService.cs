@@ -5,11 +5,13 @@ using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Directory;
 using Grand.Services.Events;
 using Grand.Services.Localization;
+using MediatR;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Directory
 {
@@ -28,19 +30,44 @@ namespace Grand.Services.Directory
         /// {1} : show hidden records?
         /// </remarks>
         private const string COUNTRIES_ALL_KEY = "Grand.country.all-{0}-{1}";
+
+        /// <summary>
+        /// key for caching by country id
+        /// </summary>
+        /// <remarks>
+        /// {0} : country ID
+        /// </remarks>
+        private static string COUNTRIES_BY_KEY = "Grand.country.id-{0}";
+
+        /// <summary>
+        /// key for caching by country id
+        /// </summary>
+        /// <remarks>
+        /// {0} : twoletter
+        /// </remarks>
+        private static string COUNTRIES_BY_TWOLETTER = "Grand.country.twoletter-{0}";
+
+        /// <summary>
+        /// key for caching by country id
+        /// </summary>
+        /// <remarks>
+        /// {0} : threeletter
+        /// </remarks>
+        private static string COUNTRIES_BY_THREELETTER = "Grand.country.threeletter-{0}";
+
         /// <summary>
         /// Key pattern to clear cache
         /// </summary>
         private const string COUNTRIES_PATTERN_KEY = "Grand.country.";
 
         #endregion
-        
+
         #region Fields
 
         private readonly IRepository<Country> _countryRepository;
         private readonly IStoreContext _storeContext;
         private readonly CatalogSettings _catalogSettings;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
         private readonly ICacheManager _cacheManager;
 
         #endregion
@@ -52,21 +79,20 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="cacheManager">Cache manager</param>
         /// <param name="countryRepository">Country repository</param>
-        /// <param name="storeMappingRepository">Store mapping repository</param>
         /// <param name="storeContext">Store context</param>
         /// <param name="catalogSettings">Catalog settings</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public CountryService(ICacheManager cacheManager,
             IRepository<Country> countryRepository,
             IStoreContext storeContext,
             CatalogSettings catalogSettings,
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
-            this._cacheManager = cacheManager;
-            this._countryRepository = countryRepository;
-            this._storeContext = storeContext;
-            this._catalogSettings = catalogSettings;
-            this._eventPublisher = eventPublisher;
+            _cacheManager = cacheManager;
+            _countryRepository = countryRepository;
+            _storeContext = storeContext;
+            _catalogSettings = catalogSettings;
+            _mediator = mediator;
         }
 
         #endregion
@@ -77,17 +103,17 @@ namespace Grand.Services.Directory
         /// Deletes a country
         /// </summary>
         /// <param name="country">Country</param>
-        public virtual void DeleteCountry(Country country)
+        public virtual async Task DeleteCountry(Country country)
         {
             if (country == null)
                 throw new ArgumentNullException("country");
 
-            _countryRepository.Delete(country);
+            await _countryRepository.DeleteAsync(country);
 
-            _cacheManager.RemoveByPattern(COUNTRIES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(COUNTRIES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(country);
+            await _mediator.EntityDeleted(country);
         }
 
         /// <summary>
@@ -96,11 +122,11 @@ namespace Grand.Services.Directory
         /// <param name="languageId">Language identifier. It's used to sort countries by localized names (if specified); pass 0 to skip it</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Countries</returns>
-        public virtual IList<Country> GetAllCountries(string languageId = "", bool showHidden = false)
+        public virtual async Task<IList<Country>> GetAllCountries(string languageId = "", bool showHidden = false)
         {
             string key = string.Format(COUNTRIES_ALL_KEY, languageId, showHidden);
 
-            return _cacheManager.Get(key, () =>
+            return await _cacheManager.GetAsync(key, async () =>
             {
                 var builder = Builders<Country>.Filter;
                 var filter = builder.Empty;
@@ -114,7 +140,7 @@ namespace Grand.Services.Directory
                     var currentStoreId = new List<string> { _storeContext.CurrentStore.Id };
                     filter = filter & (builder.AnyIn(x => x.Stores, currentStoreId) | builder.Where(x => !x.LimitedToStores));
                 }
-                var countries = _countryRepository.Collection.Find(filter).SortBy(x => x.DisplayOrder).ThenBy(x=>x.Name).ToList();
+                var countries = await _countryRepository.Collection.Find(filter).SortBy(x => x.DisplayOrder).ThenBy(x => x.Name).ToListAsync();
                 if (!string.IsNullOrEmpty(languageId))
                 {
                     //we should sort countries by localized names when they have the same display order
@@ -133,9 +159,10 @@ namespace Grand.Services.Directory
         /// <param name="languageId">Language identifier. It's used to sort countries by localized names (if specified); pass 0 to skip it</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Countries</returns>
-        public virtual IList<Country> GetAllCountriesForBilling(string languageId = "", bool showHidden = false)
+        public virtual async Task<IList<Country>> GetAllCountriesForBilling(string languageId = "", bool showHidden = false)
         {
-            return GetAllCountries(languageId, showHidden).Where(c => c.AllowsBilling).ToList();
+            var countries = await GetAllCountries(languageId, showHidden);
+            return countries.Where(c => c.AllowsBilling).ToList();
         }
 
         /// <summary>
@@ -144,9 +171,10 @@ namespace Grand.Services.Directory
         /// <param name="languageId">Language identifier. It's used to sort countries by localized names (if specified); pass 0 to skip it</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Countries</returns>
-        public virtual IList<Country> GetAllCountriesForShipping(string languageId = "", bool showHidden = false)
+        public virtual async Task<IList<Country>> GetAllCountriesForShipping(string languageId = "", bool showHidden = false)
         {
-            return GetAllCountries(languageId, showHidden).Where(c => c.AllowsShipping).ToList();
+            var countries = await GetAllCountries(languageId, showHidden);
+            return countries.Where(c => c.AllowsShipping).ToList();
         }
 
         /// <summary>
@@ -154,12 +182,13 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="countryId">Country identifier</param>
         /// <returns>Country</returns>
-        public virtual Country GetCountryById(string countryId)
+        public virtual async Task<Country> GetCountryById(string countryId)
         {
-            if (String.IsNullOrEmpty(countryId))
+            if (string.IsNullOrEmpty(countryId))
                 return null;
 
-            return _countryRepository.GetById(countryId);
+            var key = string.Format(COUNTRIES_BY_KEY, countryId);
+            return await _cacheManager.GetAsync(key, () => _countryRepository.GetByIdAsync(countryId));
         }
 
         /// <summary>
@@ -167,7 +196,7 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="countryIds">Country identifiers</param>
         /// <returns>Countries</returns>
-        public virtual IList<Country> GetCountriesByIds(string[] countryIds)
+        public virtual async Task<IList<Country>> GetCountriesByIds(string[] countryIds)
         {
             if (countryIds == null || countryIds.Length == 0)
                 return new List<Country>();
@@ -175,7 +204,7 @@ namespace Grand.Services.Directory
             var query = from c in _countryRepository.Table
                         where countryIds.Contains(c.Id)
                         select c;
-            var countries = query.ToList();
+            var countries = await query.ToListAsync();
             //sort by passed identifiers
             var sortedCountries = new List<Country>();
             foreach (string id in countryIds)
@@ -192,13 +221,14 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="twoLetterIsoCode">Country two letter ISO code</param>
         /// <returns>Country</returns>
-        public virtual Country GetCountryByTwoLetterIsoCode(string twoLetterIsoCode)
+        public virtual Task<Country> GetCountryByTwoLetterIsoCode(string twoLetterIsoCode)
         {
-            if (String.IsNullOrEmpty(twoLetterIsoCode))
-                return null;
-
-            var filter = Builders<Country>.Filter.Eq(x => x.TwoLetterIsoCode, twoLetterIsoCode);
-            return _countryRepository.Collection.Find(filter).FirstOrDefault();
+            var key = string.Format(COUNTRIES_BY_TWOLETTER, twoLetterIsoCode);
+            return _cacheManager.GetAsync(key, () =>
+            {
+                var filter = Builders<Country>.Filter.Eq(x => x.TwoLetterIsoCode, twoLetterIsoCode);
+                return _countryRepository.Collection.Find(filter).FirstOrDefaultAsync();
+            });
         }
 
         /// <summary>
@@ -206,47 +236,48 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="threeLetterIsoCode">Country three letter ISO code</param>
         /// <returns>Country</returns>
-        public virtual Country GetCountryByThreeLetterIsoCode(string threeLetterIsoCode)
+        public virtual Task<Country> GetCountryByThreeLetterIsoCode(string threeLetterIsoCode)
         {
-            if (String.IsNullOrEmpty(threeLetterIsoCode))
-                return null;
-
-            var filter = Builders<Country>.Filter.Eq(x => x.ThreeLetterIsoCode, threeLetterIsoCode);
-            return _countryRepository.Collection.Find(filter).FirstOrDefault();
+            var key = string.Format(COUNTRIES_BY_THREELETTER, threeLetterIsoCode);
+            return _cacheManager.GetAsync(key, () =>
+            {
+                var filter = Builders<Country>.Filter.Eq(x => x.ThreeLetterIsoCode, threeLetterIsoCode);
+                return _countryRepository.Collection.Find(filter).FirstOrDefaultAsync();
+            });
         }
 
         /// <summary>
         /// Inserts a country
         /// </summary>
         /// <param name="country">Country</param>
-        public virtual void InsertCountry(Country country)
+        public virtual async Task InsertCountry(Country country)
         {
             if (country == null)
                 throw new ArgumentNullException("country");
 
-            _countryRepository.Insert(country);
+            await _countryRepository.InsertAsync(country);
 
-            _cacheManager.RemoveByPattern(COUNTRIES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(COUNTRIES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(country);
+            await _mediator.EntityInserted(country);
         }
 
         /// <summary>
         /// Updates the country
         /// </summary>
         /// <param name="country">Country</param>
-        public virtual void UpdateCountry(Country country)
+        public virtual async Task UpdateCountry(Country country)
         {
             if (country == null)
                 throw new ArgumentNullException("country");
 
-            _countryRepository.Update(country);
+            await _countryRepository.UpdateAsync(country);
 
-            _cacheManager.RemoveByPattern(COUNTRIES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(COUNTRIES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(country);
+            await _mediator.EntityUpdated(country);
         }
 
         #endregion

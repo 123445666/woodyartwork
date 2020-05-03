@@ -1,44 +1,26 @@
 ﻿@model MessageTemplateModel
-@inject IEventPublisher eventPublisher
+
 <div asp-validation-summary="All"></div>
 <input asp-for="Id" type="hidden" />
-<script>
-    $(document).ready(function () {
-        $("#template-edit").show();
-        $("#template-edit").kendoTabStrip({
-            animation: {
-                open: {
-                    effects: "fadeIn"
-                }
-            },
-            select: tabstrip_on_tab_select
-        });
-    });
-</script>
-<div id="template-edit" style="display:none">
-    <ul>
-        <li @Html.RenderSelectedTabIndex(0, GetSelectedTabIndex())>
-            @T("Admin.ContentManagement.MessageTemplates.Info")
-        </li>
-        <li @Html.RenderSelectedTabIndex(1, GetSelectedTabIndex())>
-            @T("Admin.ContentManagement.MessageTemplates.Stores")
-        </li>
-    </ul>
-    <div>
-        @Html.Partial("_CreateOrUpdate.TabInfo", Model)
-    </div>
-    <div>
-        @Html.Partial("_CreateOrUpdate.TabStores", Model)
-    </div>
-</div>
-@{
-    //custom tabs
-    var eventMessage = new AdminTabStripCreated(this.Html, "template-edit");
-    eventPublisher.Publish(eventMessage);
-    foreach (var eventBlock in eventMessage.BlocksToRender)
-    {
-        @eventBlock
-    }
-}
-@*save selected tab index*@
-<input type="hidden" id="selected-tab-index" name="selected-tab-index" value="@(GetSelectedTabIndex())">
+<vc:admin-widget widget-zone="message_template_details_top" additional-data="Model" />
+
+<admin-tabstrip name="template-edit">
+    <items>
+        <tabstrip-item text="@T("Admin.ContentManagement.MessageTemplates.Info")" tab-index="0">
+            <content>
+                <div>
+                    <partial name="_CreateOrUpdate.TabInfo" model="Model" />
+                </div>
+            </content>
+        </tabstrip-item>
+        <tabstrip-item text="@T("Admin.ContentManagement.MessageTemplates.Stores")" tab-index="1">
+            <content>
+                <div>
+                    <partial name="_TabStores" model="Model" />
+                </div>
+            </content>
+        </tabstrip-item>
+        <vc:admin-widget widget-zone="messagetemplate_details_tabs" additional-data="Model" />
+    </items>
+</admin-tabstrip>
+<vc:admin-widget widget-zone="message_template_details_bottom" additional-data="Model" />

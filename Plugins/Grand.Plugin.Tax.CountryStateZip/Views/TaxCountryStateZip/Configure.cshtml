@@ -126,7 +126,7 @@
             $.ajax({
                 cache: false,
                 type: "GET",
-                url: "@(Url.Action("GetStatesByCountryId", "Country", new RouteValueDictionary { { "area", "Admin" } }))",
+                url: "@(Url.Action("GetStatesByCountryId", "Home", new RouteValueDictionary { { "area", "Admin" } }))",
                 data: { "countryId": selectedItem, "addAsterisk": "true" },
                 success: function(data) {
                     ddlStates.html('');
@@ -142,7 +142,7 @@
     });
 </script>
 <form asp-controller="TaxCountryStateZip" asp-action="Configure" method="post">
-    <antiforgery-token />
+    
     <div class="form-horizontal">
         <div class="form-body">
             <div class="form-group">

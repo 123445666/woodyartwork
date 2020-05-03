@@ -143,6 +143,13 @@ namespace Grand.Web.Areas.Admin.Models.Settings
         public bool NewProductsEnabled { get; set; }
         public bool NewProductsEnabled_OverrideForStore { get; set; }
 
+        [GrandResourceDisplayName("Admin.Configuration.Settings.Catalog.NewProductsNumberOnHomePage")]
+        public int NewProductsNumberOnHomePage { get; set; }
+        public bool NewProductsNumberOnHomePage_OverrideForStore { get; set; }
+
+        [GrandResourceDisplayName("Admin.Configuration.Settings.Catalog.NewProductsOnHomePage")]
+        public bool NewProductsOnHomePage { get; set; }
+        public bool NewProductsOnHomePage_OverrideForStore { get; set; }
 
         [GrandResourceDisplayName("Admin.Configuration.Settings.Catalog.CompareProductsEnabled")]
         public bool CompareProductsEnabled { get; set; }
@@ -240,9 +247,10 @@ namespace Grand.Web.Areas.Admin.Models.Settings
         public bool IgnoreFilterableAvailableStartEndDateTime { get; set; }
         public bool IgnoreFilterableAvailableStartEndDateTime_OverrideForStore { get; set; }
 
-        [GrandResourceDisplayName("Admin.Configuration.Settings.Catalog.CacheProductPrices")]
-        public bool CacheProductPrices { get; set; }
-        public bool CacheProductPrices_OverrideForStore { get; set; }
+      
+        [GrandResourceDisplayName("Admin.Configuration.Settings.Catalog.CustomerProductPrice")]
+        public bool CustomerProductPrice { get; set; }
+        public bool CustomerProductPrice_OverrideForStore { get; set; }
 
         [GrandResourceDisplayName("Admin.Configuration.Settings.Catalog.ManufacturersBlockItemsToDisplay")]
         public int ManufacturersBlockItemsToDisplay { get; set; }

@@ -31,8 +31,6 @@ using Grand.Core.Domain.Tax;
 using Grand.Core.Domain.Topics;
 using Grand.Core.Domain.Vendors;
 using Grand.Core.Infrastructure;
-using Grand.Data;
-using Grand.Services.Catalog;
 using Grand.Services.Common;
 using Grand.Services.Configuration;
 using Grand.Services.Customers;
@@ -41,11 +39,13 @@ using Grand.Services.Localization;
 using Grand.Services.Media;
 using Grand.Services.Seo;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Installation
 {
@@ -57,15 +57,11 @@ namespace Grand.Services.Installation
         private readonly IRepository<Bid> _bidRepository;
         private readonly IRepository<Address> _addressRepository;
         private readonly IRepository<Affiliate> _affiliateRepository;
-        private readonly IRepository<BlogComment> _blogcommentRepository;
-        private readonly IRepository<BlogPost> _blogpostRepository;
-        private readonly IRepository<Campaign> _campaignRepository;
         private readonly IRepository<CampaignHistory> _campaignHistoryRepository;
-        private readonly IRepository<Download> _downloadRepository;
-        private readonly IRepository<GiftCard> _giftcardRepository;
         private readonly IRepository<Order> _orderRepository;
         private readonly IRepository<OrderNote> _orderNoteRepository;
-        private readonly IRepository<ReturnRequest> _returnrequestRepository;
+        private readonly IRepository<ReturnRequest> _returnRequestRepository;
+        private readonly IRepository<ReturnRequestNote> _returnRequestNoteRepository;
         private readonly IRepository<Store> _storeRepository;
         private readonly IRepository<MeasureDimension> _measureDimensionRepository;
         private readonly IRepository<MeasureWeight> _measureWeightRepository;
@@ -83,6 +79,7 @@ namespace Grand.Services.Installation
         private readonly IRepository<CustomerTagProduct> _customerTagProductRepository;
         private readonly IRepository<CustomerHistoryPassword> _customerHistoryPasswordRepository;
         private readonly IRepository<CustomerNote> _customerNoteRepository;
+        private readonly IRepository<UserApi> _userapiRepository;
         private readonly IRepository<SpecificationAttribute> _specificationAttributeRepository;
         private readonly IRepository<CheckoutAttribute> _checkoutAttributeRepository;
         private readonly IRepository<ProductAttribute> _productAttributeRepository;
@@ -92,16 +89,12 @@ namespace Grand.Services.Installation
         private readonly IRepository<Product> _productRepository;
         private readonly IRepository<ProductReservation> _productReservationRepository;
         private readonly IRepository<ProductAlsoPurchased> _productalsopurchasedRepository;
-        private readonly IRepository<Picture> _pictureRepository;
         private readonly IRepository<UrlRecord> _urlRecordRepository;
         private readonly IRepository<EmailAccount> _emailAccountRepository;
         private readonly IRepository<MessageTemplate> _messageTemplateRepository;
         private readonly IRepository<ForumGroup> _forumGroupRepository;
         private readonly IRepository<Forum> _forumRepository;
-        private readonly IRepository<ForumPost> _forumpostRepository;
-        private readonly IRepository<ForumTopic> _forumtopicRepository;
         private readonly IRepository<ForumPostVote> _forumPostVote;
-        private readonly IRepository<ForumSubscription> _forumsubscriptionRepository;
         private readonly IRepository<Country> _countryRepository;
         private readonly IRepository<StateProvince> _stateProvinceRepository;
         private readonly IRepository<Discount> _discountRepository;
@@ -112,11 +105,9 @@ namespace Grand.Services.Installation
         private readonly IRepository<NewsItem> _newsItemRepository;
         private readonly IRepository<NewsLetterSubscription> _newslettersubscriptionRepository;
         private readonly IRepository<Poll> _pollRepository;
-        private readonly IRepository<PrivateMessage> _privatemessageRepository;
         private readonly IRepository<ShippingMethod> _shippingMethodRepository;
         private readonly IRepository<DeliveryDate> _deliveryDateRepository;
         private readonly IRepository<ActivityLogType> _activityLogTypeRepository;
-        private readonly IRepository<ActivityLog> _activityLogRepository;
         private readonly IRepository<ProductTag> _productTagRepository;
         private readonly IRepository<ProductReview> _productReviewRepository;
         private readonly IRepository<ProductTemplate> _productTemplateRepository;
@@ -124,7 +115,6 @@ namespace Grand.Services.Installation
         private readonly IRepository<ManufacturerTemplate> _manufacturerTemplateRepository;
         private readonly IRepository<TopicTemplate> _topicTemplateRepository;
         private readonly IRepository<ScheduleTask> _scheduleTaskRepository;
-        private readonly IRepository<QueuedEmail> _queuedemailRepository;
         private readonly IRepository<RewardPointsHistory> _rewardpointshistoryRepository;
         private readonly IRepository<SearchTerm> _searchtermRepository;
         private readonly IRepository<Setting> _settingRepository;
@@ -139,219 +129,107 @@ namespace Grand.Services.Installation
         private readonly IRepository<CustomerAction> _customerAction;
         private readonly IRepository<CustomerActionType> _customerActionType;
         private readonly IRepository<CustomerActionHistory> _customerActionHistory;
-        private readonly IRepository<Banner> _banner;
         private readonly IRepository<PopupArchive> _popupArchive;
-        private readonly IRepository<CustomerReminder> _customerReminder;
         private readonly IRepository<CustomerReminderHistory> _customerReminderHistoryRepository;
         private readonly IRepository<RecentlyViewedProduct> _recentlyViewedProductRepository;
         private readonly IRepository<KnowledgebaseArticle> _knowledgebaseArticleRepository;
         private readonly IRepository<KnowledgebaseCategory> _knowledgebaseCategoryRepository;
-        private readonly ICustomerActionService _customerActionService;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly IWebHelper _webHelper;
-
-        private readonly IHostingEnvironment _hostingEnvironment;
+        private readonly IWebHostEnvironment _hostingEnvironment;
+        private readonly IServiceProvider _serviceProvider;
 
         #endregion
 
         #region Ctor
 
-        public CodeFirstInstallationService(
-            IRepository<GrandNodeVersion> versionRepository,
-            IRepository<Bid> bidRepository,
-            IRepository<Address> addressRepository,
-            IRepository<Affiliate> affiliateRepository,
-            IRepository<BlogComment> blogcommentRepository,
-            IRepository<BlogPost> blogpostRepository,
-            IRepository<Campaign> campaignRepository,
-            IRepository<CampaignHistory> campaignHistoryRepository,
-            IRepository<Download> downloadRepository,
-            IRepository<GiftCard> giftcardRepository,
-            IRepository<Order> orderRepository,
-            IRepository<OrderNote> orderNoteRepository,
-            IRepository<Store> storeRepository,
-            IRepository<MeasureDimension> measureDimensionRepository,
-            IRepository<MeasureWeight> measureWeightRepository,
-            IRepository<MeasureUnit> measureUnitRepository,
-            IRepository<TaxCategory> taxCategoryRepository,
-            IRepository<Language> languageRepository,
-            IRepository<LocaleStringResource> lsrRepository,
-            IRepository<Log> logRepository,
-            IRepository<Currency> currencyRepository,
-            IRepository<Customer> customerRepository,
-            IRepository<CustomerRole> customerRoleRepository,
-            IRepository<CustomerRoleProduct> customerRoleProductRepository,
-            IRepository<CustomerProduct> customerProductRepository,
-            IRepository<CustomerProductPrice> customerProductPriceRepository,
-            IRepository<CustomerTagProduct> customerTagProductRepository,
-            IRepository<CustomerHistoryPassword> customerHistoryPasswordRepository,
-            IRepository<CustomerNote> customerNoteRepository,
-            IRepository<SpecificationAttribute> specificationAttributeRepository,
-            IRepository<CheckoutAttribute> checkoutAttributeRepository,
-            IRepository<ProductAttribute> productAttributeRepository,
-            IRepository<Category> categoryRepository,
-            IRepository<Manufacturer> manufacturerRepository,
-            IRepository<Product> productRepository,
-            IRepository<ProductReservation> productReservationRepository,
-            IRepository<ProductAlsoPurchased> productalsopurchasedRepository,
-            IRepository<Picture> pictureRepository,
-            IRepository<UrlRecord> urlRecordRepository,
-            IRepository<EmailAccount> emailAccountRepository,
-            IRepository<MessageTemplate> messageTemplateRepository,
-            IRepository<ForumGroup> forumGroupRepository,
-            IRepository<Forum> forumRepository,
-            IRepository<ForumPost> forumpostRepository,
-            IRepository<ForumTopic> forumtopicRepository,
-            IRepository<ForumPostVote> forumPostVote,
-            IRepository<ForumSubscription> forumsubscriptionRepository,
-            IRepository<Country> countryRepository,
-            IRepository<StateProvince> stateProvinceRepository,
-            IRepository<Discount> discountRepository,
-            IRepository<DiscountCoupon> discountCouponRepository,
-            IRepository<BlogPost> blogPostRepository,
-            IRepository<Topic> topicRepository,
-            IRepository<NewsItem> newsItemRepository,
-            IRepository<NewsLetterSubscription> newslettersubscriptionRepository,
-            IRepository<Poll> pollRepository,
-            IRepository<PrivateMessage> privatemessageRepository,
-            IRepository<ShippingMethod> shippingMethodRepository,
-            IRepository<DeliveryDate> deliveryDateRepository,
-            IRepository<ActivityLogType> activityLogTypeRepository,
-            IRepository<ActivityLog> activityLogRepository,
-            IRepository<ProductReview> productReviewRepository,
-            IRepository<ProductTag> productTagRepository,
-            IRepository<ProductTemplate> productTemplateRepository,
-            IRepository<CategoryTemplate> categoryTemplateRepository,
-            IRepository<ManufacturerTemplate> manufacturerTemplateRepository,
-            IRepository<TopicTemplate> topicTemplateRepository,
-            IRepository<ScheduleTask> scheduleTaskRepository,
-            IRepository<QueuedEmail> queuedemailRepository,
-            IRepository<ReturnRequest> returnrequestRepository,
-            IRepository<RewardPointsHistory> rewardpointshistoryRepository,
-            IRepository<SearchTerm> searchtermRepository,
-            IRepository<Setting> settingRepository,
-            IRepository<Shipment> shipmentRepository,
-            IRepository<Warehouse> warehouseRepository,
-            IRepository<PickupPoint> pickupPointsRepository,
-            IRepository<PermissionRecord> permissionRepository,
-            IRepository<Vendor> vendorRepository,
-            IRepository<ExternalAuthenticationRecord> externalAuthenticationRepository,
-            IRepository<DiscountUsageHistory> discountusageRepository,
-            IRepository<ReturnRequestReason> returnRequestReasonRepository,
-            IRepository<ReturnRequestAction> returnRequestActionRepository,
-            IRepository<ContactUs> contactUsRepository,
-            IRepository<CustomerAction> customerAction,
-            IRepository<CustomerActionType> customerActionType,
-            IRepository<CustomerActionHistory> customerActionHistory,
-            IRepository<Banner> banner,
-            IRepository<PopupArchive> popupArchive,
-            IRepository<CustomerReminder> customerReminder,
-            IRepository<CustomerReminderHistory> customerReminderHistoryRepository,
-            IRepository<RecentlyViewedProduct> recentlyViewedProductRepository,
-            IRepository<KnowledgebaseArticle> knowledgebaseArticleRepository,
-            IRepository<KnowledgebaseCategory> knowledgebaseCategoryRepository,
-            IGenericAttributeService genericAttributeService,
-            ICustomerActionService customerActionService,
-            IWebHelper webHelper,
-            IHostingEnvironment hostingEnvironment)
+        public CodeFirstInstallationService(IServiceProvider serviceProvider)
         {
-            this._versionRepository = versionRepository;
-            this._bidRepository = bidRepository;
-            this._addressRepository = addressRepository;
-            this._affiliateRepository = affiliateRepository;
-            this._blogcommentRepository = blogcommentRepository;
-            this._blogpostRepository = blogpostRepository;
-            this._campaignRepository = campaignRepository;
-            this._campaignHistoryRepository = campaignHistoryRepository;
-            this._downloadRepository = downloadRepository;
-            this._orderRepository = orderRepository;
-            this._orderNoteRepository = orderNoteRepository;
-            this._giftcardRepository = giftcardRepository;
-            this._storeRepository = storeRepository;
-            this._measureDimensionRepository = measureDimensionRepository;
-            this._measureWeightRepository = measureWeightRepository;
-            this._measureUnitRepository = measureUnitRepository;
-            this._taxCategoryRepository = taxCategoryRepository;
-            this._languageRepository = languageRepository;
-            this._lsrRepository = lsrRepository;
-            this._logRepository = logRepository;
-            this._currencyRepository = currencyRepository;
-            this._customerRepository = customerRepository;
-            this._customerRoleRepository = customerRoleRepository;
-            this._customerProductRepository = customerProductRepository;
-            this._customerProductPriceRepository = customerProductPriceRepository;
-            this._customerRoleProductRepository = customerRoleProductRepository;
-            this._customerTagProductRepository = customerTagProductRepository;
-            this._customerHistoryPasswordRepository = customerHistoryPasswordRepository;
-            this._customerNoteRepository = customerNoteRepository;
-            this._specificationAttributeRepository = specificationAttributeRepository;
-            this._checkoutAttributeRepository = checkoutAttributeRepository;
-            this._productAttributeRepository = productAttributeRepository;
-            this._categoryRepository = categoryRepository;
-            this._manufacturerRepository = manufacturerRepository;
-            this._productRepository = productRepository;
-            this._productReservationRepository = productReservationRepository;
-            this._pictureRepository = pictureRepository;
-            this._productalsopurchasedRepository = productalsopurchasedRepository;
-            this._urlRecordRepository = urlRecordRepository;
-            this._emailAccountRepository = emailAccountRepository;
-            this._messageTemplateRepository = messageTemplateRepository;
-            this._forumGroupRepository = forumGroupRepository;
-            this._forumRepository = forumRepository;
-            this._forumpostRepository = forumpostRepository;
-            this._forumtopicRepository = forumtopicRepository;
-            this._forumsubscriptionRepository = forumsubscriptionRepository;
-            this._forumPostVote = forumPostVote;
-            this._countryRepository = countryRepository;
-            this._stateProvinceRepository = stateProvinceRepository;
-            this._discountRepository = discountRepository;
-            this._discountCouponRepository = discountCouponRepository;
-            this._blogPostRepository = blogPostRepository;
-            this._topicRepository = topicRepository;
-            this._productReviewRepository = productReviewRepository;
-            this._newsItemRepository = newsItemRepository;
-            this._newslettersubscriptionRepository = newslettersubscriptionRepository;
-            this._pollRepository = pollRepository;
-            this._privatemessageRepository = privatemessageRepository;
-            this._shippingMethodRepository = shippingMethodRepository;
-            this._deliveryDateRepository = deliveryDateRepository;
-            this._activityLogTypeRepository = activityLogTypeRepository;
-            this._activityLogRepository = activityLogRepository;
-            this._productTagRepository = productTagRepository;
-            this._productTemplateRepository = productTemplateRepository;
-            this._recentlyViewedProductRepository = recentlyViewedProductRepository;
-            this._categoryTemplateRepository = categoryTemplateRepository;
-            this._manufacturerTemplateRepository = manufacturerTemplateRepository;
-            this._topicTemplateRepository = topicTemplateRepository;
-            this._scheduleTaskRepository = scheduleTaskRepository;
-            this._queuedemailRepository = queuedemailRepository;
-            this._returnrequestRepository = returnrequestRepository;
-            this._rewardpointshistoryRepository = rewardpointshistoryRepository;
-            this._searchtermRepository = searchtermRepository;
-            this._settingRepository = settingRepository;
-            this._shipmentRepository = shipmentRepository;
-            this._warehouseRepository = warehouseRepository;
-            this._pickupPointsRepository = pickupPointsRepository;
-            this._permissionRepository = permissionRepository;
-            this._vendorRepository = vendorRepository;
-            this._externalAuthenticationRepository = externalAuthenticationRepository;
-            this._discountusageRepository = discountusageRepository;
-            this._returnRequestReasonRepository = returnRequestReasonRepository;
-            this._contactUsRepository = contactUsRepository;
-            this._returnRequestActionRepository = returnRequestActionRepository;
-            this._customerAction = customerAction;
-            this._customerActionType = customerActionType;
-            this._customerActionHistory = customerActionHistory;
-            this._customerReminder = customerReminder;
-            this._customerReminderHistoryRepository = customerReminderHistoryRepository;
-            this._knowledgebaseArticleRepository = knowledgebaseArticleRepository;
-            this._knowledgebaseCategoryRepository = knowledgebaseCategoryRepository;
-            this._banner = banner;
-            this._popupArchive = popupArchive;
-            this._genericAttributeService = genericAttributeService;
-            this._customerActionService = customerActionService;
-            this._webHelper = webHelper;
-            this._hostingEnvironment = hostingEnvironment;
+            _versionRepository = serviceProvider.GetRequiredService<IRepository<GrandNodeVersion>>();
+            _bidRepository = serviceProvider.GetRequiredService<IRepository<Bid>>();
+            _addressRepository = serviceProvider.GetRequiredService<IRepository<Address>>();
+            _affiliateRepository = serviceProvider.GetRequiredService<IRepository<Affiliate>>();
+            _campaignHistoryRepository = serviceProvider.GetRequiredService<IRepository<CampaignHistory>>();
+            _orderRepository = serviceProvider.GetRequiredService<IRepository<Order>>();
+            _orderNoteRepository = serviceProvider.GetRequiredService<IRepository<OrderNote>>();
+            _storeRepository = serviceProvider.GetRequiredService<IRepository<Store>>();
+            _measureDimensionRepository = serviceProvider.GetRequiredService<IRepository<MeasureDimension>>();
+            _measureWeightRepository = serviceProvider.GetRequiredService<IRepository<MeasureWeight>>();
+            _measureUnitRepository = serviceProvider.GetRequiredService<IRepository<MeasureUnit>>();
+            _taxCategoryRepository = serviceProvider.GetRequiredService<IRepository<TaxCategory>>();
+            _languageRepository = serviceProvider.GetRequiredService<IRepository<Language>>();
+            _lsrRepository = serviceProvider.GetRequiredService<IRepository<LocaleStringResource>>();
+            _logRepository = serviceProvider.GetRequiredService<IRepository<Log>>();
+            _currencyRepository = serviceProvider.GetRequiredService<IRepository<Currency>>();
+            _customerRepository = serviceProvider.GetRequiredService<IRepository<Customer>>();
+            _customerRoleRepository = serviceProvider.GetRequiredService<IRepository<CustomerRole>>();
+            _customerProductRepository = serviceProvider.GetRequiredService<IRepository<CustomerProduct>>();
+            _customerProductPriceRepository = serviceProvider.GetRequiredService<IRepository<CustomerProductPrice>>();
+            _customerRoleProductRepository = serviceProvider.GetRequiredService<IRepository<CustomerRoleProduct>>();
+            _customerTagProductRepository = serviceProvider.GetRequiredService<IRepository<CustomerTagProduct>>();
+            _customerHistoryPasswordRepository = serviceProvider.GetRequiredService<IRepository<CustomerHistoryPassword>>();
+            _customerNoteRepository = serviceProvider.GetRequiredService<IRepository<CustomerNote>>();
+            _userapiRepository = serviceProvider.GetRequiredService<IRepository<UserApi>>();
+            _specificationAttributeRepository = serviceProvider.GetRequiredService<IRepository<SpecificationAttribute>>();
+            _checkoutAttributeRepository = serviceProvider.GetRequiredService<IRepository<CheckoutAttribute>>();
+            _productAttributeRepository = serviceProvider.GetRequiredService<IRepository<ProductAttribute>>();
+            _categoryRepository = serviceProvider.GetRequiredService<IRepository<Category>>();
+            _manufacturerRepository = serviceProvider.GetRequiredService<IRepository<Manufacturer>>();
+            _productRepository = serviceProvider.GetRequiredService<IRepository<Product>>();
+            _productReservationRepository = serviceProvider.GetRequiredService<IRepository<ProductReservation>>();
+            _productalsopurchasedRepository = serviceProvider.GetRequiredService<IRepository<ProductAlsoPurchased>>();
+            _urlRecordRepository = serviceProvider.GetRequiredService<IRepository<UrlRecord>>();
+            _emailAccountRepository = serviceProvider.GetRequiredService<IRepository<EmailAccount>>();
+            _messageTemplateRepository = serviceProvider.GetRequiredService<IRepository<MessageTemplate>>();
+            _forumGroupRepository = serviceProvider.GetRequiredService<IRepository<ForumGroup>>();
+            _forumRepository = serviceProvider.GetRequiredService<IRepository<Forum>>();
+            _forumPostVote = serviceProvider.GetRequiredService<IRepository<ForumPostVote>>();
+            _countryRepository = serviceProvider.GetRequiredService<IRepository<Country>>();
+            _stateProvinceRepository = serviceProvider.GetRequiredService<IRepository<StateProvince>>();
+            _discountRepository = serviceProvider.GetRequiredService<IRepository<Discount>>();
+            _discountCouponRepository = serviceProvider.GetRequiredService<IRepository<DiscountCoupon>>();
+            _blogPostRepository = serviceProvider.GetRequiredService<IRepository<BlogPost>>();
+            _topicRepository = serviceProvider.GetRequiredService<IRepository<Topic>>();
+            _productReviewRepository = serviceProvider.GetRequiredService<IRepository<ProductReview>>();
+            _newsItemRepository = serviceProvider.GetRequiredService<IRepository<NewsItem>>();
+            _newslettersubscriptionRepository = serviceProvider.GetRequiredService<IRepository<NewsLetterSubscription>>();
+            _pollRepository = serviceProvider.GetRequiredService<IRepository<Poll>>();
+            _shippingMethodRepository = serviceProvider.GetRequiredService<IRepository<ShippingMethod>>();
+            _deliveryDateRepository = serviceProvider.GetRequiredService<IRepository<DeliveryDate>>();
+            _activityLogTypeRepository = serviceProvider.GetRequiredService<IRepository<ActivityLogType>>();
+            _productTagRepository = serviceProvider.GetRequiredService<IRepository<ProductTag>>();
+            _productTemplateRepository = serviceProvider.GetRequiredService<IRepository<ProductTemplate>>();
+            _recentlyViewedProductRepository = serviceProvider.GetRequiredService<IRepository<RecentlyViewedProduct>>();
+            _categoryTemplateRepository = serviceProvider.GetRequiredService<IRepository<CategoryTemplate>>();
+            _manufacturerTemplateRepository = serviceProvider.GetRequiredService<IRepository<ManufacturerTemplate>>();
+            _topicTemplateRepository = serviceProvider.GetRequiredService<IRepository<TopicTemplate>>();
+            _scheduleTaskRepository = serviceProvider.GetRequiredService<IRepository<ScheduleTask>>();
+            _returnRequestRepository = serviceProvider.GetRequiredService<IRepository<ReturnRequest>>();
+            _returnRequestNoteRepository = serviceProvider.GetRequiredService<IRepository<ReturnRequestNote>>();
+            _rewardpointshistoryRepository = serviceProvider.GetRequiredService<IRepository<RewardPointsHistory>>();
+            _searchtermRepository = serviceProvider.GetRequiredService<IRepository<SearchTerm>>();
+            _settingRepository = serviceProvider.GetRequiredService<IRepository<Setting>>();
+            _shipmentRepository = serviceProvider.GetRequiredService<IRepository<Shipment>>();
+            _warehouseRepository = serviceProvider.GetRequiredService<IRepository<Warehouse>>();
+            _pickupPointsRepository = serviceProvider.GetRequiredService<IRepository<PickupPoint>>();
+            _permissionRepository = serviceProvider.GetRequiredService<IRepository<PermissionRecord>>();
+            _vendorRepository = serviceProvider.GetRequiredService<IRepository<Vendor>>();
+            _externalAuthenticationRepository = serviceProvider.GetRequiredService<IRepository<ExternalAuthenticationRecord>>();
+            _discountusageRepository = serviceProvider.GetRequiredService<IRepository<DiscountUsageHistory>>();
+            _returnRequestReasonRepository = serviceProvider.GetRequiredService<IRepository<ReturnRequestReason>>();
+            _contactUsRepository = serviceProvider.GetRequiredService<IRepository<ContactUs>>();
+            _returnRequestActionRepository = serviceProvider.GetRequiredService<IRepository<ReturnRequestAction>>();
+            _customerAction = serviceProvider.GetRequiredService<IRepository<CustomerAction>>();
+            _customerActionType = serviceProvider.GetRequiredService<IRepository<CustomerActionType>>();
+            _customerActionHistory = serviceProvider.GetRequiredService<IRepository<CustomerActionHistory>>();
+            _customerReminderHistoryRepository = serviceProvider.GetRequiredService<IRepository<CustomerReminderHistory>>();
+            _knowledgebaseArticleRepository = serviceProvider.GetRequiredService<IRepository<KnowledgebaseArticle>>();
+            _knowledgebaseCategoryRepository = serviceProvider.GetRequiredService<IRepository<KnowledgebaseCategory>>();
+            _popupArchive = serviceProvider.GetRequiredService<IRepository<PopupArchive>>();
+            _genericAttributeService = serviceProvider.GetRequiredService<IGenericAttributeService>();
+            _webHelper = serviceProvider.GetRequiredService<IWebHelper>();
+            _hostingEnvironment = serviceProvider.GetRequiredService<IWebHostEnvironment>();
+            _serviceProvider = serviceProvider;
         }
 
         #endregion
@@ -364,16 +242,15 @@ namespace Grand.Services.Installation
         }
 
 
-        protected virtual void InstallVersion()
+        protected virtual async Task InstallVersion()
         {
-            var version = new GrandNodeVersion
-            {
+            var version = new GrandNodeVersion {
                 DataBaseVersion = GrandVersion.CurrentVersion
             };
-            _versionRepository.Insert(version);
+            await _versionRepository.InsertAsync(version);
         }
 
-        protected virtual void InstallStores()
+        protected virtual async Task InstallStores()
         {
             //var storeUrl = "http://www.yourStore.com/";
             var storeUrl = _webHelper.GetStoreLocation(false);
@@ -382,22 +259,25 @@ namespace Grand.Services.Installation
                 new Store
                 {
                     Name = "Your store name",
+                    Shortcut = "Store",
                     Url = storeUrl,
                     SslEnabled = false,
                     Hosts = "yourstore.com,www.yourstore.com",
                     DisplayOrder = 1,
                     //should we set some default company info?
                     CompanyName = "Your company name",
-                    CompanyAddress = "your company country, state, zip, street, etc",
+                    CompanyAddress = "21 West 52nd Street",
                     CompanyPhoneNumber = "(123) 456-78901",
                     CompanyVat = null,
+                    CompanyEmail = "company@email.com",
+                    CompanyHours = "Monday - Sunday / 8:00AM - 6:00PM"
                 },
             };
 
-            _storeRepository.Insert(stores);
+            await _storeRepository.InsertAsync(stores);
         }
 
-        protected virtual void InstallMeasures()
+        protected virtual async Task InstallMeasures()
         {
             var measureDimensions = new List<MeasureDimension>
             {
@@ -431,7 +311,7 @@ namespace Grand.Services.Installation
                 }
             };
 
-            _measureDimensionRepository.Insert(measureDimensions);
+            await _measureDimensionRepository.InsertAsync(measureDimensions);
 
             var measureWeights = new List<MeasureWeight>
             {
@@ -465,7 +345,7 @@ namespace Grand.Services.Installation
                 }
             };
 
-            _measureWeightRepository.Insert(measureWeights);
+            await _measureWeightRepository.InsertAsync(measureWeights);
 
             var measureUnits = new List<MeasureUnit>
             {
@@ -486,11 +366,11 @@ namespace Grand.Services.Installation
                 }
             };
 
-            _measureUnitRepository.Insert(measureUnits);
+            await _measureUnitRepository.InsertAsync(measureUnits);
 
         }
 
-        protected virtual void InstallTaxCategories()
+        protected virtual async Task InstallTaxCategories()
         {
             var taxCategories = new List<TaxCategory>
                                {
@@ -520,14 +400,13 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 20,
                                        },
                                };
-            _taxCategoryRepository.Insert(taxCategories);
+            await _taxCategoryRepository.InsertAsync(taxCategories);
 
         }
 
-        protected virtual void InstallLanguages()
+        protected virtual async Task InstallLanguages()
         {
-            var language = new Language
-            {
+            var language = new Language {
                 Name = "English",
                 LanguageCulture = "en-US",
                 UniqueSeoCode = "en",
@@ -535,10 +414,10 @@ namespace Grand.Services.Installation
                 Published = true,
                 DisplayOrder = 1
             };
-            _languageRepository.Insert(language);
+            await _languageRepository.InsertAsync(language);
         }
 
-        protected virtual void InstallLocaleResources()
+        protected virtual async Task InstallLocaleResources()
         {
             //'English' language
             var language = _languageRepository.Table.Single(l => l.Name == "English");
@@ -547,13 +426,13 @@ namespace Grand.Services.Installation
             foreach (var filePath in System.IO.Directory.EnumerateFiles(CommonHelper.MapPath("~/App_Data/Localization/"), "*.grandres.xml", SearchOption.TopDirectoryOnly))
             {
                 var localesXml = File.ReadAllText(filePath);
-                var localizationService = EngineContext.Current.Resolve<ILocalizationService>();
-                localizationService.ImportResourcesFromXmlInstall(language, localesXml);
+                var localizationService = _serviceProvider.GetRequiredService<ILocalizationService>();
+                await localizationService.ImportResourcesFromXmlInstall(language, localesXml);
             }
 
         }
 
-        protected virtual void InstallCurrencies()
+        protected virtual async Task InstallCurrencies()
         {
             var currencies = new List<Currency>
             {
@@ -642,13 +521,12 @@ namespace Grand.Services.Installation
                     UpdatedOnUtc = DateTime.UtcNow,
                 },
             };
-            _currencyRepository.Insert(currencies);
+            await _currencyRepository.InsertAsync(currencies);
         }
 
-        protected virtual void InstallCountriesAndStates()
+        protected virtual async Task InstallCountriesAndStates()
         {
-            var cUsa = new Country
-            {
+            var cUsa = new Country {
                 Name = "United States",
                 AllowsBilling = true,
                 AllowsShipping = true,
@@ -661,506 +539,443 @@ namespace Grand.Services.Installation
             };
 
             var states = new List<StateProvince>();
-            _countryRepository.Insert(cUsa);
+            await _countryRepository.InsertAsync(cUsa);
 
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "AA (Armed Forces Americas)",
                 Abbreviation = "AA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "AE (Armed Forces Europe)",
                 Abbreviation = "AE",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Alabama",
                 Abbreviation = "AL",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Alaska",
                 Abbreviation = "AK",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "American Samoa",
                 Abbreviation = "AS",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "AP (Armed Forces Pacific)",
                 Abbreviation = "AP",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Arizona",
                 Abbreviation = "AZ",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Arkansas",
                 Abbreviation = "AR",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "California",
                 Abbreviation = "CA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Colorado",
                 Abbreviation = "CO",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Connecticut",
                 Abbreviation = "CT",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Delaware",
                 Abbreviation = "DE",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "District of Columbia",
                 Abbreviation = "DC",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Federated States of Micronesia",
                 Abbreviation = "FM",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Florida",
                 Abbreviation = "FL",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Georgia",
                 Abbreviation = "GA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Guam",
                 Abbreviation = "GU",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Hawaii",
                 Abbreviation = "HI",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Idaho",
                 Abbreviation = "ID",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Illinois",
                 Abbreviation = "IL",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Indiana",
                 Abbreviation = "IN",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Iowa",
                 Abbreviation = "IA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Kansas",
                 Abbreviation = "KS",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Kentucky",
                 Abbreviation = "KY",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Louisiana",
                 Abbreviation = "LA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Maine",
                 Abbreviation = "ME",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Marshall Islands",
                 Abbreviation = "MH",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Maryland",
                 Abbreviation = "MD",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Massachusetts",
                 Abbreviation = "MA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Michigan",
                 Abbreviation = "MI",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Minnesota",
                 Abbreviation = "MN",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Mississippi",
                 Abbreviation = "MS",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Missouri",
                 Abbreviation = "MO",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Montana",
                 Abbreviation = "MT",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Nebraska",
                 Abbreviation = "NE",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Nevada",
                 Abbreviation = "NV",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "New Hampshire",
                 Abbreviation = "NH",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "New Jersey",
                 Abbreviation = "NJ",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "New Mexico",
                 Abbreviation = "NM",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "New York",
                 Abbreviation = "NY",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "North Carolina",
                 Abbreviation = "NC",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "North Dakota",
                 Abbreviation = "ND",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Northern Mariana Islands",
                 Abbreviation = "MP",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Ohio",
                 Abbreviation = "OH",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Oklahoma",
                 Abbreviation = "OK",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Oregon",
                 Abbreviation = "OR",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Palau",
                 Abbreviation = "PW",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Pennsylvania",
                 Abbreviation = "PA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Puerto Rico",
                 Abbreviation = "PR",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Rhode Island",
                 Abbreviation = "RI",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "South Carolina",
                 Abbreviation = "SC",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "South Dakota",
                 Abbreviation = "SD",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Tennessee",
                 Abbreviation = "TN",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Texas",
                 Abbreviation = "TX",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Utah",
                 Abbreviation = "UT",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Vermont",
                 Abbreviation = "VT",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Virgin Islands",
                 Abbreviation = "VI",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Virginia",
                 Abbreviation = "VA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Washington",
                 Abbreviation = "WA",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "West Virginia",
                 Abbreviation = "WV",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Wisconsin",
                 Abbreviation = "WI",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cUsa.Id,
                 Name = "Wyoming",
                 Abbreviation = "WY",
                 Published = true,
                 DisplayOrder = 1,
             });
-            var cCanada = new Country
-            {
+            var cCanada = new Country {
                 Name = "Canada",
                 AllowsBilling = true,
                 AllowsShipping = true,
@@ -1171,106 +986,93 @@ namespace Grand.Services.Installation
                 DisplayOrder = 100,
                 Published = true,
             };
-            _countryRepository.Insert(cCanada);
+            await _countryRepository.InsertAsync(cCanada);
 
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Alberta",
                 Abbreviation = "AB",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "British Columbia",
                 Abbreviation = "BC",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Manitoba",
                 Abbreviation = "MB",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "New Brunswick",
                 Abbreviation = "NB",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Newfoundland and Labrador",
                 Abbreviation = "NL",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Northwest Territories",
                 Abbreviation = "NT",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Nova Scotia",
                 Abbreviation = "NS",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Nunavut",
                 Abbreviation = "NU",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Ontario",
                 Abbreviation = "ON",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Prince Edward Island",
                 Abbreviation = "PE",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Quebec",
                 Abbreviation = "QC",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Saskatchewan",
                 Abbreviation = "SK",
                 Published = true,
                 DisplayOrder = 1,
             });
-            states.Add(new StateProvince
-            {
+            states.Add(new StateProvince {
                 CountryId = cCanada.Id,
                 Name = "Yukon Territory",
                 Abbreviation = "YT",
@@ -1278,7 +1080,7 @@ namespace Grand.Services.Installation
                 DisplayOrder = 1,
             });
 
-            _stateProvinceRepository.Insert(states);
+            await _stateProvinceRepository.InsertAsync(states);
 
             var countries = new List<Country>
                                 {
@@ -4103,10 +3905,10 @@ namespace Grand.Services.Installation
                                         Published = true
                                     },
                                 };
-            _countryRepository.Insert(countries);
+            await _countryRepository.InsertAsync(countries);
         }
 
-        protected virtual void InstallShippingMethods()
+        protected virtual async Task InstallShippingMethods()
         {
             var shippingMethods = new List<ShippingMethod>
                                 {
@@ -4129,10 +3931,10 @@ namespace Grand.Services.Installation
                                             DisplayOrder = 3
                                         }
                                 };
-            _shippingMethodRepository.Insert(shippingMethods);
+            await _shippingMethodRepository.InsertAsync(shippingMethods);
         }
 
-        protected virtual void InstallDeliveryDates()
+        protected virtual async Task InstallDeliveryDates()
         {
             var deliveryDates = new List<DeliveryDate>
                                 {
@@ -4152,59 +3954,61 @@ namespace Grand.Services.Installation
                                             DisplayOrder = 10
                                         },
                                 };
-            _deliveryDateRepository.Insert(deliveryDates);
+            await _deliveryDateRepository.InsertAsync(deliveryDates);
         }
 
-        protected virtual void InstallCustomersAndUsers(string defaultUserEmail, string defaultUserPassword)
+        protected virtual async Task InstallCustomersAndUsers(string defaultUserEmail, string defaultUserPassword)
         {
-            var crAdministrators = new CustomerRole
-            {
+            var crAdministrators = new CustomerRole {
                 Name = "Administrators",
                 Active = true,
                 IsSystemRole = true,
                 SystemName = SystemCustomerRoleNames.Administrators,
             };
-            _customerRoleRepository.Insert(crAdministrators);
+            await _customerRoleRepository.InsertAsync(crAdministrators);
 
-            var crForumModerators = new CustomerRole
-            {
+            var crForumModerators = new CustomerRole {
                 Name = "Forum Moderators",
                 Active = true,
                 IsSystemRole = true,
                 SystemName = SystemCustomerRoleNames.ForumModerators,
             };
-            _customerRoleRepository.Insert(crForumModerators);
+            await _customerRoleRepository.InsertAsync(crForumModerators);
 
-            var crRegistered = new CustomerRole
-            {
+            var crRegistered = new CustomerRole {
                 Name = "Registered",
                 Active = true,
                 IsSystemRole = true,
                 SystemName = SystemCustomerRoleNames.Registered,
             };
-            _customerRoleRepository.Insert(crRegistered);
+            await _customerRoleRepository.InsertAsync(crRegistered);
 
-            var crGuests = new CustomerRole
-            {
+            var crGuests = new CustomerRole {
                 Name = "Guests",
                 Active = true,
                 IsSystemRole = true,
                 SystemName = SystemCustomerRoleNames.Guests,
             };
-            _customerRoleRepository.Insert(crGuests);
+            await _customerRoleRepository.InsertAsync(crGuests);
 
-            var crVendors = new CustomerRole
-            {
+            var crVendors = new CustomerRole {
                 Name = "Vendors",
                 Active = true,
                 IsSystemRole = true,
                 SystemName = SystemCustomerRoleNames.Vendors,
             };
-            _customerRoleRepository.Insert(crVendors);
+            await _customerRoleRepository.InsertAsync(crVendors);
+
+            var crStaff = new CustomerRole {
+                Name = "Staff",
+                Active = true,
+                IsSystemRole = true,
+                SystemName = SystemCustomerRoleNames.Staff,
+            };
+            await _customerRoleRepository.InsertAsync(crStaff);
 
             //admin user
-            var adminUser = new Customer
-            {
+            var adminUser = new Customer {
                 CustomerGuid = Guid.NewGuid(),
                 Email = defaultUserEmail,
                 Username = defaultUserEmail,
@@ -4216,8 +4020,7 @@ namespace Grand.Services.Installation
                 LastActivityDateUtc = DateTime.UtcNow,
                 PasswordChangeDateUtc = DateTime.UtcNow,
             };
-            var defaultAdminUserAddress = new Address
-            {
+            var defaultAdminUserAddress = new Address {
                 FirstName = "John",
                 LastName = "Smith",
                 PhoneNumber = "12345678",
@@ -4238,16 +4041,15 @@ namespace Grand.Services.Installation
             adminUser.CustomerRoles.Add(crAdministrators);
             adminUser.CustomerRoles.Add(crForumModerators);
             adminUser.CustomerRoles.Add(crRegistered);
-            _customerRepository.Insert(adminUser);
+            await _customerRepository.InsertAsync(adminUser);
 
             //set default customer name
-            _genericAttributeService.SaveAttribute(adminUser, SystemCustomerAttributeNames.FirstName, "John");
-            _genericAttributeService.SaveAttribute(adminUser, SystemCustomerAttributeNames.LastName, "Smith");
+            await _genericAttributeService.SaveAttribute(adminUser, SystemCustomerAttributeNames.FirstName, "John");
+            await _genericAttributeService.SaveAttribute(adminUser, SystemCustomerAttributeNames.LastName, "Smith");
 
 
             //search engine (crawler) built-in user
-            var searchEngineUser = new Customer
-            {
+            var searchEngineUser = new Customer {
                 Email = "builtin@search_engine_record.com",
                 CustomerGuid = Guid.NewGuid(),
                 PasswordFormat = PasswordFormat.Clear,
@@ -4259,12 +4061,11 @@ namespace Grand.Services.Installation
                 LastActivityDateUtc = DateTime.UtcNow,
             };
             searchEngineUser.CustomerRoles.Add(crGuests);
-            _customerRepository.Insert(searchEngineUser);
+            await _customerRepository.InsertAsync(searchEngineUser);
 
 
             //built-in user for background tasks
-            var backgroundTaskUser = new Customer
-            {
+            var backgroundTaskUser = new Customer {
                 Email = "builtin@background-task-record.com",
                 CustomerGuid = Guid.NewGuid(),
                 PasswordFormat = PasswordFormat.Clear,
@@ -4276,18 +4077,17 @@ namespace Grand.Services.Installation
                 LastActivityDateUtc = DateTime.UtcNow,
             };
             backgroundTaskUser.CustomerRoles.Add(crGuests);
-            _customerRepository.Insert(backgroundTaskUser);
+            await _customerRepository.InsertAsync(backgroundTaskUser);
 
         }
 
-        protected virtual void HashDefaultCustomerPassword(string defaultUserEmail, string defaultUserPassword)
+        protected virtual async Task HashDefaultCustomerPassword(string defaultUserEmail, string defaultUserPassword)
         {
-            var customerRegistrationService = EngineContext.Current.Resolve<ICustomerRegistrationService>();
-            customerRegistrationService.ChangePassword(new ChangePasswordRequest(defaultUserEmail, false,
-            PasswordFormat.Hashed, defaultUserPassword));
+            var customerRegistrationService = _serviceProvider.GetRequiredService<ICustomerRegistrationService>();
+            await customerRegistrationService.ChangePassword(new ChangePasswordRequest(defaultUserEmail, false, PasswordFormat.Hashed, defaultUserPassword));
         }
 
-        protected virtual void InstallCustomerAction()
+        protected virtual async Task InstallCustomerAction()
         {
             var customerActionType = new List<CustomerActionType>()
             {
@@ -4302,6 +4102,13 @@ namespace Grand.Services.Installation
                 {
                     Name = "Add order",
                     SystemKeyword = "AddOrder",
+                    Enabled = false,
+                    ConditionType = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13 }
+                },
+                new CustomerActionType()
+                {
+                    Name = "Paid order",
+                    SystemKeyword = "PaidOrder",
                     Enabled = false,
                     ConditionType = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13 }
                 },
@@ -4327,11 +4134,11 @@ namespace Grand.Services.Installation
                     ConditionType = {7, 8, 9, 10, 13}
                 }
             };
-            _customerActionType.Insert(customerActionType);
+            await _customerActionType.InsertAsync(customerActionType);
 
         }
 
-        protected virtual void InstallEmailAccounts()
+        protected virtual async Task InstallEmailAccounts()
         {
             var emailAccounts = new List<EmailAccount>
                                {
@@ -4343,321 +4150,350 @@ namespace Grand.Services.Installation
                                            Port = 25,
                                            Username = "123",
                                            Password = "123",
-                                           EnableSsl = false,
-                                           UseDefaultCredentials = false
+                                           SecureSocketOptionsId = 1,
+                                           UseServerCertificateValidation = true
                                        },
                                };
-            _emailAccountRepository.Insert(emailAccounts);
+            await _emailAccountRepository.InsertAsync(emailAccounts);
         }
 
-        protected virtual void InstallMessageTemplates()
+        protected virtual async Task InstallMessageTemplates()
         {
             var eaGeneral = _emailAccountRepository.Table.FirstOrDefault();
             if (eaGeneral == null)
                 throw new Exception("Default email account cannot be loaded");
+
+            var OrderProducts = File.ReadAllText(CommonHelper.MapPath("~/App_Data/Upgrade/Order.Products.txt"));
+            var OrderVendorProducts = File.ReadAllText(CommonHelper.MapPath("~/App_Data/Upgrade/Order.VendorProducts.txt"));
+            var ShipmentProducts = File.ReadAllText(CommonHelper.MapPath("~/App_Data/Upgrade/Shipment.Products.txt"));
+
             var messageTemplates = new List<MessageTemplate>
                                {
                                     new MessageTemplate
                                        {
                                            Name = "AuctionEnded.CustomerNotificationWin",
-                                           Subject = "%Store.Name%. Auction ended.",
-                                           Body = "<p>Hello, %Customer.FullName%!</p><p></p><p>At %Auctions.EndTime% you have won <a href=\"%Store.URL%%Auctions.ProductSeName%\">%Auctions.ProductName%</a> for %Auctions.Price%. Visit  <a href=\"%Store.URL%/cart\">cart</a> to finish checkout process. </p>",
+                                           Subject = "{{Store.Name}}. Auction ended.",
+                                           Body = "<p>Hello, {{Customer.FullName}}!</p><p></p><p>At {{Auctions.EndTime}} you have won <a href=\"{{Store.URL}}{{Auctions.ProductSeName}}\">{{Auctions.ProductName}}</a> for {{Auctions.Price}}. Visit  <a href=\"{{Store.URL}}/cart\">cart</a> to finish checkout process. </p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                     new MessageTemplate
                                             {
                                                 Name = "AuctionEnded.CustomerNotificationLost",
-                                                Subject = "%Store.Name%. Auction ended.",
-                                                Body = "<p>Hello, %Customer.FullName%!</p><p></p><p>Unfortunately you did not win the bid %Auctions.ProductName%</p> <p>End price:  %Auctions.Price% </p> <p>End date auction %Auctions.EndTime% </p>",
+                                                Subject = "{{Store.Name}}. Auction ended.",
+                                                Body = "<p>Hello, {{Customer.FullName}}!</p><p></p><p>Unfortunately you did not win the bid {{Auctions.ProductName}}</p> <p>End price:  {{Auctions.Price}} </p> <p>End date auction {{Auctions.EndTime}} </p>",
                                                 IsActive = true,
                                                 EmailAccountId = eaGeneral.Id,
                                             },
                                     new MessageTemplate
                                             {
                                                 Name = "AuctionEnded.CustomerNotificationBin",
-                                                Subject = "%Store.Name%. Auction ended.",
-                                                Body = "<p>Hello, %Customer.FullName%!</p><p></p><p>Unfortunately you did not win the bid %Product.Name%</p> <p>Product was bought by option Buy it now for price: %Product.Price% </p>",
+                                                Subject = "{{Store.Name}}. Auction ended.",
+                                                Body = "<p>Hello, {{Customer.FullName}}!</p><p></p><p>Unfortunately you did not win the bid {{Product.Name}}</p> <p>Product was bought by option Buy it now for price: {{Product.Price}} </p>",
                                                 IsActive = true,
                                                 EmailAccountId = eaGeneral.Id,
                                             },
                                     new MessageTemplate
                                        {
                                            Name = "AuctionEnded.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Auction ended.",
-                                           Body = "<p>At %Auctions.EndTime% %Customer.FullName% have won <a href=\"%Store.URL%%Auctions.ProductSeName%\">%Auctions.ProductName%</a> for %Auctions.Price%.</p>",
+                                           Subject = "{{Store.Name}}. Auction ended.",
+                                           Body = "<p>At {{Auctions.EndTime}} {{Customer.FullName}} have won <a href=\"{{Store.URL}}{{Auctions.ProductSeName}}\">{{Auctions.ProductName}}</a> for {{Auctions.Price}}.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                     new MessageTemplate
                                        {
+                                           Name = "AuctionExpired.StoreOwnerNotification",
+                                           Subject = "Your auction to product {{Product.Name}}  has expired.",
+                                           Body = "Hello, <br> Your auction to product {{Product.Name}} has expired without bid.",
+                                           IsActive = false,
+                                           EmailAccountId = eaGeneral.Id,
+                                       },
+                                    new MessageTemplate
+                                       {
                                            Name = "BidUp.CustomerNotification",
-                                           Subject = "%Store.Name%. Your offer has been outbid.",
-                                           Body = "<p>Hi %Customer.FullName%!</p><p>Your offer for product <a href=\"%Auctions.ProductSeName%\">%Auctions.ProductName%</a> has been outbid. New price is %Auctions.Price%.<br />Raise a price by raising one's offer. Auction will be ended on %Auctions.EndTime%</p>",
+                                           Subject = "{{Store.Name}}. Your offer has been outbid.",
+                                           Body = "<p>Hi {{Customer.FullName}}!</p><p>Your offer for product <a href=\"{{Store.URL}}{{Auctions.ProductSeName}}\">{{Auctions.ProductName}}</a> has been outbid. Your price was {{Auctions.Price}}.<br />\r\nRaise a price by raising one's offer. Auction will be ended on {{Auctions.EndTime}}</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                     new MessageTemplate
                                        {
                                            Name = "Blog.BlogComment",
-                                           Subject = "%Store.Name%. New blog comment.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />A new blog comment has been created for blog post \"%BlogComment.BlogPostTitle%\".</p>",
+                                           Subject = "{{Store.Name}}. New blog comment.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nA new blog comment has been created for blog post \"{{BlogComment.BlogPostTitle}}\".</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Knowledgebase.ArticleComment",
-                                           Subject = "%Store.Name%. New article comment.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />A new article comment has been created for article \"%Article.ArticleTitle%\".</p>",
+                                           Subject = "{{Store.Name}}. New article comment.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nA new article comment has been created for article \"{{Knowledgebase.ArticleCommentTitle}}\".</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Customer.BackInStock",
-                                           Subject = "%Store.Name%. Back in stock notification",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Customer.FullName%, <br />Product <a target=\"_blank\" href=\"%BackInStockSubscription.ProductUrl%\">%BackInStockSubscription.ProductName%</a> is in stock.</p>",
+                                           Subject = "{{Store.Name}}. Back in stock notification",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Customer.FullName}}, <br />\r\nProduct <a target=\"_blank\" href=\"{{BackInStockSubscription.ProductUrl}}\">{{BackInStockSubscription.ProductName}}</a> is in stock.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "CustomerDelete.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Customer has been deleted.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> ,<br />%Customer.FullName% (%Customer.Email%) has just deleted from your database. </p>",
+                                           Subject = "{{Store.Name}}. Customer has been deleted.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> ,<br />\r\n{{Customer.FullName}} ({{Customer.Email}}) has just deleted from your database. </p>",
+                                           IsActive = true,
+                                           EmailAccountId = eaGeneral.Id,
+                                       },
+                                   new MessageTemplate
+                                       {
+                                           Name = "Customer.EmailTokenValidationMessage",
+                                           Subject = "{{Store.Name}} - Email Verification Code",
+                                           Body = "Hello {{Customer.FullName}}, <br /><br />\r\n Enter this 6 digit code on the sign in page to confirm your identity:<br /><br /> \r\n <b>{{AdditionalTokens[\"Token\"]}}</b><br /><br />\r\n Yours securely, <br /> \r\n Team",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Customer.EmailValidationMessage",
-                                           Subject = "%Store.Name%. Email validation",
-                                           Body = "<a href=\"%Store.URL%\">%Store.Name%</a>  <br />  <br />  To activate your account <a href=\"%Customer.AccountActivationURL%\">click here</a>.     <br />  <br />  %Store.Name%",
+                                           Subject = "{{Store.Name}}. Email validation",
+                                           Body = "<a href=\"{{Store.URL}}\">{{Store.Name}}</a>  <br />\r\n  <br />\r\n  To activate your account <a href=\"{{Customer.AccountActivationURL}}\">click here</a>.     <br />\r\n  <br />\r\n  {{Store.Name}}",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Customer.NewPM",
-                                           Subject = "%Store.Name%. You have received a new private message",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />You have received a new private message.</p>",
+                                           Subject = "{{Store.Name}}. You have received a new private message",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nYou have received a new private message.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Customer.PasswordRecovery",
-                                           Subject = "%Store.Name%. Password recovery",
-                                           Body = "<a href=\"%Store.URL%\">%Store.Name%</a>  <br />  <br />  To change your password <a href=\"%Customer.PasswordRecoveryURL%\">click here</a>.     <br />  <br />  %Store.Name%",
+                                           Subject = "{{Store.Name}}. Password recovery",
+                                           Body = "<a href=\"{{Store.URL}}\">{{Store.Name}}</a>  <br />\r\n  <br />\r\n  To change your password <a href=\"{{Customer.PasswordRecoveryURL}}\">click here</a>.     <br />\r\n  <br />\r\n  {{Store.Name}}",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Customer.WelcomeMessage",
-                                           Subject = "Welcome to %Store.Name%",
-                                           Body = "We welcome you to <a href=\"%Store.URL%\"> %Store.Name%</a>.<br /><br />You can now take part in the various services we have to offer you. Some of these services include:<br /><br />Permanent Cart - Any products added to your online cart remain there until you remove them, or check them out.<br />Address Book - We can now deliver your products to another address other than yours! This is perfect to send birthday gifts direct to the birthday-person themselves.<br />Order History - View your history of purchases that you have made with us.<br />Products Reviews - Share your opinions on products with our other customers.<br /><br />For help with any of our online services, please email the store-owner: <a href=\"mailto:%Store.Email%\">%Store.Email%</a>.<br /><br />Note: This email address was provided on our registration page. If you own the email and did not register on our site, please send an email to <a href=\"mailto:%Store.Email%\">%Store.Email%</a>.",
+                                           Subject = "Welcome to {{Store.Name}}",
+                                           Body = "We welcome you to <a href=\"{{Store.URL}}\"> {{Store.Name}}</a>.<br />\r\n<br />\r\nYou can now take part in the various services we have to offer you. Some of these services include:<br />\r\n<br />\r\nPermanent Cart - Any products added to your online cart remain there until you remove them, or check them out.<br />\r\nAddress Book - We can now deliver your products to another address other than yours! This is perfect to send birthday gifts direct to the birthday-person themselves.<br />\r\nOrder History - View your history of purchases that you have made with us.<br />\r\nProducts Reviews - Share your opinions on products with our other customers.<br />\r\n<br />\r\nFor help with any of our online services, please email the store-owner: <a href=\"mailto:{{Store.Email}}\">{{Store.Email}}</a>.<br />\r\n<br />\r\nNote: This email address was provided on our registration page. If you own the email and did not register on our site, please send an email to <a href=\"mailto:{{Store.Email}}\">{{Store.Email}}</a>.",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Forums.NewForumPost",
-                                           Subject = "%Store.Name%. New Post Notification.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />A new post has been created in the topic <a href=\"%Forums.TopicURL%\">\"%Forums.TopicName%\"</a> at <a href=\"%Forums.ForumURL%\">\"%Forums.ForumName%\"</a> forum.<br /><br />Click <a href=\"%Forums.TopicURL%\">here</a> for more info.<br /><br />Post author: %Forums.PostAuthor%<br />Post body: %Forums.PostBody%</p>",
+                                           Subject = "{{Store.Name}}. New Post Notification.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nA new post has been created in the topic <a href=\"{{Forums.TopicURL}}\">\"{{Forums.TopicName}}\"</a> at <a href=\"{{Forums.ForumURL}}\">\"{{Forums.ForumName}}\"</a> forum.<br />\r\n<br />\r\nClick <a href=\"{{Forums.TopicURL}}\">here</a> for more info.<br />\r\n<br />\r\nPost author: {{Forums.PostAuthor}}<br />\r\nPost body: {{Forums.PostBody}}</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Forums.NewForumTopic",
-                                           Subject = "%Store.Name%. New Topic Notification.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />A new topic <a href=\"%Forums.TopicURL%\">\"%Forums.TopicName%\"</a> has been created at <a href=\"%Forums.ForumURL%\">\"%Forums.ForumName%\"</a> forum.<br /><br />Click <a href=\"%Forums.TopicURL%\">here</a> for more info.</p>",
+                                           Subject = "{{Store.Name}}. New Topic Notification.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nA new topic <a href=\"{{Forums.TopicURL}}\">\"{{Forums.TopicName}}\"</a> has been created at <a href=\"{{Forums.ForumURL}}\">\"{{Forums.ForumName}}\"</a> forum.<br />\r\n<br />\r\nClick <a href=\"{{Forums.TopicURL}}\">here</a> for more info.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "GiftCard.Notification",
-                                           Subject = "%GiftCard.SenderName% has sent you a gift card for %Store.Name%",
-                                           Body = "<p>You have received a gift card for %Store.Name%</p><p>Dear %GiftCard.RecipientName%, <br /><br />%GiftCard.SenderName% (%GiftCard.SenderEmail%) has sent you a %GiftCard.Amount% gift cart for <a href=\"%Store.URL%\"> %Store.Name%</a></p><p>You gift card code is %GiftCard.CouponCode%</p><p>%GiftCard.Message%</p>",
+                                           Subject = "{{GiftCard.SenderName}} has sent you a gift card for {{Store.Name}}",
+                                           Body = "<p>You have received a gift card for {{Store.Name}}</p><p>Dear {{GiftCard.RecipientName}}, <br />\r\n<br />\r\n{{GiftCard.SenderName}} ({{GiftCard.SenderEmail}}) has sent you a {{GiftCard.Amount}} gift cart for <a href=\"{{Store.URL}}\"> {{Store.Name}}</a></p><p>You gift card code is {{GiftCard.CouponCode}}</p><p>{{GiftCard.Message}}</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "NewCustomer.Notification",
-                                           Subject = "%Store.Name%. New customer registration",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />A new customer registered with your store. Below are the customer's details:<br />Full name: %Customer.FullName%<br />Email: %Customer.Email%</p>",
+                                           Subject = "{{Store.Name}}. New customer registration",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nA new customer registered with your store. Below are the customer's details:<br />\r\nFull name: {{Customer.FullName}}<br />\r\nEmail: {{Customer.Email}}</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "NewReturnRequest.CustomerNotification",
-                                           Subject = "%Store.Name%. New return request.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Customer.FullName%!<br /> You have just submitted a new return request. Details are below:<br />Request ID: %ReturnRequest.ID%<br />Products:<br />%ReturnRequest.Products%<br />Customer comments: %ReturnRequest.CustomerComment%<br /><br />Pickup date: %ReturnRequest.PickupDate%<br /><br />Pickup address:<br />%PickupAddress.FirstName% %PickupAddress.LastName%<br />%PickupAddress.Address1%<br />%PickupAddress.City% %PickupAddress.ZipPostalCode%<br />%PickupAddress.StateProvince% %PickupAddress.Country%<br /></p>",
+                                           Subject = "{{Store.Name}}. New return request.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Customer.FullName}}!<br />\r\n You have just submitted a new return request. Details are below:<br />\r\nRequest ID: {{ReturnRequest.Id}}<br />\r\nProducts:<br />\r\n{{ReturnRequest.Products}}<br />\r\nCustomer comments: {{ReturnRequest.CustomerComment}}<br />\r\n<br />\r\nPickup date: {{ReturnRequest.PickupDate}}<br />\r\n<br />\r\nPickup address:<br />\r\n{{ReturnRequest.PickupAddressFirstName}} {{ReturnRequest.PickupAddressLastName}}<br />\r\n{{ReturnRequest.PickupAddressAddress1}}<br />\r\n{{ReturnRequest.PickupAddressCity}} {{ReturnRequest.PickupAddressZipPostalCode}}<br />\r\n{{ReturnRequest.PickupAddressStateProvince}} {{ReturnRequest.PickupAddressCountry}}<br />\r\n</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "NewReturnRequest.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. New return request.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />%Customer.FullName% has just submitted a new return request. Details are below:<br />Request ID: %ReturnRequest.ID%<br />Products:<br />%ReturnRequest.Products%<br />Customer comments: %ReturnRequest.CustomerComment%<br /><br />Pickup date: %ReturnRequest.PickupDate%<br /><br />Pickup address:<br />%PickupAddress.FirstName% %PickupAddress.LastName%<br />%PickupAddress.Address1%<br />%PickupAddress.City% %PickupAddress.ZipPostalCode%<br />%PickupAddress.StateProvince% %PickupAddress.Country%<br /></p>",
+                                           Subject = "{{Store.Name}}. New return request.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n{{Customer.FullName}} has just submitted a new return request. Details are below:<br />\r\nRequest ID: {{ReturnRequest.Id}}<br />\r\nProducts:<br />\r\n{{ReturnRequest.Products}}<br />\r\nCustomer comments: {{ReturnRequest.CustomerComment}}<br />\r\n<br />\r\nPickup date: {{ReturnRequest.PickupDate}}<br />\r\n<br />\r\nPickup address:<br />\r\n{{ReturnRequest.PickupAddressFirstName}} {{ReturnRequest.PickupAddressLastName}}<br />\r\n{{ReturnRequest.PickupAddressAddress1}}<br />\r\n{{ReturnRequest.PickupAddressCity}} {{ReturnRequest.PickupAddressZipPostalCode}}<br />\r\n{{ReturnRequest.PickupAddressStateProvince}} {{ReturnRequest.PickupAddressCountry}}<br />\r\n</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "News.NewsComment",
-                                           Subject = "%Store.Name%. New news comment.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />A new news comment has been created for news \"%NewsComment.NewsTitle%\".</p>",
+                                           Subject = "{{Store.Name}}. New news comment.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nA new news comment has been created for news \"{{NewsComment.NewsTitle}}\".</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "NewsLetterSubscription.ActivationMessage",
-                                           Subject = "%Store.Name%. Subscription activation message.",
-                                           Body = "<p><a href=\"%NewsLetterSubscription.ActivationUrl%\">Click here to confirm your subscription to our list.</a></p><p>If you received this email by mistake, simply delete it.</p>",
+                                           Subject = "{{Store.Name}}. Subscription activation message.",
+                                           Body = "<p><a href=\"{{NewsLetterSubscription.ActivationUrl}}\">Click here to confirm your subscription to our list.</a></p><p>If you received this email by mistake, simply delete it.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "NewsLetterSubscription.DeactivationMessage",
-                                           Subject = "%Store.Name%. Subscription deactivation message.",
-                                           Body = "<p><a href=\"%NewsLetterSubscription.DeactivationUrl%\">Click here to unsubscribe from our newsletter.</a></p><p>If you received this email by mistake, simply delete it.</p>",
+                                           Subject = "{{Store.Name}}. Subscription deactivation message.",
+                                           Body = "<p><a href=\"{{NewsLetterSubscription.DeactivationUrl}}\">Click here to unsubscribe from our newsletter.</a></p><p>If you received this email by mistake, simply delete it.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "NewVATSubmitted.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. New VAT number is submitted.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />%Customer.FullName% (%Customer.Email%) has just submitted a new VAT number. Details are below:<br />VAT number: %Customer.VatNumber%<br />VAT number status: %Customer.VatNumberStatus%<br />Received name: %VatValidationResult.Name%<br />Received address: %VatValidationResult.Address%</p>",
+                                           Subject = "{{Store.Name}}. New VAT number is submitted.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n{{Customer.FullName}} ({{Customer.Email}}) has just submitted a new VAT number. Details are below:<br />\r\nVAT number: {{Customer.VatNumber}}<br />\r\nVAT number status: {{Customer.VatNumberStatus}}<br />\r\nReceived name: {{VatValidationResult.Name}}<br />\r\nReceived address: {{VatValidationResult.Address}}</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                   new MessageTemplate
                                        {
                                            Name = "OrderCancelled.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Customer cancelled an order",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br /><br />Customer cancelled an order. Below is the summary of the order. <br /><br />Order Number: %Order.OrderNumber%<br />Order Details: <a target=\"_blank\" href=\"%Order.OrderURLForCustomer%\">%Order.OrderURLForCustomer%</a><br />Date Ordered: %Order.CreatedOn%<br /><br /><br /><br />Billing Address<br />%Order.BillingFirstName% %Order.BillingLastName%<br />%Order.BillingAddress1%<br />%Order.BillingCity% %Order.BillingZipPostalCode%<br />%Order.BillingStateProvince% %Order.BillingCountry%<br /><br /><br /><br />Shipping Address<br />%Order.ShippingFirstName% %Order.ShippingLastName%<br />%Order.ShippingAddress1%<br />%Order.ShippingCity% %Order.ShippingZipPostalCode%<br />%Order.ShippingStateProvince% %Order.ShippingCountry%<br /><br />Shipping Method: %Order.ShippingMethod%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "{{Store.Name}}. Customer cancelled an order",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n<br />\r\nCustomer cancelled an order. Below is the summary of the order. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nOrder Details: <a target=\"_blank\" href=\"{{Order.OrderURLForCustomer}}\">{{Order.OrderURLForCustomer}}</a><br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nBilling Address<br />\r\n{{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n{{Order.BillingAddress1}}<br />\r\n{{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n{{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nShipping Address<br />\r\n{{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n{{Order.ShippingAddress1}}<br />\r\n{{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n{{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n<br />\r\nShipping Method: {{Order.ShippingMethod}}<br />\r\n<br />\r\n" + OrderProducts + "</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                     new MessageTemplate
                                        {
                                            Name = "OrderCancelled.CustomerNotification",
-                                           Subject = "%Store.Name%. Your order cancelled",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Order.CustomerFullName%, <br />Your order has been cancelled. Below is the summary of the order. <br /><br />Order Number: %Order.OrderNumber%<br />Order Details: <a target=\"_blank\" href=\"%Order.OrderURLForCustomer%\">%Order.OrderURLForCustomer%</a><br />Date Ordered: %Order.CreatedOn%<br /><br /><br /><br />Billing Address<br />%Order.BillingFirstName% %Order.BillingLastName%<br />%Order.BillingAddress1%<br />%Order.BillingCity% %Order.BillingZipPostalCode%<br />%Order.BillingStateProvince% %Order.BillingCountry%<br /><br /><br /><br />Shipping Address<br />%Order.ShippingFirstName% %Order.ShippingLastName%<br />%Order.ShippingAddress1%<br />%Order.ShippingCity% %Order.ShippingZipPostalCode%<br />%Order.ShippingStateProvince% %Order.ShippingCountry%<br /><br />Shipping Method: %Order.ShippingMethod%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "{{Store.Name}}. Your order cancelled",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Order.CustomerFullName}}, <br />\r\nYour order has been cancelled. Below is the summary of the order. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nOrder Details: <a target=\"_blank\" href=\"{{Order.OrderURLForCustomer}}\">{{Order.OrderURLForCustomer}}</a><br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nBilling Address<br />\r\n{{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n{{Order.BillingAddress1}}<br />\r\n{{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n{{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nShipping Address<br />\r\n{{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n{{Order.ShippingAddress1}}<br />\r\n{{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n{{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n<br />\r\nShipping Method: {{Order.ShippingMethod}}<br />\r\n<br />\r\n" + OrderProducts + "</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
-                                   new MessageTemplate
+                                    new MessageTemplate
+                                       {
+                                           Name = "OrderCancelled.VendorNotification",
+                                           Subject = "{{Store.Name}}. Order #{{Order.OrderNumber}} cancelled",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br /><br />Order #{{Order.OrderNumber}} has been cancelled. <br /><br />Order Number: {{Order.OrderNumber}} <br />   Date Ordered: {{Order.CreatedOn}} <br /><br /> ",
+                                           IsActive = false,
+                                           EmailAccountId = eaGeneral.Id,
+                                       },
+                                    new MessageTemplate
                                        {
                                            Name = "OrderCompleted.CustomerNotification",
-                                           Subject = "%Store.Name%. Your order completed",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Order.CustomerFullName%, <br />Your order has been completed. Below is the summary of the order. <br /><br />Order Number: %Order.OrderNumber%<br />Order Details: <a target=\"_blank\" href=\"%Order.OrderURLForCustomer%\">%Order.OrderURLForCustomer%</a><br />Date Ordered: %Order.CreatedOn%<br /><br /><br /><br />Billing Address<br />%Order.BillingFirstName% %Order.BillingLastName%<br />%Order.BillingAddress1%<br />%Order.BillingCity% %Order.BillingZipPostalCode%<br />%Order.BillingStateProvince% %Order.BillingCountry%<br /><br /><br /><br />Shipping Address<br />%Order.ShippingFirstName% %Order.ShippingLastName%<br />%Order.ShippingAddress1%<br />%Order.ShippingCity% %Order.ShippingZipPostalCode%<br />%Order.ShippingStateProvince% %Order.ShippingCountry%<br /><br />Shipping Method: %Order.ShippingMethod%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "{{Store.Name}}. Your order completed",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Order.CustomerFullName}}, <br />\r\nYour order has been completed. Below is the summary of the order. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nOrder Details: <a target=\"_blank\" href=\"{{Order.OrderURLForCustomer}}\">{{Order.OrderURLForCustomer}}</a><br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nBilling Address<br />\r\n{{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n{{Order.BillingAddress1}}<br />\r\n{{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n{{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nShipping Address<br />\r\n{{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n{{Order.ShippingAddress1}}<br />\r\n{{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n{{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n<br />\r\nShipping Method: {{Order.ShippingMethod}}<br />\r\n<br />\r\n" + OrderProducts + "</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "ShipmentDelivered.CustomerNotification",
-                                           Subject = "Your order from %Store.Name% has been delivered.",
-                                           Body = "<p><a href=\"%Store.URL%\"> %Store.Name%</a> <br /> <br /> Hello %Order.CustomerFullName%, <br /> Good news! You order has been delivered. <br /> Order Number: %Order.OrderNumber%<br /> Order Details: <a href=\"%Order.OrderURLForCustomer%\" target=\"_blank\">%Order.OrderURLForCustomer%</a><br /> Date Ordered: %Order.CreatedOn%<br /> <br /> <br /> <br /> Billing Address<br /> %Order.BillingFirstName% %Order.BillingLastName%<br /> %Order.BillingAddress1%<br /> %Order.BillingCity% %Order.BillingZipPostalCode%<br /> %Order.BillingStateProvince% %Order.BillingCountry%<br /> <br /> <br /> <br /> Shipping Address<br /> %Order.ShippingFirstName% %Order.ShippingLastName%<br /> %Order.ShippingAddress1%<br /> %Order.ShippingCity% %Order.ShippingZipPostalCode%<br /> %Order.ShippingStateProvince% %Order.ShippingCountry%<br /> <br /> Shipping Method: %Order.ShippingMethod% <br /> <br /> Delivered Products: <br /> <br /> %Shipment.Product(s)%</p>",
+                                           Subject = "Your order from {{Store.Name}} has been delivered.",
+                                           Body = "<p><a href=\"{{Store.URL}}\"> {{Store.Name}}</a> <br />\r\n <br />\r\n Hello {{Order.CustomerFullName}}, <br />\r\n Good news! You order has been delivered. <br />\r\n Order Number: {{Order.OrderNumber}}<br />\r\n Order Details: <a href=\"{{Order.OrderURLForCustomer}}\" target=\"_blank\">{{Order.OrderURLForCustomer}}</a><br />\r\n Date Ordered: {{Order.CreatedOn}}<br />\r\n <br />\r\n <br />\r\n <br />\r\n Billing Address<br />\r\n {{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n {{Order.BillingAddress1}}<br />\r\n {{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n {{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n <br />\r\n <br />\r\n <br />\r\n Shipping Address<br />\r\n {{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n {{Order.ShippingAddress1}}<br />\r\n {{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n {{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n <br />\r\n Shipping Method: {{Order.ShippingMethod}} <br />\r\n <br />\r\n Delivered Products: <br />\r\n <br />\r\n" + ShipmentProducts + "</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "OrderPlaced.CustomerNotification",
-                                           Subject = "Order receipt from %Store.Name%.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Order.CustomerFullName%, <br />Thanks for buying from <a href=\"%Store.URL%\">%Store.Name%</a>. Below is the summary of the order. <br /><br />Order Number: %Order.OrderNumber%<br />Order Details: <a target=\"_blank\" href=\"%Order.OrderURLForCustomer%\">%Order.OrderURLForCustomer%</a><br />Date Ordered: %Order.CreatedOn%<br /><br /><br /><br />Billing Address<br />%Order.BillingFirstName% %Order.BillingLastName%<br />%Order.BillingAddress1%<br />%Order.BillingCity% %Order.BillingZipPostalCode%<br />%Order.BillingStateProvince% %Order.BillingCountry%<br /><br /><br /><br />Shipping Address<br />%Order.ShippingFirstName% %Order.ShippingLastName%<br />%Order.ShippingAddress1%<br />%Order.ShippingCity% %Order.ShippingZipPostalCode%<br />%Order.ShippingStateProvince% %Order.ShippingCountry%<br /><br />Shipping Method: %Order.ShippingMethod%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "Order receipt from {{Store.Name}}.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Order.CustomerFullName}}, <br />\r\nThanks for buying from <a href=\"{{Store.URL}}\">{{Store.Name}}</a>. Below is the summary of the order. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nOrder Details: <a target=\"_blank\" href=\"{{Order.OrderURLForCustomer}}\">{{Order.OrderURLForCustomer}}</a><br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nBilling Address<br />\r\n{{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n{{Order.BillingAddress1}}<br />\r\n{{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n{{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nShipping Address<br />\r\n{{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n{{Order.ShippingAddress1}}<br />\r\n{{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n{{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n<br />\r\nShipping Method: {{Order.ShippingMethod}}<br />\r\n<br />\r\n" + OrderProducts + "</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "OrderPlaced.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Purchase Receipt for Order #%Order.OrderNumber%",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />%Order.CustomerFullName% (%Order.CustomerEmail%) has just placed an order from your store. Below is the summary of the order. <br /><br />Order Number: %Order.OrderNumber%<br />Date Ordered: %Order.CreatedOn%<br /><br /><br /><br />Billing Address<br />%Order.BillingFirstName% %Order.BillingLastName%<br />%Order.BillingAddress1%<br />%Order.BillingCity% %Order.BillingZipPostalCode%<br />%Order.BillingStateProvince% %Order.BillingCountry%<br /><br /><br /><br />Shipping Address<br />%Order.ShippingFirstName% %Order.ShippingLastName%<br />%Order.ShippingAddress1%<br />%Order.ShippingCity% %Order.ShippingZipPostalCode%<br />%Order.ShippingStateProvince% %Order.ShippingCountry%<br /><br />Shipping Method: %Order.ShippingMethod%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "{{Store.Name}}. Purchase Receipt for Order #{{Order.OrderNumber}}",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n{{Order.CustomerFullName}} ({{Order.CustomerEmail}}) has just placed an order from your store. Below is the summary of the order. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nBilling Address<br />\r\n{{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n{{Order.BillingAddress1}}<br />\r\n{{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n{{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nShipping Address<br />\r\n{{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n{{Order.ShippingAddress1}}<br />\r\n{{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n{{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n<br />\r\nShipping Method: {{Order.ShippingMethod}}<br />\r\n<br />\r\n" + OrderProducts + "</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "ShipmentSent.CustomerNotification",
-                                           Subject = "Your order from %Store.Name% has been shipped.",
-                                           Body = "<p><a href=\"%Store.URL%\"> %Store.Name%</a> <br /><br />Hello %Order.CustomerFullName%!, <br />Good news! You order has been shipped. <br />Order Number: %Order.OrderNumber%<br />Order Details: <a href=\"%Order.OrderURLForCustomer%\" target=\"_blank\">%Order.OrderURLForCustomer%</a><br />Date Ordered: %Order.CreatedOn%<br /><br /><br /><br />Billing Address<br />%Order.BillingFirstName% %Order.BillingLastName%<br />%Order.BillingAddress1%<br />%Order.BillingCity% %Order.BillingZipPostalCode%<br />%Order.BillingStateProvince% %Order.BillingCountry%<br /><br /><br /><br />Shipping Address<br />%Order.ShippingFirstName% %Order.ShippingLastName%<br />%Order.ShippingAddress1%<br />%Order.ShippingCity% %Order.ShippingZipPostalCode%<br />%Order.ShippingStateProvince% %Order.ShippingCountry%<br /><br />Shipping Method: %Order.ShippingMethod% <br /> <br /> Shipped Products: <br /> <br /> %Shipment.Product(s)%</p>",
+                                           Subject = "Your order from {{Store.Name}} has been shipped.",
+                                           Body = "<p><a href=\"{{Store.URL}}\"> {{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Order.CustomerFullName}}!, <br />\r\nGood news! You order has been shipped. <br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nOrder Details: <a href=\"{{Order.OrderURLForCustomer}}\" target=\"_blank\">{{Order.OrderURLForCustomer}}</a><br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nBilling Address<br />\r\n{{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n{{Order.BillingAddress1}}<br />\r\n{{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n{{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nShipping Address<br />\r\n{{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n{{Order.ShippingAddress1}}<br />\r\n{{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n{{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n<br />\r\nShipping Method: {{Order.ShippingMethod}} <br />\r\n <br />\r\n Shipped Products: <br />\r\n <br />\r\n" + ShipmentProducts + "</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Product.ProductReview",
-                                           Subject = "%Store.Name%. New product review.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />A new product review has been written for product \"%ProductReview.ProductName%\".</p>",
+                                           Subject = "{{Store.Name}}. New product review.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nA new product review has been written for product \"{{ProductReview.ProductName}}\".</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "QuantityBelow.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Quantity below notification. %Product.Name%",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />%Product.Name% (ID: %Product.ID%) low quantity. <br /><br />Quantity: %Product.StockQuantity%<br /></p>",
+                                           Subject = "{{Store.Name}}. Quantity below notification. {{Product.Name}}",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n{{Product.Name}} (ID: {{Product.Id}}) low quantity. <br />\r\n<br />\r\nQuantity: {{Product.StockQuantity}}<br />\r\n</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "QuantityBelow.AttributeCombination.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Quantity below notification. %Product.Name%",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />%Product.Name% (ID: %Product.ID%) low quantity. <br />%AttributeCombination.Formatted%<br />Quantity: %AttributeCombination.StockQuantity%<br /></p>",
+                                           Subject = "{{Store.Name}}. Quantity below notification. {{Product.Name}}",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n{{Product.Name}} (ID: {{Product.Id}}) low quantity. <br />\r\n{{AttributeCombination.Formatted}}<br />\r\nQuantity: {{AttributeCombination.StockQuantity}}<br />\r\n</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "ReturnRequestStatusChanged.CustomerNotification",
-                                           Subject = "%Store.Name%. Return request status was changed.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Customer.FullName%,<br />Your return request #%ReturnRequest.ID% status has been changed.</p>",
+                                           Subject = "{{Store.Name}}. Return request status was changed.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Customer.FullName}},<br />\r\nYour return request #{{ReturnRequest.Id}} status has been changed.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Service.EmailAFriend",
-                                           Subject = "%Store.Name%. Referred Item",
-                                           Body = "<p><a href=\"%Store.URL%\"> %Store.Name%</a> <br /><br />%EmailAFriend.Email% was shopping on %Store.Name% and wanted to share the following item with you. <br /><br /><b><a target=\"_blank\" href=\"%Product.ProductURLForCustomer%\">%Product.Name%</a></b> <br />%Product.ShortDescription% <br /><br />For more info click <a target=\"_blank\" href=\"%Product.ProductURLForCustomer%\">here</a> <br /><br /><br />%EmailAFriend.PersonalMessage%<br /><br />%Store.Name%</p>",
+                                           Subject = "{{Store.Name}}. Referred Item",
+                                           Body = "<p><a href=\"{{Store.URL}}\"> {{Store.Name}}</a> <br />\r\n<br />\r\n{{EmailAFriend.Email}} was shopping on {{Store.Name}} and wanted to share the following item with you. <br />\r\n<br />\r\n<b><a target=\"_blank\" href=\"{{Product.ProductURLForCustomer}}\">{{Product.Name}}</a></b> <br />\r\n{{Product.ShortDescription}} <br />\r\n<br />\r\nFor more info click <a target=\"_blank\" href=\"{{Product.ProductURLForCustomer}}\">here</a> <br />\r\n<br />\r\n<br />\r\n{{EmailAFriend.PersonalMessage}}<br />\r\n<br />\r\n{{Store.Name}}</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Service.AskQuestion",
-                                           Subject = "%Store.Name%. Question about a product",
-                                           Body = "<p><a href=\"%Store.URL%\"> %Store.Name%</a> <br /><br />%AskQuestion.Email% wanted to ask question about a product %Product.Name%. <br /><br /><b><a target=\"_blank\" href=\"%Product.ProductURLForCustomer%\">%Product.Name%</a></b> <br />%Product.ShortDescription% <br />%AskQuestion.Message%<br /> %AskQuestion.Email% <br /> %AskQuestion.FullName% <br /> %AskQuestion.Phone% <br />%Store.Name%</p>",
+                                           Subject = "{{Store.Name}}. Question about a product",
+                                           Body = "<p><a href=\"{{Store.URL}}\"> {{Store.Name}}</a> <br />\r\n<br />\r\n{{AskQuestion.Email}} wanted to ask question about a product {{Product.Name}}. <br />\r\n<br />\r\n<b><a target=\"_blank\" href=\"{{Product.ProductURLForCustomer}}\">{{Product.Name}}</a></b> <br />\r\n{{Product.ShortDescription}} <br />\r\n{{AskQuestion.Message}}<br />\r\n {{AskQuestion.Email}} <br />\r\n {{AskQuestion.FullName}} <br />\r\n {{AskQuestion.Phone}} <br />\r\n{{Store.Name}}</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Service.ContactUs",
-                                           Subject = "%Store.Name%. Contact us",
-                                           Body = string.Format("<p>From %ContactUs.SenderName% - %ContactUs.SenderEmail% {0} %ContactUs.Body%{0}</p>{0}", Environment.NewLine),
+                                           Subject = "{{Store.Name}}. Contact us",
+                                           Body = "<p>From {{ContactUs.SenderName}} - {{ContactUs.SenderEmail}}<br /><br />{{ContactUs.Body}}</p><br />",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Service.ContactVendor",
-                                           Subject = "%Store.Name%. Contact us",
-                                           Body = string.Format("<p>From %ContactUs.SenderName% - %ContactUs.SenderEmail% {0} %ContactUs.Body%{0}</p>{0}", Environment.NewLine),
+                                           Subject = "{{Store.Name}}. Contact us",
+                                           Body = "<p>From {{ContactUs.SenderName}} - {{ContactUs.SenderEmail}}<br /><br />{{ContactUs.Body}}</p><br />",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
@@ -4665,16 +4501,16 @@ namespace Grand.Services.Installation
                                    new MessageTemplate
                                        {
                                            Name = "Wishlist.EmailAFriend",
-                                           Subject = "%Store.Name%. Wishlist",
-                                           Body = "<p><a href=\"%Store.URL%\"> %Store.Name%</a> <br /><br />%Wishlist.Email% was shopping on %Store.Name% and wanted to share a wishlist with you. <br /><br /><br />For more info click <a target=\"_blank\" href=\"%Wishlist.URLForCustomer%\">here</a> <br /><br /><br />%Wishlist.PersonalMessage%<br /><br />%Store.Name%</p>",
+                                           Subject = "{{Store.Name}}. Wishlist",
+                                           Body = "<p><a href=\"{{Store.URL}}\"> {{Store.Name}}</a> <br />\r\n<br />\r\n{{ShoppingCart.WishlistEmail}} was shopping on {{Store.Name}} and wanted to share a wishlist with you. <br />\r\n<br />\r\n<br />\r\nFor more info click <a target=\"_blank\" href=\"{{ShoppingCart.WishlistURLForCustomer}}\">here</a> <br />\r\n<br />\r\n<br />\r\n{{ShoppingCart.WishlistPersonalMessage}}<br />\r\n<br />\r\n{{Store.Name}}</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "Customer.NewOrderNote",
-                                           Subject = "%Store.Name%. New order note has been added",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Customer.FullName%, <br />New order note has been added to your account:<br />\"%Order.NewNoteText%\".<br /><a target=\"_blank\" href=\"%Order.OrderURLForCustomer%\">%Order.OrderURLForCustomer%</a></p>",
+                                           Subject = "{{Store.Name}}. New order note has been added",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Customer.FullName}}, <br />\r\nNew order note has been added to your account:<br />\r\n\"{{Order.NewNoteText}}\".<br />\r\n<a target=\"_blank\" href=\"{{Order.OrderURLForCustomer}}\">{{Order.OrderURLForCustomer}}</a></p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
@@ -4682,23 +4518,31 @@ namespace Grand.Services.Installation
                                        {
                                            Name = "Customer.NewCustomerNote",
                                            Subject = "New customer note has been added",
-                                           Body = "<p><br />Hello %Customer.FullName%, <br />New customer note has been added to your account:<br />\"%Customer.NewTitleText%\".<br /></p>",
+                                           Body = "<p><br />\r\nHello {{Customer.FullName}}, <br />\r\nNew customer note has been added to your account:<br />\r\n\"{{Customer.NewTitleText}}\".<br />\r\n</p>",
+                                           IsActive = true,
+                                           EmailAccountId = eaGeneral.Id,
+                                       },
+                                     new MessageTemplate
+                                       {
+                                           Name = "Customer.NewReturnRequestNote",
+                                           Subject = "{{Store.Name}}. New return request note has been added",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Customer.FullName}},<br />\r\nYour return request #{{ReturnRequest.ReturnNumber}} has a new note.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "RecurringPaymentCancelled.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Recurring payment cancelled",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />%Customer.FullName% (%Customer.Email%) has just cancelled a recurring payment ID=%RecurringPayment.ID%.</p>",
+                                           Subject = "{{Store.Name}}. Recurring payment cancelled",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n{{Customer.FullName}} ({{Customer.Email}}) has just cancelled a recurring payment ID={{RecurringPayment.ID}}.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                    new MessageTemplate
                                        {
                                            Name = "OrderPlaced.VendorNotification",
-                                           Subject = "%Store.Name%. Order placed",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />%Customer.FullName% (%Customer.Email%) has just placed an order. <br /><br />Order Number: %Order.OrderNumber%<br />Date Ordered: %Order.CreatedOn%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "{{Store.Name}}. Order placed",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n{{Customer.FullName}} ({{Customer.Email}}) has just placed an order. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n" + OrderVendorProducts + "</p>",
                                            //this template is disabled by default
                                            IsActive = false,
                                            EmailAccountId = eaGeneral.Id,
@@ -4706,8 +4550,8 @@ namespace Grand.Services.Installation
                                    new MessageTemplate
                                        {
                                            Name = "OrderPaid.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Order #%Order.OrderNumber% paid",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Order #%Order.OrderNumber% has been just paid<br />Date Ordered: %Order.CreatedOn%</p>",
+                                           Subject = "{{Store.Name}}. Order #{{Order.OrderNumber}} paid",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nOrder #{{Order.OrderNumber}} has been just paid<br />\r\nDate Ordered: {{Order.CreatedOn}}</p>",
                                            //this template is disabled by default
                                            IsActive = false,
                                            EmailAccountId = eaGeneral.Id,
@@ -4715,8 +4559,8 @@ namespace Grand.Services.Installation
                                    new MessageTemplate
                                        {
                                            Name = "OrderPaid.CustomerNotification",
-                                           Subject = "%Store.Name%. Order #%Order.OrderNumber% paid",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Order.CustomerFullName%, <br />Thanks for buying from <a href=\"%Store.URL%\">%Store.Name%</a>. Order #%Order.OrderNumber% has been just paid. Below is the summary of the order. <br /><br />Order Number: %Order.OrderNumber%<br />Order Details: <a href=\"%Order.OrderURLForCustomer%\" target=\"_blank\">%Order.OrderURLForCustomer%</a><br />Date Ordered: %Order.CreatedOn%<br /><br /><br /><br />Billing Address<br />%Order.BillingFirstName% %Order.BillingLastName%<br />%Order.BillingAddress1%<br />%Order.BillingCity% %Order.BillingZipPostalCode%<br />%Order.BillingStateProvince% %Order.BillingCountry%<br /><br /><br /><br />Shipping Address<br />%Order.ShippingFirstName% %Order.ShippingLastName%<br />%Order.ShippingAddress1%<br />%Order.ShippingCity% %Order.ShippingZipPostalCode%<br />%Order.ShippingStateProvince% %Order.ShippingCountry%<br /><br />Shipping Method: %Order.ShippingMethod%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "{{Store.Name}}. Order #{{Order.OrderNumber}} paid",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Order.CustomerFullName}}, <br />\r\nThanks for buying from <a href=\"{{Store.URL}}\">{{Store.Name}}</a>. Order #{{Order.OrderNumber}} has been just paid. Below is the summary of the order. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nOrder Details: <a href=\"{{Order.OrderURLForCustomer}}\" target=\"_blank\">{{Order.OrderURLForCustomer}}</a><br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nBilling Address<br />\r\n{{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n{{Order.BillingAddress1}}<br />\r\n{{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n{{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nShipping Address<br />\r\n{{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n{{Order.ShippingAddress1}}<br />\r\n{{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n{{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n<br />\r\nShipping Method: {{Order.ShippingMethod}}<br />\r\n<br />\r\n" + OrderProducts + "</p>",
                                            //this template is disabled by default
                                            IsActive = false,
                                            EmailAccountId = eaGeneral.Id,
@@ -4724,8 +4568,8 @@ namespace Grand.Services.Installation
                                    new MessageTemplate
                                        {
                                            Name = "OrderPaid.VendorNotification",
-                                           Subject = "%Store.Name%. Order #%Order.OrderNumber% paid",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Order #%Order.OrderNumber% has been just paid. <br /><br />Order Number: %Order.OrderNumber%<br />Date Ordered: %Order.CreatedOn%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "{{Store.Name}}. Order #{{Order.OrderNumber}} paid",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nOrder #{{Order.OrderNumber}} has been just paid. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n" + OrderVendorProducts + "</p>",
                                            //this template is disabled by default
                                            IsActive = false,
                                            EmailAccountId = eaGeneral.Id,
@@ -4733,8 +4577,8 @@ namespace Grand.Services.Installation
                                    new MessageTemplate
                                         {
                                            Name = "OrderRefunded.CustomerNotification",
-                                           Subject = "%Store.Name%. Order #%Order.OrderNumber% refunded",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Hello %Order.CustomerFullName%, <br />Thanks for buying from <a href=\"%Store.URL%\">%Store.Name%</a>. Order #%Order.OrderNumber% has been has been refunded. Please allow 7-14 days for the refund to be reflected in your account.<br /><br />Amount refunded: %Order.AmountRefunded%<br /><br />Below is the summary of the order. <br /><br />Order Number: %Order.OrderNumber%<br />Order Details: <a href=\"%Order.OrderURLForCustomer%\" target=\"_blank\">%Order.OrderURLForCustomer%</a><br />Date Ordered: %Order.CreatedOn%<br /><br /><br /><br />Billing Address<br />%Order.BillingFirstName% %Order.BillingLastName%<br />%Order.BillingAddress1%<br />%Order.BillingCity% %Order.BillingZipPostalCode%<br />%Order.BillingStateProvince% %Order.BillingCountry%<br /><br /><br /><br />Shipping Address<br />%Order.ShippingFirstName% %Order.ShippingLastName%<br />%Order.ShippingAddress1%<br />%Order.ShippingCity% %Order.ShippingZipPostalCode%<br />%Order.ShippingStateProvince% %Order.ShippingCountry%<br /><br />Shipping Method: %Order.ShippingMethod%<br /><br />%Order.Product(s)%</p>",
+                                           Subject = "{{Store.Name}}. Order #{{Order.OrderNumber}} refunded",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nHello {{Order.CustomerFullName}}, <br />\r\nThanks for buying from <a href=\"{{Store.URL}}\">{{Store.Name}}</a>. Order #{{Order.OrderNumber}} has been has been refunded. Please allow 7-14 days for the refund to be reflected in your account.<br />\r\n<br />\r\nAmount refunded: {{Order.AmountRefunded}}<br />\r\n<br />\r\nBelow is the summary of the order. <br />\r\n<br />\r\nOrder Number: {{Order.OrderNumber}}<br />\r\nOrder Details: <a href=\"{{Order.OrderURLForCustomer}}\" target=\"_blank\">{{Order.OrderURLForCustomer}}</a><br />\r\nDate Ordered: {{Order.CreatedOn}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nBilling Address<br />\r\n{{Order.BillingFirstName}} {{Order.BillingLastName}}<br />\r\n{{Order.BillingAddress1}}<br />\r\n{{Order.BillingCity}} {{Order.BillingZipPostalCode}}<br />\r\n{{Order.BillingStateProvince}} {{Order.BillingCountry}}<br />\r\n<br />\r\n<br />\r\n<br />\r\nShipping Address<br />\r\n{{Order.ShippingFirstName}} {{Order.ShippingLastName}}<br />\r\n{{Order.ShippingAddress1}}<br />\r\n{{Order.ShippingCity}} {{Order.ShippingZipPostalCode}}<br />\r\n{{Order.ShippingStateProvince}} {{Order.ShippingCountry}}<br />\r\n<br />\r\nShipping Method: {{Order.ShippingMethod}}<br />\r\n<br />\r\n" + OrderProducts + "</p>",
                                            //this template is disabled by default
                                            IsActive = false,
                                            EmailAccountId = eaGeneral.Id,
@@ -4742,8 +4586,8 @@ namespace Grand.Services.Installation
                                     new MessageTemplate
                                         {
                                            Name = "OrderRefunded.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. Order #%Order.OrderNumber% refunded",
-                                           Body = "%Store.Name%. Order #%Order.OrderNumber% refunded', N'<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />Order #%Order.OrderNumber% has been just refunded<br /><br />Amount refunded: %Order.AmountRefunded%<br /><br />Date Ordered: %Order.CreatedOn%</p>",
+                                           Subject = "{{Store.Name}}. Order #{{Order.OrderNumber}} refunded",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nOrder #{{Order.OrderNumber}} has been just refunded<br />\r\n<br />\r\nAmount refunded: {{Order.AmountRefunded}}<br />\r\n<br />\r\nDate Ordered: {{Order.CreatedOn}}</p>",
                                            //this template is disabled by default
                                            IsActive = false,
                                            EmailAccountId = eaGeneral.Id,
@@ -4751,24 +4595,24 @@ namespace Grand.Services.Installation
                                     new MessageTemplate
                                        {
                                            Name = "VendorAccountApply.StoreOwnerNotification",
-                                           Subject = "%Store.Name%. New vendor account submitted.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />%Customer.FullName% (%Customer.Email%) has just submitted for a vendor account. Details are below:<br />Vendor name: %Vendor.Name%<br />Vendor email: %Vendor.Email%<br /><br />You can activate it in admin area.</p>",
+                                           Subject = "{{Store.Name}}. New vendor account submitted.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\n{{Customer.FullName}} ({{Customer.Email}}) has just submitted for a vendor account. Details are below:<br />\r\nVendor name: {{Vendor.Name}}<br />\r\nVendor email: {{Vendor.Email}}<br />\r\n<br />\r\nYou can activate it in admin area.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                     new MessageTemplate
                                        {
                                            Name = "Vendor.VendorReview",
-                                           Subject = "%Store.Name%. New vendor review.",
-                                           Body = "<p><a href=\"%Store.URL%\">%Store.Name%</a> <br /><br />A new vendor review has been written.</p>",
+                                           Subject = "{{Store.Name}}. New vendor review.",
+                                           Body = "<p><a href=\"{{Store.URL}}\">{{Store.Name}}</a> <br />\r\n<br />\r\nA new vendor review has been written.</p>",
                                            IsActive = true,
                                            EmailAccountId = eaGeneral.Id,
                                        },
                                };
-            _messageTemplateRepository.Insert(messageTemplates);
+            await _messageTemplateRepository.InsertAsync(messageTemplates);
         }
 
-        protected virtual void InstallTopics()
+        protected virtual async Task InstallTopics()
         {
             var defaultTopicTemplate =
                 _topicTemplateRepository.Table.FirstOrDefault(tt => tt.Name == "Default template");
@@ -4782,11 +4626,12 @@ namespace Grand.Services.Installation
                                            SystemName = "AboutUs",
                                            IncludeInSitemap = false,
                                            IsPasswordProtected = false,
-                                           IncludeInFooterColumn1 = true,
+                                           IncludeInFooterRow1 = true,
                                            DisplayOrder = 20,
                                            Title = "About us",
                                            Body = "<p>Put your &quot;About Us&quot; information here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
@@ -4796,18 +4641,20 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "",
                                            Body = "<p><strong>Register and save time!</strong><br />Register with us for future convenience:</p><ul><li>Fast and easy check out</li><li>Easy access to your order history and status</li></ul>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
                                            SystemName = "ConditionsOfUse",
                                            IncludeInSitemap = false,
                                            IsPasswordProtected = false,
-                                           IncludeInFooterColumn1 = true,
+                                           IncludeInFooterRow1 = true,
                                            DisplayOrder = 15,
                                            Title = "Conditions of Use",
                                            Body = "<p>Put your conditions of use information here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
@@ -4817,7 +4664,8 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "",
                                            Body = "<p>Put your contact information here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
@@ -4827,7 +4675,8 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "Forums",
                                            Body = "<p>Put your welcome message here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
@@ -4837,7 +4686,8 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "Welcome to our store",
                                            Body = "<p>Online shopping is the process consumers go through to purchase products or services over the Internet. You can edit this in the admin site.</p><p>If you have questions, see the <a href=\"http://www.grandnode.com/\">Documentation</a>, or post in the <a href=\"http://www.grandnode.com/boards/\">Forums</a> at <a href=\"http://www.grandnode.com\">grandnode.com</a></p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
@@ -4847,18 +4697,20 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "About login / registration",
                                            Body = "<p>Put your login / registration information here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
                                            SystemName = "PrivacyInfo",
                                            IncludeInSitemap = false,
                                            IsPasswordProtected = false,
-                                           IncludeInFooterColumn1 = true,
+                                           IncludeInFooterRow1 = true,
                                            DisplayOrder = 10,
                                            Title = "Privacy notice",
                                            Body = "<p>Put your privacy policy information here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
@@ -4868,18 +4720,20 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "",
                                            Body = "<p><strong>The page you requested was not found, and we have a fine guess why.</strong></p><ul><li>If you typed the URL directly, please make sure the spelling is correct.</li><li>The page no longer exists. In this case, we profusely apologize for the inconvenience and for any damage this may cause.</li></ul>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
                                            SystemName = "ShippingInfo",
                                            IncludeInSitemap = false,
                                            IsPasswordProtected = false,
-                                           IncludeInFooterColumn1 = true,
+                                           IncludeInFooterRow1 = true,
                                            DisplayOrder = 5,
                                            Title = "Shipping & returns",
                                            Body = "<p>Put your shipping &amp; returns information here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
@@ -4889,7 +4743,8 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "",
                                            Body = "<p>Put your apply vendor instructions here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                    new Topic
                                        {
@@ -4899,9 +4754,10 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "",
                                            Body = "<p>Put your terms of service information here. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
-                                                                      new Topic
+                                   new Topic
                                        {
                                            SystemName = "KnowledgebaseHomePage",
                                            IncludeInSitemap = false,
@@ -4909,19 +4765,19 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1,
                                            Title = "",
                                            Body = "<p>Knowledgebase homepage. You can edit this in the admin site.</p>",
-                                           TopicTemplateId = defaultTopicTemplate.Id
+                                           TopicTemplateId = defaultTopicTemplate.Id,
+                                           Published = true,
                                        },
                                };
-            _topicRepository.Insert(topics);
+            await _topicRepository.InsertAsync(topics);
 
             var ltopics = from p in _topicRepository.Table
                           select p;
             //search engine names
             foreach (var topic in ltopics)
             {
-                var seName = topic.ValidateSeName("", !String.IsNullOrEmpty(topic.Title) ? topic.Title : topic.SystemName, true);
-                _urlRecordRepository.Insert(new UrlRecord
-                {
+                var seName = topic.SystemName.ToLowerInvariant();
+                await _urlRecordRepository.InsertAsync(new UrlRecord {
                     EntityId = topic.Id,
                     EntityName = "Topic",
                     LanguageId = "",
@@ -4929,17 +4785,16 @@ namespace Grand.Services.Installation
                     Slug = seName
                 });
                 topic.SeName = seName;
-                _topicRepository.Update(topic);
+                await _topicRepository.UpdateAsync(topic);
             }
 
         }
 
-        protected virtual void InstallSettings(bool installSampleData)
+        protected virtual async Task InstallSettings(bool installSampleData)
         {
-            var _settingService = EngineContext.Current.Resolve<ISettingService>();
+            var _settingService = _serviceProvider.GetRequiredService<ISettingService>();
 
-            _settingService.SaveSetting(new MenuItemSettings
-            {
+            await _settingService.SaveSetting(new MenuItemSettings {
                 DisplayHomePageMenu = !installSampleData,
                 DisplayNewProductsMenu = !installSampleData,
                 DisplaySearchMenu = !installSampleData,
@@ -4949,8 +4804,7 @@ namespace Grand.Services.Installation
                 DisplayContactUsMenu = !installSampleData
             });
 
-            _settingService.SaveSetting(new PdfSettings
-            {
+            await _settingService.SaveSetting(new PdfSettings {
                 LogoPictureId = "",
                 LetterPageSizeEnabled = false,
                 RenderOrderNotes = true,
@@ -4959,8 +4813,7 @@ namespace Grand.Services.Installation
                 InvoiceFooterTextColumn2 = null,
             });
 
-            _settingService.SaveSetting(new CommonSettings
-            {
+            await _settingService.SaveSetting(new CommonSettings {
                 StoreInDatabaseContactUsForm = true,
                 UseSystemEmailForContactUsForm = true,
                 UseStoredProceduresIfSupported = true,
@@ -4979,8 +4832,7 @@ namespace Grand.Services.Installation
                 PopupForTermsOfServiceLinks = true,
                 AllowToSelectStore = false,
             });
-            _settingService.SaveSetting(new SecuritySettings
-            {
+            await _settingService.SaveSetting(new SecuritySettings {
                 EncryptionKey = CommonHelper.GenerateRandomDigitCode(24),
                 AdminAreaAllowedIpAddresses = null,
                 EnableXsrfProtectionForAdminArea = true,
@@ -4989,8 +4841,7 @@ namespace Grand.Services.Installation
                 HoneypotInputName = "hpinput",
                 AllowNonAsciiCharInHeaders = true,
             });
-            _settingService.SaveSetting(new MediaSettings
-            {
+            await _settingService.SaveSetting(new MediaSettings {
                 AvatarPictureSize = 120,
                 BlogThumbPictureSize = 450,
                 ProductThumbPictureSize = 415,
@@ -5000,6 +4851,8 @@ namespace Grand.Services.Installation
                 CategoryThumbPictureSize = 450,
                 ManufacturerThumbPictureSize = 420,
                 VendorThumbPictureSize = 450,
+                CourseThumbPictureSize = 200,
+                LessonThumbPictureSize = 64,
                 CartThumbPictureSize = 80,
                 MiniCartThumbPictureSize = 100,
                 AddToCartThumbPictureSize = 200,
@@ -5008,11 +4861,11 @@ namespace Grand.Services.Installation
                 MaximumImageSize = 1980,
                 DefaultPictureZoomEnabled = true,
                 DefaultImageQuality = 80,
-                MultipleThumbDirectories = false
+                MultipleThumbDirectories = false,
+                StoreLocation = "/"
             });
 
-            _settingService.SaveSetting(new SeoSettings
-            {
+            await _settingService.SaveSetting(new SeoSettings {
                 PageTitleSeparator = ". ",
                 PageTitleSeoAdjustment = PageTitleSeoAdjustment.PagenameAfterStorename,
                 DefaultTitle = "Your store",
@@ -5020,9 +4873,9 @@ namespace Grand.Services.Installation
                 DefaultMetaDescription = "",
                 GenerateProductMetaDescription = true,
                 ConvertNonWesternChars = false,
+                SeoCharConversion = "ą:a;ę:e;ó:o;ć:c;ł:l;ś:s;ź:z;ż:z",
                 AllowUnicodeCharsInUrls = true,
                 CanonicalUrlsEnabled = false,
-                WwwRequirement = WwwRequirement.NoMatter,
                 //we disable bundling out of the box because it requires a lot of server resources
                 EnableJsBundling = false,
                 EnableCssBundling = false,
@@ -5085,19 +4938,15 @@ namespace Grand.Services.Installation
                     },
             });
 
-            _settingService.SaveSetting(new AdminAreaSettings
-            {
+            await _settingService.SaveSetting(new AdminAreaSettings {
                 DefaultGridPageSize = 15,
                 GridPageSizes = "10, 15, 20, 50, 100",
                 RichEditorAdditionalSettings = null,
                 RichEditorAllowJavaScript = false,
                 UseIsoDateTimeConverterInJson = true,
-                AdminLayout = "Darkblue",
-                KendoLayout = "custom",
             });
 
-            _settingService.SaveSetting(new CatalogSettings
-            {
+            await _settingService.SaveSetting(new CatalogSettings {
                 AllowViewUnpublishedProductPage = true,
                 DisplayDiscontinuedMessageForUnpublishedProducts = true,
                 PublishBackProductWhenCancellingOrders = false,
@@ -5133,6 +4982,8 @@ namespace Grand.Services.Installation
                 PersonalizedProductsNumber = 6,
                 NewProductsNumber = 6,
                 NewProductsEnabled = true,
+                NewProductsOnHomePage = false,
+                NewProductsNumberOnHomePage = 6,
                 CompareProductsEnabled = true,
                 CompareProductsNumber = 4,
                 ProductSearchAutoCompleteEnabled = true,
@@ -5141,6 +4992,7 @@ namespace Grand.Services.Installation
                 ShowProductImagesInSearchAutoComplete = true,
                 ShowBestsellersOnHomepage = false,
                 NumberOfBestsellersOnHomepage = 4,
+                PeriodBestsellers = 6,
                 SearchPageProductsPerPage = 6,
                 SearchPageAllowCustomersToSelectPageSize = true,
                 SearchPagePageSizeOptions = "6, 3, 9, 18",
@@ -5159,7 +5011,7 @@ namespace Grand.Services.Installation
                 IgnoreStoreLimitations = true,
                 IgnoreFilterableSpecAttributeOption = true,
                 IgnoreFilterableAvailableStartEndDateTime = true,
-                CacheProductPrices = false,
+                CustomerProductPrice = false,
                 ProductsByTagAllowCustomersToSelectPageSize = true,
                 ProductsByTagPageSizeOptions = "6, 3, 9, 18",
                 MaximumBackInStockSubscriptions = 200,
@@ -5175,8 +5027,7 @@ namespace Grand.Services.Installation
                 LimitOfFeaturedProducts = 30,
             });
 
-            _settingService.SaveSetting(new LocalizationSettings
-            {
+            await _settingService.SaveSetting(new LocalizationSettings {
                 DefaultAdminLanguageId = _languageRepository.Table.Single(l => l.Name == "English").Id,
                 UseImagesForLanguageSelection = false,
                 SeoFriendlyUrlsForLanguagesEnabled = false,
@@ -5187,8 +5038,7 @@ namespace Grand.Services.Installation
                 IgnoreRtlPropertyForAdminArea = false,
             });
 
-            _settingService.SaveSetting(new CustomerSettings
-            {
+            await _settingService.SaveSetting(new CustomerSettings {
                 UsernamesEnabled = false,
                 CheckUsernameAvailabilityEnabled = false,
                 AllowUsersToChangeUsernames = false,
@@ -5211,13 +5061,14 @@ namespace Grand.Services.Installation
                 HideBackInStockSubscriptionsTab = false,
                 HideAuctionsTab = true,
                 HideNotesTab = true,
+                HideDocumentsTab = true,
                 DownloadableProductsValidateUser = false,
                 CustomerNameFormat = CustomerNameFormat.ShowFirstName,
-                GenderEnabled = true,
-                DateOfBirthEnabled = true,
+                GenderEnabled = false,
+                DateOfBirthEnabled = false,
                 DateOfBirthRequired = false,
-                DateOfBirthMinimumAge = null,
-                CompanyEnabled = true,
+                DateOfBirthMinimumAge = 0,
+                CompanyEnabled = false,
                 StreetAddressEnabled = false,
                 StreetAddress2Enabled = false,
                 ZipPostalCodeEnabled = false,
@@ -5240,11 +5091,13 @@ namespace Grand.Services.Installation
                 SaveVisitedPage = false,
                 SuffixDeletedCustomers = true,
                 AllowUsersToDeleteAccount = false,
-                AllowUsersToExportData = false
+                AllowUsersToExportData = false,
+                HideReviewsTab = false,
+                HideCoursesTab = true,
+                TwoFactorAuthenticationEnabled = false,
             });
 
-            _settingService.SaveSetting(new AddressSettings
-            {
+            await _settingService.SaveSetting(new AddressSettings {
                 CompanyEnabled = true,
                 StreetAddressEnabled = true,
                 StreetAddressRequired = true,
@@ -5257,11 +5110,10 @@ namespace Grand.Services.Installation
                 StateProvinceEnabled = true,
                 PhoneEnabled = true,
                 PhoneRequired = true,
-                FaxEnabled = true,
+                FaxEnabled = false,
             });
 
-            _settingService.SaveSetting(new StoreInformationSettings
-            {
+            await _settingService.SaveSetting(new StoreInformationSettings {
                 StoreClosed = false,
                 DefaultStoreTheme = "DefaultClean",
                 AllowCustomerToSelectTheme = false,
@@ -5270,34 +5122,30 @@ namespace Grand.Services.Installation
                 FacebookLink = "https://www.facebook.com/grandnodecom",
                 TwitterLink = "https://twitter.com/grandnode",
                 YoutubeLink = "http://www.youtube.com/user/grandnode",
-                GooglePlusLink = "https://plus.google.com/104905799281078572776",
                 InstagramLink = "https://www.instagram.com/grandnode/",
                 LinkedInLink = "https://www.linkedin.com/company/grandnode.com/",
                 PinterestLink = "",
                 HidePoweredByGrandNode = false
             });
 
-            _settingService.SaveSetting(new ExternalAuthenticationSettings
-            {
+            await _settingService.SaveSetting(new ExternalAuthenticationSettings {
                 AutoRegisterEnabled = true,
                 RequireEmailValidation = false
             });
 
-            _settingService.SaveSetting(new RewardPointsSettings
-            {
+            await _settingService.SaveSetting(new RewardPointsSettings {
                 Enabled = true,
                 ExchangeRate = 1,
                 PointsForRegistration = 0,
                 PointsForPurchases_Amount = 10,
                 PointsForPurchases_Points = 1,
                 PointsForPurchases_Awarded = OrderStatus.Complete,
-                PointsForPurchases_Canceled = OrderStatus.Cancelled,
+                ReduceRewardPointsAfterCancelOrder = true,
                 DisplayHowMuchWillBeEarned = true,
                 PointsAccumulatedForAllStores = true,
             });
 
-            _settingService.SaveSetting(new CurrencySettings
-            {
+            await _settingService.SaveSetting(new CurrencySettings {
                 DisplayCurrencyLabel = false,
                 PrimaryStoreCurrencyId = _currencyRepository.Table.Single(c => c.CurrencyCode == "USD").Id,
                 PrimaryExchangeRateCurrencyId = _currencyRepository.Table.Single(c => c.CurrencyCode == "USD").Id,
@@ -5305,14 +5153,12 @@ namespace Grand.Services.Installation
                 AutoUpdateEnabled = false
             });
 
-            _settingService.SaveSetting(new MeasureSettings
-            {
+            await _settingService.SaveSetting(new MeasureSettings {
                 BaseDimensionId = _measureDimensionRepository.Table.Single(m => m.SystemKeyword == "inches").Id,
                 BaseWeightId = _measureWeightRepository.Table.Single(m => m.SystemKeyword == "lb").Id,
             });
 
-            _settingService.SaveSetting(new MessageTemplatesSettings
-            {
+            await _settingService.SaveSetting(new MessageTemplatesSettings {
                 CaseInvariantReplacement = false,
                 Color1 = "#b9babe",
                 Color2 = "#ebecee",
@@ -5320,8 +5166,7 @@ namespace Grand.Services.Installation
                 PictureSize = 50,
             });
 
-            _settingService.SaveSetting(new ShoppingCartSettings
-            {
+            await _settingService.SaveSetting(new ShoppingCartSettings {
                 DisplayCartAfterAddingProduct = false,
                 DisplayWishlistAfterAddingProduct = false,
                 MaximumShoppingCartItems = 1000,
@@ -5344,8 +5189,7 @@ namespace Grand.Services.Installation
                 RenderAssociatedAttributeValueQuantity = false
             });
 
-            _settingService.SaveSetting(new OrderSettings
-            {
+            await _settingService.SaveSetting(new OrderSettings {
                 IsReOrderAllowed = true,
                 MinOrderSubtotalAmount = 0,
                 MinOrderSubtotalAmountIncludingTax = false,
@@ -5369,10 +5213,10 @@ namespace Grand.Services.Installation
                 DeactivateGiftCardsAfterDeletingOrder = false,
                 CompleteOrderWhenDelivered = true,
                 UserCanCancelUnpaidOrder = false,
+                LengthCode = 8
             });
 
-            _settingService.SaveSetting(new ShippingSettings
-            {
+            await _settingService.SaveSetting(new ShippingSettings {
                 ActiveShippingRateComputationMethodSystemNames = new List<string> { "Shipping.ByWeight" },
                 ShipToSameAddress = false,
                 AllowPickUpInStore = true,
@@ -5389,8 +5233,7 @@ namespace Grand.Services.Installation
                 UseCubeRootMethod = true
             });
 
-            _settingService.SaveSetting(new PaymentSettings
-            {
+            await _settingService.SaveSetting(new PaymentSettings {
                 ActivePaymentMethodSystemNames = new List<string>
                     {
                         "Payments.CheckMoneyOrder",
@@ -5403,8 +5246,7 @@ namespace Grand.Services.Installation
                 SkipPaymentInfoStepForRedirectionPaymentMethods = false,
             });
 
-            _settingService.SaveSetting(new TaxSettings
-            {
+            await _settingService.SaveSetting(new TaxSettings {
                 TaxBasedOn = TaxBasedOn.BillingAddress,
                 TaxDisplayType = TaxDisplayType.ExcludingTax,
                 ActiveTaxProviderSystemName = "Tax.FixedRate",
@@ -5431,17 +5273,15 @@ namespace Grand.Services.Installation
                 EuVatEmailAdminWhenNewVatSubmitted = false
             });
 
-            _settingService.SaveSetting(new DateTimeSettings
-            {
+            await _settingService.SaveSetting(new DateTimeSettings {
                 DefaultStoreTimeZoneId = "",
                 AllowCustomersToSetTimeZone = false
             });
 
-            _settingService.SaveSetting(new BlogSettings
-            {
+            await _settingService.SaveSetting(new BlogSettings {
                 Enabled = true,
                 PostsPageSize = 10,
-                AllowNotRegisteredUsersToLeaveComments = true,
+                AllowNotRegisteredUsersToLeaveComments = false,
                 NotifyAboutNewBlogComments = false,
                 NumberOfTags = 15,
                 ShowHeaderRssUrl = false,
@@ -5450,21 +5290,18 @@ namespace Grand.Services.Installation
                 MaxTextSizeHomePage = 200
             });
 
-            _settingService.SaveSetting(new KnowledgebaseSettings
-            {
+            await _settingService.SaveSetting(new KnowledgebaseSettings {
                 Enabled = false,
-                AllowNotRegisteredUsersToLeaveComments = true,
+                AllowNotRegisteredUsersToLeaveComments = false,
                 NotifyAboutNewArticleComments = false
             });
 
-            _settingService.SaveSetting(new PushNotificationsSettings
-            {
+            await _settingService.SaveSetting(new PushNotificationsSettings {
                 Enabled = false,
                 AllowGuestNotifications = true
             });
 
-            _settingService.SaveSetting(new AdminSearchSettings
-            {
+            await _settingService.SaveSetting(new AdminSearchSettings {
                 BlogsDisplayOrder = 0,
                 CategoriesDisplayOrder = 0,
                 CustomersDisplayOrder = 0,
@@ -5487,10 +5324,9 @@ namespace Grand.Services.Installation
                 MenuDisplayOrder = -1
             });
 
-            _settingService.SaveSetting(new NewsSettings
-            {
+            await _settingService.SaveSetting(new NewsSettings {
                 Enabled = true,
-                AllowNotRegisteredUsersToLeaveComments = true,
+                AllowNotRegisteredUsersToLeaveComments = false,
                 NotifyAboutNewNewsComments = false,
                 ShowNewsOnMainPage = true,
                 MainPageNewsCount = 3,
@@ -5498,8 +5334,7 @@ namespace Grand.Services.Installation
                 ShowHeaderRssUrl = false,
             });
 
-            _settingService.SaveSetting(new ForumSettings
-            {
+            await _settingService.SaveSetting(new ForumSettings {
                 ForumsEnabled = false,
                 RelativeDateTimeFormattingEnabled = true,
                 AllowCustomersToDeletePosts = false,
@@ -5535,13 +5370,12 @@ namespace Grand.Services.Installation
                 ForumSearchTermMinimumLength = 3,
             });
 
-            _settingService.SaveSetting(new VendorSettings
-            {
+            await _settingService.SaveSetting(new VendorSettings {
                 DefaultVendorPageSizeOptions = "6, 3, 9",
                 VendorsBlockItemsToDisplay = 0,
                 ShowVendorOnProductDetailsPage = true,
                 AllowCustomersToContactVendors = true,
-                AllowCustomersToApplyForVendorAccount = true,
+                AllowCustomersToApplyForVendorAccount = false,
                 AllowAnonymousUsersToReviewVendor = false,
                 DefaultVendorRatingValue = 5,
                 VendorReviewsMustBeApproved = true,
@@ -5552,37 +5386,32 @@ namespace Grand.Services.Installation
             var eaGeneral = _emailAccountRepository.Table.FirstOrDefault();
             if (eaGeneral == null)
                 throw new Exception("Default email account cannot be loaded");
-            _settingService.SaveSetting(new EmailAccountSettings
-            {
+            await _settingService.SaveSetting(new EmailAccountSettings {
                 DefaultEmailAccountId = eaGeneral.Id
             });
 
-            _settingService.SaveSetting(new WidgetSettings
-            {
+            await _settingService.SaveSetting(new WidgetSettings {
                 ActiveWidgetSystemNames = new List<string> { "Widgets.Slider" },
             });
 
-            _settingService.SaveSetting(new GoogleAnalyticsSettings()
-            {
+            await _settingService.SaveSetting(new GoogleAnalyticsSettings() {
                 gaprivateKey = "",
                 gaserviceAccountEmail = "",
                 gaviewID = ""
             });
         }
 
-        protected virtual void InstallCheckoutAttributes()
+        protected virtual async Task InstallCheckoutAttributes()
         {
-            var ca1 = new CheckoutAttribute
-            {
+            var ca1 = new CheckoutAttribute {
                 Name = "Gift wrapping",
                 IsRequired = true,
                 ShippableProductRequired = true,
                 AttributeControlType = AttributeControlType.DropdownList,
                 DisplayOrder = 1,
             };
-            _checkoutAttributeRepository.Insert(ca1);
-            ca1.CheckoutAttributeValues.Add(new CheckoutAttributeValue
-            {
+            await _checkoutAttributeRepository.InsertAsync(ca1);
+            ca1.CheckoutAttributeValues.Add(new CheckoutAttributeValue {
                 Name = "No",
                 PriceAdjustment = 0,
                 DisplayOrder = 1,
@@ -5590,179 +5419,171 @@ namespace Grand.Services.Installation
                 CheckoutAttributeId = ca1.Id,
             });
 
-            ca1.CheckoutAttributeValues.Add(new CheckoutAttributeValue
-            {
+            ca1.CheckoutAttributeValues.Add(new CheckoutAttributeValue {
                 Name = "Yes",
                 PriceAdjustment = 10,
                 DisplayOrder = 2,
                 CheckoutAttributeId = ca1.Id,
             });
-            _checkoutAttributeRepository.Update(ca1);
+            await _checkoutAttributeRepository.UpdateAsync(ca1);
         }
 
-        protected virtual void InstallSpecificationAttributes()
+        protected virtual async Task InstallSpecificationAttributes()
         {
-            var sa1 = new SpecificationAttribute
-            {
+            var sa1 = new SpecificationAttribute {
                 Name = "Screensize",
                 DisplayOrder = 1,
+                SeName = SeoExtensions.GetSeName("Screensize", false, false),
             };
-            _specificationAttributeRepository.Insert(sa1);
+            await _specificationAttributeRepository.InsertAsync(sa1);
 
-            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
-
+            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "13.0''",
                 DisplayOrder = 2,
-                SpecificationAttributeId = sa1.Id,
+                SeName = SeoExtensions.GetSeName("13.0''", false, false),
             });
-            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "13.3''",
                 DisplayOrder = 3,
-                SpecificationAttributeId = sa1.Id,
+                SeName = SeoExtensions.GetSeName("13.3''", false, false),
             });
-            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "14.0''",
                 DisplayOrder = 4,
-                SpecificationAttributeId = sa1.Id,
+                SeName = SeoExtensions.GetSeName("14.0''", false, false),
             });
-            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "15.0''",
                 DisplayOrder = 4,
-                SpecificationAttributeId = sa1.Id,
+                SeName = SeoExtensions.GetSeName("15.0''", false, false),
             });
-            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa1.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "15.6''",
                 DisplayOrder = 5,
-                SpecificationAttributeId = sa1.Id,
+                SeName = SeoExtensions.GetSeName("15.6''", false, false),
             });
-            _specificationAttributeRepository.Update(sa1);
+            await _specificationAttributeRepository.UpdateAsync(sa1);
 
-            var sa2 = new SpecificationAttribute
-            {
+            var sa2 = new SpecificationAttribute {
                 Name = "CPU Type",
                 DisplayOrder = 2,
+                SeName = SeoExtensions.GetSeName("CPU Type", false, false),
             };
-            _specificationAttributeRepository.Insert(sa2);
+            await _specificationAttributeRepository.InsertAsync(sa2);
 
-            sa2.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa2.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "Intel Core i5",
                 DisplayOrder = 1,
-                SpecificationAttributeId = sa1.Id,
+                SeName = SeoExtensions.GetSeName("Intel Core i5", false, false),
             });
 
-            sa2.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa2.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "Intel Core i7",
                 DisplayOrder = 2,
-                SpecificationAttributeId = sa2.Id,
+                SeName = SeoExtensions.GetSeName("Intel Core i7", false, false),
             });
-            _specificationAttributeRepository.Update(sa2);
+            await _specificationAttributeRepository.UpdateAsync(sa2);
 
-            var sa3 = new SpecificationAttribute
-            {
+            var sa3 = new SpecificationAttribute {
                 Name = "Memory",
                 DisplayOrder = 3,
+                SeName = SeoExtensions.GetSeName("Memory", false, false),
             };
-            _specificationAttributeRepository.Insert(sa3);
+            await _specificationAttributeRepository.InsertAsync(sa3);
 
-            sa3.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa3.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "4 GB",
                 DisplayOrder = 1,
-                SpecificationAttributeId = sa3.Id,
+                SeName = SeoExtensions.GetSeName("4 GB", false, false),
             });
-            sa3.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa3.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "8 GB",
                 DisplayOrder = 2,
-                SpecificationAttributeId = sa3.Id,
+                SeName = SeoExtensions.GetSeName("8 GB", false, false),
             });
-            sa3.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa3.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "16 GB",
                 DisplayOrder = 3,
-                SpecificationAttributeId = sa3.Id,
+                SeName = SeoExtensions.GetSeName("16 GB", false, false),
             });
-            _specificationAttributeRepository.Update(sa3);
+            await _specificationAttributeRepository.UpdateAsync(sa3);
 
-            var sa4 = new SpecificationAttribute
-            {
+            var sa4 = new SpecificationAttribute {
                 Name = "Hardrive",
                 DisplayOrder = 5,
+                SeName = SeoExtensions.GetSeName("Hardrive", false, false),
             };
-            _specificationAttributeRepository.Insert(sa4);
+            await _specificationAttributeRepository.InsertAsync(sa4);
 
-            sa4.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa4.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "128 GB",
                 DisplayOrder = 7,
-                SpecificationAttributeId = sa4.Id,
+                SeName = SeoExtensions.GetSeName("128 GB", false, false),
             });
-            sa4.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa4.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "500 GB",
                 DisplayOrder = 4,
-                SpecificationAttributeId = sa4.Id,
+                SeName = SeoExtensions.GetSeName("500 GB", false, false),
             });
-            sa4.SpecificationAttributeOptions.Add(new SpecificationAttributeOption
-            {
+            sa4.SpecificationAttributeOptions.Add(new SpecificationAttributeOption {
                 Name = "1 TB",
                 DisplayOrder = 3,
-                SpecificationAttributeId = sa4.Id,
+                SeName = SeoExtensions.GetSeName("1 TB", false, false),
             });
-            _specificationAttributeRepository.Update(sa4);
-
+            await _specificationAttributeRepository.UpdateAsync(sa4);
         }
 
-        protected virtual void InstallProductAttributes()
+        protected virtual async Task InstallProductAttributes()
         {
             var productAttributes = new List<ProductAttribute>
             {
                 new ProductAttribute
                 {
                     Name = "Color",
+                    SeName = "color"
                 },
                 new ProductAttribute
                 {
                     Name = "Custom Text",
+                    SeName = "custom-text"
                 },
                 new ProductAttribute
                 {
                     Name = "HDD",
+                    SeName = "hdd"
                 },
                 new ProductAttribute
                 {
                     Name = "OS",
+                    SeName = "os"
                 },
                 new ProductAttribute
                 {
                     Name = "Processor",
+                    SeName  = "processor"
                 },
                 new ProductAttribute
                 {
                     Name = "RAM",
+                    SeName = "ram"
                 },
                 new ProductAttribute
                 {
                     Name = "Size",
+                    SeName = "size"
                 },
                 new ProductAttribute
                 {
                     Name = "Software",
+                    SeName = "software"
                 },
             };
-            _productAttributeRepository.Insert(productAttributes);
+            await _productAttributeRepository.InsertAsync(productAttributes);
         }
 
-        protected virtual void InstallCategories()
+        protected virtual async Task InstallCategories()
         {
-            var pictureService = EngineContext.Current.Resolve<IPictureService>();
+            var pictureService = _serviceProvider.GetRequiredService<IPictureService>();
 
             //sample pictures
             var sampleImagesPath = GetSamplesPath();
@@ -5775,15 +5596,14 @@ namespace Grand.Services.Installation
 
             //categories
             var allCategories = new List<Category>();
-            var categoryComputers = new Category
-            {
+            var categoryComputers = new Category {
                 Name = "Computers",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = "",
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_computers.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Computers")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_computers.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Computers"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
                 Flag = "New",
@@ -5794,15 +5614,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryComputers);
 
-            var categoryDesktops = new Category
-            {
+            var categoryDesktops = new Category {
                 Name = "Desktops",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryComputers.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_desktops.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Desktops")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_desktops.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Desktops"))).Id,
                 PriceRanges = "-1000;1000-1200;1200-;",
                 IncludeInTopMenu = true,
                 Published = true,
@@ -5812,15 +5631,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryDesktops);
 
-            var categoryNotebooks = new Category
-            {
+            var categoryNotebooks = new Category {
                 Name = "Notebooks",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryComputers.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_notebooks.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Notebooks")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_notebooks.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Notebooks"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
                 DisplayOrder = 2,
@@ -5829,15 +5647,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryNotebooks);
 
-            var categorySoftware = new Category
-            {
+            var categorySoftware = new Category {
                 Name = "Software",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryComputers.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_software.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Software")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_software.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Software"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
                 DisplayOrder = 3,
@@ -5846,15 +5663,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categorySoftware);
 
-            var categoryElectronics = new Category
-            {
+            var categoryElectronics = new Category {
                 Name = "Electronics",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 ParentCategoryId = "",
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_electronics.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Electronics")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_electronics.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Electronics"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
                 ShowOnHomePage = true,
@@ -5864,15 +5680,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryElectronics);
 
-            var categoryCameraPhoto = new Category
-            {
+            var categoryCameraPhoto = new Category {
                 Name = "Camera & photo",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryElectronics.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_camera_photo.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Camera, photo")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_camera_photo.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Camera, photo"))).Id,
                 PriceRanges = "-500;500-;",
                 IncludeInTopMenu = true,
                 Published = true,
@@ -5882,15 +5697,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryCameraPhoto);
 
-            var categoryCellPhones = new Category
-            {
+            var categoryCellPhones = new Category {
                 Name = "Cell phones",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryElectronics.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_cell_phones.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Cell phones")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_cell_phones.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Cell phones"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
                 DisplayOrder = 2,
@@ -5899,15 +5713,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryCellPhones);
 
-            var categoryOthers = new Category
-            {
+            var categoryOthers = new Category {
                 Name = "Others",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryElectronics.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_accessories.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Accessories")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_accessories.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Accessories"))).Id,
                 IncludeInTopMenu = true,
                 PriceRanges = "-100;100-;",
                 Published = true,
@@ -5917,15 +5730,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryOthers);
 
-            var categoryApparel = new Category
-            {
+            var categoryApparel = new Category {
                 Name = "Apparel",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 ParentCategoryId = "",
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_apparel.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Apparel")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_apparel.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Apparel"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
                 ShowOnHomePage = true,
@@ -5935,15 +5747,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryApparel);
 
-            var categoryShoes = new Category
-            {
+            var categoryShoes = new Category {
                 Name = "Shoes",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryApparel.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_shoes.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Shoes")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_shoes.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Shoes"))).Id,
                 PriceRanges = "-500;500-;",
                 IncludeInTopMenu = true,
                 Published = true,
@@ -5953,15 +5764,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryShoes);
 
-            var categoryClothing = new Category
-            {
+            var categoryClothing = new Category {
                 Name = "Clothing",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryApparel.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_clothing.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Clothing")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_clothing.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Clothing"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
                 DisplayOrder = 2,
@@ -5970,15 +5780,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryClothing);
 
-            var categoryAccessories = new Category
-            {
+            var categoryAccessories = new Category {
                 Name = "Accessories",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 ParentCategoryId = categoryApparel.Id,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_apparel_accessories.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Apparel Accessories")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_apparel_accessories.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Apparel Accessories"))).Id,
                 IncludeInTopMenu = true,
                 PriceRanges = "-100;100-;",
                 Published = true,
@@ -5988,26 +5797,24 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryAccessories);
 
-            var categoryDigitalDownloads = new Category
-            {
+            var categoryDigitalDownloads = new Category {
                 Name = "Digital downloads",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 ParentCategoryId = "",
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_digital_downloads.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Digital downloads")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_digital_downloads.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Digital downloads"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
-                ShowOnHomePage = true,
+                ShowOnHomePage = false,
                 DisplayOrder = 4,
                 CreatedOnUtc = DateTime.UtcNow,
                 UpdatedOnUtc = DateTime.UtcNow
             };
             allCategories.Add(categoryDigitalDownloads);
 
-            var categoryBooks = new Category
-            {
+            var categoryBooks = new Category {
                 Name = "Books",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 MetaKeywords = "Books, Dictionary, Textbooks",
@@ -6016,10 +5823,11 @@ namespace Grand.Services.Installation
                 ParentCategoryId = "",
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_book.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Book")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_book.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Book"))).Id,
                 PriceRanges = "-25;25-50;50-;",
                 IncludeInTopMenu = true,
                 Published = true,
+                ShowOnHomePage = true,
                 DisplayOrder = 5,
                 Flag = "Promo!",
                 FlagStyle = "bg-success",
@@ -6028,15 +5836,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryBooks);
 
-            var categoryJewelry = new Category
-            {
+            var categoryJewelry = new Category {
                 Name = "Jewelry",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 ParentCategoryId = "",
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_jewelry.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Jewelry")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_jewelry.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Jewelry"))).Id,
                 PriceRanges = "0-500;500-700;700-3000;",
                 IncludeInTopMenu = true,
                 Published = true,
@@ -6046,15 +5853,14 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryJewelry);
 
-            var categoryGiftCards = new Category
-            {
+            var categoryGiftCards = new Category {
                 Name = "Gift Cards",
                 CategoryTemplateId = categoryTemplateInGridAndLines.Id,
                 PageSize = 6,
                 ParentCategoryId = "",
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_gift_cards.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Gift Cards")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "category_gift_cards.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Gift Cards"))).Id,
                 IncludeInTopMenu = true,
                 Published = true,
                 DisplayOrder = 7,
@@ -6063,27 +5869,26 @@ namespace Grand.Services.Installation
             };
             allCategories.Add(categoryGiftCards);
 
-            _categoryRepository.Insert(allCategories);
+            await _categoryRepository.InsertAsync(allCategories);
             //search engine names
             foreach (var category in allCategories)
             {
-                category.SeName = category.ValidateSeName("", category.Name, true);
-                _urlRecordRepository.Insert(new UrlRecord
-                {
+                category.SeName = SeoExtensions.GetSeName(category.Name, false, false);
+                await _urlRecordRepository.InsertAsync(new UrlRecord {
                     EntityId = category.Id,
                     EntityName = "Category",
                     LanguageId = "",
                     IsActive = true,
                     Slug = category.SeName,
                 });
-                _categoryRepository.Update(category);
+                await _categoryRepository.UpdateAsync(category);
             }
         }
 
-        protected virtual void InstallManufacturers()
+        protected virtual async Task InstallManufacturers()
         {
-            var pictureService = EngineContext.Current.Resolve<IPictureService>();
-            var downloadService = EngineContext.Current.Resolve<IDownloadService>();
+            var pictureService = _serviceProvider.GetRequiredService<IPictureService>();
+            var downloadService = _serviceProvider.GetRequiredService<IDownloadService>();
 
             var sampleImagesPath = GetSamplesPath();
 
@@ -6093,76 +5898,72 @@ namespace Grand.Services.Installation
                 throw new Exception("Manufacturer template cannot be loaded");
 
             var allManufacturers = new List<Manufacturer>();
-            var manufacturerAsus = new Manufacturer
-            {
+            var manufacturerAsus = new Manufacturer {
                 Name = "Apple",
                 ManufacturerTemplateId = manufacturerTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 Published = true,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "manufacturer_apple.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Apple")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "manufacturer_apple.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Apple"))).Id,
                 DisplayOrder = 1,
                 CreatedOnUtc = DateTime.UtcNow,
                 UpdatedOnUtc = DateTime.UtcNow
             };
-            _manufacturerRepository.Insert(manufacturerAsus);
+            await _manufacturerRepository.InsertAsync(manufacturerAsus);
             allManufacturers.Add(manufacturerAsus);
 
 
-            var manufacturerHp = new Manufacturer
-            {
+            var manufacturerHp = new Manufacturer {
                 Name = "HP",
                 ManufacturerTemplateId = manufacturerTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 Published = true,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "manufacturer_hp.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Hp")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "manufacturer_hp.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Hp"))).Id,
                 DisplayOrder = 5,
                 CreatedOnUtc = DateTime.UtcNow,
                 UpdatedOnUtc = DateTime.UtcNow
             };
-            _manufacturerRepository.Insert(manufacturerHp);
+            await _manufacturerRepository.InsertAsync(manufacturerHp);
             allManufacturers.Add(manufacturerHp);
 
 
-            var manufacturerNike = new Manufacturer
-            {
+            var manufacturerNike = new Manufacturer {
                 Name = "Nike",
                 ManufacturerTemplateId = manufacturerTemplateInGridAndLines.Id,
                 PageSize = 6,
                 AllowCustomersToSelectPageSize = true,
                 PageSizeOptions = "6, 3, 9",
                 Published = true,
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "manufacturer_nike.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Nike")).Id,
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "manufacturer_nike.jpg"), "image/pjpeg", pictureService.GetPictureSeName("Nike"))).Id,
                 DisplayOrder = 5,
                 CreatedOnUtc = DateTime.UtcNow,
                 UpdatedOnUtc = DateTime.UtcNow
             };
-            _manufacturerRepository.Insert(manufacturerNike);
+            await _manufacturerRepository.InsertAsync(manufacturerNike);
             allManufacturers.Add(manufacturerNike);
 
             //search engine names
             foreach (var manufacturer in allManufacturers)
             {
                 manufacturer.SeName = SeoExtensions.GetSeName(manufacturer.Name, false, true);
-                _urlRecordRepository.Insert(new UrlRecord
-                {
+                await _urlRecordRepository.InsertAsync(new UrlRecord {
                     EntityId = manufacturer.Id,
                     EntityName = "Manufacturer",
                     LanguageId = "",
                     IsActive = true,
                     Slug = manufacturer.SeName
                 });
-                _manufacturerRepository.Update(manufacturer);
+                await _manufacturerRepository.UpdateAsync(manufacturer);
             }
         }
 
-        protected virtual void InstallProducts(string defaultUserEmail)
+        protected virtual async Task InstallProducts(string defaultUserEmail)
         {
-            var pictureService = EngineContext.Current.Resolve<IPictureService>();
-            var downloadService = EngineContext.Current.Resolve<IDownloadService>();
+            var pictureService = _serviceProvider.GetRequiredService<IPictureService>();
+            var downloadService = _serviceProvider.GetRequiredService<IDownloadService>();
 
             var productTemplateSimple = _productTemplateRepository.Table.FirstOrDefault(pt => pt.Name == "Simple product");
             if (productTemplateSimple == null)
@@ -6198,8 +5999,7 @@ namespace Grand.Services.Installation
             #region Desktops
 
 
-            var productBuildComputer = new Product
-            {
+            var productBuildComputer = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Build your own computer",
@@ -6370,29 +6170,26 @@ namespace Grand.Services.Installation
             };
             allProducts.Add(productBuildComputer);
 
-            var Picture1 = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Desktops_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBuildComputer.Name));
-            var Picture2 = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Desktops_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBuildComputer.Name));
+            var Picture1 = await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Desktops_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBuildComputer.Name));
+            var Picture2 = await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Desktops_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBuildComputer.Name));
 
-            _productRepository.Insert(productBuildComputer);
+            await _productRepository.InsertAsync(productBuildComputer);
 
-            var productpicture1 = new ProductPicture
-            {
+            var productpicture1 = new ProductPicture {
                 ProductId = productBuildComputer.Id,
                 PictureId = Picture1.Id,
                 DisplayOrder = 1
             };
-            var productpicture2 = new ProductPicture
-            {
+            var productpicture2 = new ProductPicture {
                 ProductId = productBuildComputer.Id,
                 PictureId = Picture2.Id,
                 DisplayOrder = 1
             };
             productBuildComputer.ProductPictures.Add(productpicture1);
             productBuildComputer.ProductPictures.Add(productpicture2);
-            _productRepository.Update(productBuildComputer);
+            await _productRepository.UpdateAsync(productBuildComputer);
 
-            var productDigitalStorm = new Product
-            {
+            var productDigitalStorm = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Digital Storm VANQUISH 3 Custom Performance PC",
@@ -6429,15 +6226,13 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productDigitalStorm);
-            productDigitalStorm.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_DigitalStorm.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productDigitalStorm.Name)).Id,
+            productDigitalStorm.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_DigitalStorm.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productDigitalStorm.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productDigitalStorm);
+            await _productRepository.InsertAsync(productDigitalStorm);
 
-            var productLenovoIdeaCentre = new Product
-            {
+            var productLenovoIdeaCentre = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Lenovo IdeaCentre 600 All-in-One PC",
@@ -6474,19 +6269,17 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productLenovoIdeaCentre);
-            productLenovoIdeaCentre.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LenovoIdeaCentre.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productLenovoIdeaCentre.Name)).Id,
+            productLenovoIdeaCentre.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LenovoIdeaCentre.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productLenovoIdeaCentre.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productLenovoIdeaCentre);
+            await _productRepository.InsertAsync(productLenovoIdeaCentre);
 
             #endregion
 
             #region Notebooks
 
-            var productAppleMacBookPro = new Product
-            {
+            var productAppleMacBookPro = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Apple MacBook Pro 13-inch",
@@ -6561,21 +6354,18 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productAppleMacBookPro);
-            productAppleMacBookPro.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_macbook_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAppleMacBookPro.Name)).Id,
+            productAppleMacBookPro.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_macbook_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAppleMacBookPro.Name))).Id,
                 DisplayOrder = 1,
             });
-            productAppleMacBookPro.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_macbook_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAppleMacBookPro.Name)).Id,
+            productAppleMacBookPro.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_macbook_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAppleMacBookPro.Name))).Id,
                 DisplayOrder = 2,
             });
-            _productRepository.Insert(productAppleMacBookPro);
+            await _productRepository.InsertAsync(productAppleMacBookPro);
 
 
-            var productAsusN551JK = new Product
-            {
+            var productAsusN551JK = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Asus N551JK-XO076H Laptop",
@@ -6647,16 +6437,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productAsusN551JK);
-            productAsusN551JK.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_asuspc_N551JK.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAsusN551JK.Name)).Id,
+            productAsusN551JK.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_asuspc_N551JK.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAsusN551JK.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productAsusN551JK);
+            await _productRepository.InsertAsync(productAsusN551JK);
 
 
-            var productSamsungSeries = new Product
-            {
+            var productSamsungSeries = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Samsung Series 9 NP900X4C Premium Ultrabook",
@@ -6728,15 +6516,13 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productSamsungSeries);
-            productSamsungSeries.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_SamsungNP900X4C.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productSamsungSeries.Name)).Id,
+            productSamsungSeries.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_SamsungNP900X4C.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productSamsungSeries.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productSamsungSeries);
+            await _productRepository.InsertAsync(productSamsungSeries);
 
-            var productHpSpectre = new Product
-            {
+            var productHpSpectre = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "HP Spectre XT Pro UltraBook",
@@ -6816,21 +6602,18 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productHpSpectre);
-            productHpSpectre.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HPSpectreXT_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHpSpectre.Name)).Id,
+            productHpSpectre.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HPSpectreXT_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHpSpectre.Name))).Id,
                 DisplayOrder = 1,
             });
-            productHpSpectre.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HPSpectreXT_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHpSpectre.Name)).Id,
+            productHpSpectre.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HPSpectreXT_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHpSpectre.Name))).Id,
                 DisplayOrder = 2,
             });
-            _productRepository.Insert(productHpSpectre);
+            await _productRepository.InsertAsync(productHpSpectre);
 
 
-            var productHpEnvy = new Product
-            {
+            var productHpEnvy = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "HP Envy 6-1180ca 15.6-Inch Sleekbook",
@@ -6910,16 +6693,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productHpEnvy);
-            productHpEnvy.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HpEnvy6.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHpEnvy.Name)).Id,
+            productHpEnvy.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HpEnvy6.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHpEnvy.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productHpEnvy);
+            await _productRepository.InsertAsync(productHpEnvy);
 
 
-            var productLenovoThinkpad = new Product
-            {
+            var productLenovoThinkpad = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Lenovo Thinkpad X1 Carbon Laptop",
@@ -6975,20 +6756,18 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productLenovoThinkpad);
-            productLenovoThinkpad.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LenovoThinkpad.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productLenovoThinkpad.Name)).Id,
+            productLenovoThinkpad.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LenovoThinkpad.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productLenovoThinkpad.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productLenovoThinkpad);
+            await _productRepository.InsertAsync(productLenovoThinkpad);
 
             #endregion
 
             #region Software
 
 
-            var productAdobePhotoshop = new Product
-            {
+            var productAdobePhotoshop = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Adobe Photoshop CS4",
@@ -7025,16 +6804,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productAdobePhotoshop);
-            productAdobePhotoshop.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_AdobePhotoshop.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAdobePhotoshop.Name)).Id,
+            productAdobePhotoshop.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_AdobePhotoshop.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAdobePhotoshop.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productAdobePhotoshop);
+            await _productRepository.InsertAsync(productAdobePhotoshop);
 
 
-            var productWindows8Pro = new Product
-            {
+            var productWindows8Pro = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Windows 8 Pro",
@@ -7071,16 +6848,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productWindows8Pro);
-            productWindows8Pro.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Windows8.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productWindows8Pro.Name)).Id,
+            productWindows8Pro.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Windows8.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productWindows8Pro.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productWindows8Pro);
+            await _productRepository.InsertAsync(productWindows8Pro);
 
 
-            var productSoundForge = new Product
-            {
+            var productSoundForge = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Sound Forge Pro 11",
@@ -7117,12 +6892,11 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productSoundForge);
-            productSoundForge.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_SoundForge.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productSoundForge.Name)).Id,
+            productSoundForge.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_SoundForge.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productSoundForge.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productSoundForge);
+            await _productRepository.InsertAsync(productSoundForge);
 
 
             #endregion
@@ -7131,8 +6905,7 @@ namespace Grand.Services.Installation
 
 
             //this one is a grouped product with two associated ones
-            var productNikonD5500DSLR = new Product
-            {
+            var productNikonD5500DSLR = new Product {
                 ProductType = ProductType.GroupedProduct,
                 VisibleIndividually = true,
                 Name = "Nikon D5500 DSLR",
@@ -7169,19 +6942,16 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productNikonD5500DSLR);
-            productNikonD5500DSLR.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikonCamera_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productNikonD5500DSLR.Name)).Id,
+            productNikonD5500DSLR.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikonCamera_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productNikonD5500DSLR.Name))).Id,
                 DisplayOrder = 1,
             });
-            productNikonD5500DSLR.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikonCamera_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productNikonD5500DSLR.Name)).Id,
+            productNikonD5500DSLR.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikonCamera_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productNikonD5500DSLR.Name))).Id,
                 DisplayOrder = 2,
             });
-            _productRepository.Insert(productNikonD5500DSLR);
-            var productNikonD5500DSLR_associated_1 = new Product
-            {
+            await _productRepository.InsertAsync(productNikonD5500DSLR);
+            var productNikonD5500DSLR_associated_1 = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = false, //hide this products
                 ParentGroupedProductId = productNikonD5500DSLR.Id,
@@ -7209,14 +6979,12 @@ namespace Grand.Services.Installation
                 UpdatedOnUtc = DateTime.UtcNow
             };
             allProducts.Add(productNikonD5500DSLR_associated_1);
-            productNikonD5500DSLR_associated_1.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikonCamera_black.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Canon Digital SLR Camera - Black")).Id,
+            productNikonD5500DSLR_associated_1.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikonCamera_black.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Canon Digital SLR Camera - Black"))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productNikonD5500DSLR_associated_1);
-            var productNikonD5500DSLR_associated_2 = new Product
-            {
+            await _productRepository.InsertAsync(productNikonD5500DSLR_associated_1);
+            var productNikonD5500DSLR_associated_2 = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = false,
                 ParentGroupedProductId = productNikonD5500DSLR.Id,
@@ -7244,15 +7012,13 @@ namespace Grand.Services.Installation
                 UpdatedOnUtc = DateTime.UtcNow
             };
             allProducts.Add(productNikonD5500DSLR_associated_2);
-            productNikonD5500DSLR_associated_2.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikonCamera_red.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Canon Digital SLR Camera - Silver")).Id,
+            productNikonD5500DSLR_associated_2.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikonCamera_red.jpeg"), "image/jpeg", pictureService.GetPictureSeName("Canon Digital SLR Camera - Silver"))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productNikonD5500DSLR_associated_2);
+            await _productRepository.InsertAsync(productNikonD5500DSLR_associated_2);
 
-            var productLeica = new Product
-            {
+            var productLeica = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Leica T Mirrorless Digital Camera",
@@ -7289,16 +7055,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productLeica);
-            productLeica.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LeicaT.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productLeica.Name)).Id,
+            productLeica.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LeicaT.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productLeica.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productLeica);
+            await _productRepository.InsertAsync(productLeica);
 
 
-            var productAppleICam = new Product
-            {
+            var productAppleICam = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Apple iCam",
@@ -7343,19 +7107,17 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productAppleICam);
-            productAppleICam.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_iCam.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAppleICam.Name)).Id,
+            productAppleICam.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_iCam.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productAppleICam.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productAppleICam);
+            await _productRepository.InsertAsync(productAppleICam);
 
             #endregion
 
             #region Cell Phone
 
-            var productHtcOne = new Product
-            {
+            var productHtcOne = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "HTC One M8 Android L 5.0 Lollipop",
@@ -7395,16 +7157,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productHtcOne);
-            productHtcOne.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HTC_One_M8.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHtcOne.Name)).Id,
+            productHtcOne.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HTC_One_M8.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHtcOne.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productHtcOne);
+            await _productRepository.InsertAsync(productHtcOne);
 
 
-            var productHtcOneMini = new Product
-            {
+            var productHtcOneMini = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "HTC One Mini Blue",
@@ -7441,21 +7201,18 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productHtcOneMini);
-            productHtcOneMini.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HTC_One_Mini_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHtcOneMini.Name)).Id,
+            productHtcOneMini.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HTC_One_Mini_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHtcOneMini.Name))).Id,
                 DisplayOrder = 1,
             });
-            productHtcOneMini.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HTC_One_Mini_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHtcOneMini.Name)).Id,
+            productHtcOneMini.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_HTC_One_Mini_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productHtcOneMini.Name))).Id,
                 DisplayOrder = 2,
             });
-            _productRepository.Insert(productHtcOneMini);
+            await _productRepository.InsertAsync(productHtcOneMini);
 
 
-            var productNokiaLumia = new Product
-            {
+            var productNokiaLumia = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Nokia Lumia 1020",
@@ -7492,12 +7249,11 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productNokiaLumia);
-            productNokiaLumia.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Lumia1020.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productNokiaLumia.Name)).Id,
+            productNokiaLumia.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Lumia1020.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productNokiaLumia.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productNokiaLumia);
+            await _productRepository.InsertAsync(productNokiaLumia);
 
 
             #endregion
@@ -7506,8 +7262,7 @@ namespace Grand.Services.Installation
 
 
 
-            var productBeatsPill = new Product
-            {
+            var productBeatsPill = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Beats Pill 2.0 Wireless Speaker",
@@ -7556,7 +7311,6 @@ namespace Grand.Services.Installation
                         Price = 15,
                     }
                 },
-                HasTierPrices = true,
                 ProductCategories =
                 {
                     new ProductCategory
@@ -7567,21 +7321,18 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productBeatsPill);
-            productBeatsPill.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_PillBeats_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBeatsPill.Name)).Id,
+            productBeatsPill.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_PillBeats_1.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBeatsPill.Name))).Id,
                 DisplayOrder = 1,
             });
-            productBeatsPill.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_PillBeats_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBeatsPill.Name)).Id,
+            productBeatsPill.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_PillBeats_2.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBeatsPill.Name))).Id,
                 DisplayOrder = 2,
             });
-            _productRepository.Insert(productBeatsPill);
+            await _productRepository.InsertAsync(productBeatsPill);
 
 
-            var productUniversalTabletCover = new Product
-            {
+            var productUniversalTabletCover = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Universal 7-8 Inch Tablet Cover",
@@ -7618,16 +7369,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productUniversalTabletCover);
-            productUniversalTabletCover.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_TabletCover.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productUniversalTabletCover.Name)).Id,
+            productUniversalTabletCover.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_TabletCover.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productUniversalTabletCover.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productUniversalTabletCover);
+            await _productRepository.InsertAsync(productUniversalTabletCover);
 
 
-            var productPortableSoundSpeakers = new Product
-            {
+            var productPortableSoundSpeakers = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Portable Sound Speakers",
@@ -7664,12 +7413,11 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productPortableSoundSpeakers);
-            productPortableSoundSpeakers.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Speakers.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productPortableSoundSpeakers.Name)).Id,
+            productPortableSoundSpeakers.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Speakers.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productPortableSoundSpeakers.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productPortableSoundSpeakers);
+            await _productRepository.InsertAsync(productPortableSoundSpeakers);
 
 
             #endregion
@@ -7677,8 +7425,7 @@ namespace Grand.Services.Installation
             #region Shoes
 
 
-            var productNikeFloral = new Product
-            {
+            var productNikeFloral = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Nike Floral Roshe Customized Running Shoes",
@@ -7780,21 +7527,18 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productNikeFloral);
-            productNikeFloral.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikeFloralShoe_1.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productNikeFloral.Name)).Id,
+            productNikeFloral.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikeFloralShoe_1.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productNikeFloral.Name))).Id,
                 DisplayOrder = 1,
             });
-            productNikeFloral.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikeFloralShoe_2.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productNikeFloral.Name)).Id,
+            productNikeFloral.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikeFloralShoe_2.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productNikeFloral.Name))).Id,
                 DisplayOrder = 2,
             });
-            _productRepository.Insert(productNikeFloral);
+            await _productRepository.InsertAsync(productNikeFloral);
 
 
-            var productAdidas = new Product
-            {
+            var productAdidas = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "adidas Consortium Campus 80s Running Shoes",
@@ -7898,35 +7642,31 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productAdidas);
-            productAdidas.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_adidas.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productAdidas.Name)).Id,
+            productAdidas.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_adidas.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productAdidas.Name))).Id,
                 DisplayOrder = 1,
             });
-            productAdidas.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_adidas_2.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productAdidas.Name)).Id,
+            productAdidas.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_adidas_2.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productAdidas.Name))).Id,
                 DisplayOrder = 2,
             });
-            productAdidas.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_adidas_3.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productAdidas.Name)).Id,
+            productAdidas.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_adidas_3.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productAdidas.Name))).Id,
                 DisplayOrder = 3,
             });
 
 
-            _productRepository.Insert(productAdidas);
+            await _productRepository.InsertAsync(productAdidas);
 
-            var productAttribute = EngineContext.Current.Resolve<IProductAttributeService>().GetAllProductAttributes().Where(x => x.Name == "Color").FirstOrDefault();
+            var productAttribute = _productAttributeRepository.Table.Where(x => x.Name == "Color").FirstOrDefault();
 
             productAdidas.ProductAttributeMappings.Where(x => x.ProductAttributeId == productAttribute.Id).First().ProductAttributeValues.Where(x => x.Name == "Red").First().PictureId = productAdidas.ProductPictures.ElementAt(0).PictureId;
             productAdidas.ProductAttributeMappings.Where(x => x.ProductAttributeId == productAttribute.Id).First().ProductAttributeValues.Where(x => x.Name == "Blue").First().PictureId = productAdidas.ProductPictures.ElementAt(1).PictureId;
             productAdidas.ProductAttributeMappings.Where(x => x.ProductAttributeId == productAttribute.Id).First().ProductAttributeValues.Where(x => x.Name == "Silver").First().PictureId = productAdidas.ProductPictures.ElementAt(2).PictureId;
-            _productRepository.Update(productAdidas);
+            await _productRepository.UpdateAsync(productAdidas);
 
 
-            var productNikeZoom = new Product
-            {
+            var productNikeZoom = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Nike SB Zoom Stefan Janoski \"Medium Mint\"",
@@ -7971,20 +7711,18 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productNikeZoom);
-            productNikeZoom.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikeZoom.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productNikeZoom.Name)).Id,
+            productNikeZoom.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikeZoom.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productNikeZoom.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productNikeZoom);
+            await _productRepository.InsertAsync(productNikeZoom);
 
 
             #endregion
 
             #region Clothing
 
-            var productNikeTailwind = new Product
-            {
+            var productNikeTailwind = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Nike Tailwind Loose Short-Sleeve Running Shirt",
@@ -8078,15 +7816,13 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productNikeTailwind);
-            productNikeTailwind.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikeShirt.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productNikeTailwind.Name)).Id,
+            productNikeTailwind.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NikeShirt.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productNikeTailwind.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productNikeTailwind);
+            await _productRepository.InsertAsync(productNikeTailwind);
 
-            var productOversizedWomenTShirt = new Product
-            {
+            var productOversizedWomenTShirt = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Oversized Women T-Shirt",
@@ -8131,7 +7867,6 @@ namespace Grand.Services.Installation
                         Price = 16,
                     }
                 },
-                HasTierPrices = true,
                 ProductCategories =
                 {
                     new ProductCategory
@@ -8142,16 +7877,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productOversizedWomenTShirt);
-            productOversizedWomenTShirt.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_WomenTShirt.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productOversizedWomenTShirt.Name)).Id,
+            productOversizedWomenTShirt.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_WomenTShirt.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productOversizedWomenTShirt.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productOversizedWomenTShirt);
+            await _productRepository.InsertAsync(productOversizedWomenTShirt);
 
 
-            var productCustomTShirt = new Product
-            {
+            var productCustomTShirt = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Custom T-Shirt",
@@ -8198,16 +7931,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productCustomTShirt);
-            productCustomTShirt.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_CustomTShirt.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productCustomTShirt.Name)).Id,
+            productCustomTShirt.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_CustomTShirt.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productCustomTShirt.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productCustomTShirt);
+            await _productRepository.InsertAsync(productCustomTShirt);
 
 
-            var productLeviJeans = new Product
-            {
+            var productLeviJeans = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Levi's 511 Jeans",
@@ -8253,7 +7984,6 @@ namespace Grand.Services.Installation
                         Price = 35,
                     }
                 },
-                HasTierPrices = true,
                 ProductCategories =
                 {
                     new ProductCategory
@@ -8265,17 +7995,15 @@ namespace Grand.Services.Installation
             };
             allProducts.Add(productLeviJeans);
 
-            productLeviJeans.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LeviJeans_1.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productLeviJeans.Name)).Id,
+            productLeviJeans.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LeviJeans_1.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productLeviJeans.Name))).Id,
                 DisplayOrder = 1,
             });
-            productLeviJeans.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LeviJeans_2.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productLeviJeans.Name)).Id,
+            productLeviJeans.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_LeviJeans_2.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productLeviJeans.Name))).Id,
                 DisplayOrder = 2,
             });
-            _productRepository.Insert(productLeviJeans);
+            await _productRepository.InsertAsync(productLeviJeans);
 
 
             #endregion
@@ -8283,8 +8011,7 @@ namespace Grand.Services.Installation
             #region Accessories
 
 
-            var productObeyHat = new Product
-            {
+            var productObeyHat = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Obey Propaganda Hat",
@@ -8357,17 +8084,15 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productObeyHat);
-            productObeyHat.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_hat.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productObeyHat.Name)).Id,
+            productObeyHat.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_hat.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productObeyHat.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productObeyHat);
+            await _productRepository.InsertAsync(productObeyHat);
 
 
 
-            var productBelt = new Product
-            {
+            var productBelt = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Reversible Horseferry Check Belt",
@@ -8404,17 +8129,15 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productBelt);
-            productBelt.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Belt.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBelt.Name)).Id,
+            productBelt.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Belt.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productBelt.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productBelt);
+            await _productRepository.InsertAsync(productBelt);
 
 
 
-            var productSunglasses = new Product
-            {
+            var productSunglasses = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Ray Ban Aviator Sunglasses",
@@ -8451,20 +8174,18 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productSunglasses);
-            productSunglasses.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Sunglasses.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productSunglasses.Name)).Id,
+            productSunglasses.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Sunglasses.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productSunglasses.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productSunglasses);
+            await _productRepository.InsertAsync(productSunglasses);
 
             #endregion
 
             #region Digital Downloads
 
 
-            var downloadNightVision1 = new Download
-            {
+            var downloadNightVision1 = new Download {
                 DownloadGuid = Guid.NewGuid(),
                 ContentType = "application/x-zip-co",
                 DownloadBinary = File.ReadAllBytes(sampleDownloadsPath + "product_NightVision_1.zip"),
@@ -8472,9 +8193,8 @@ namespace Grand.Services.Installation
                 Filename = "Night_Vision_1",
                 IsNew = true,
             };
-            downloadService.InsertDownload(downloadNightVision1);
-            var downloadNightVision2 = new Download
-            {
+            await downloadService.InsertDownload(downloadNightVision1);
+            var downloadNightVision2 = new Download {
                 DownloadGuid = Guid.NewGuid(),
                 ContentType = "text/plain",
                 DownloadBinary = File.ReadAllBytes(sampleDownloadsPath + "product_NightVision_2.txt"),
@@ -8482,9 +8202,8 @@ namespace Grand.Services.Installation
                 Filename = "Night_Vision_1",
                 IsNew = true,
             };
-            downloadService.InsertDownload(downloadNightVision2);
-            var productNightVision = new Product
-            {
+            await downloadService.InsertDownload(downloadNightVision2);
+            var productNightVision = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Night Visions",
@@ -8523,17 +8242,15 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productNightVision);
-            productNightVision.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NightVisions.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productNightVision.Name)).Id,
+            productNightVision.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_NightVisions.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productNightVision.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productNightVision);
+            await _productRepository.InsertAsync(productNightVision);
 
 
 
-            var downloadIfYouWait1 = new Download
-            {
+            var downloadIfYouWait1 = new Download {
                 DownloadGuid = Guid.NewGuid(),
                 ContentType = "application/x-zip-co",
                 DownloadBinary = File.ReadAllBytes(sampleDownloadsPath + "product_IfYouWait_1.zip"),
@@ -8541,9 +8258,8 @@ namespace Grand.Services.Installation
                 Filename = "If_You_Wait_1",
                 IsNew = true,
             };
-            downloadService.InsertDownload(downloadIfYouWait1);
-            var downloadIfYouWait2 = new Download
-            {
+            await downloadService.InsertDownload(downloadIfYouWait1);
+            var downloadIfYouWait2 = new Download {
                 DownloadGuid = Guid.NewGuid(),
                 ContentType = "text/plain",
                 DownloadBinary = File.ReadAllBytes(sampleDownloadsPath + "product_IfYouWait_2.txt"),
@@ -8551,9 +8267,8 @@ namespace Grand.Services.Installation
                 Filename = "If_You_Wait_1",
                 IsNew = true,
             };
-            downloadService.InsertDownload(downloadIfYouWait2);
-            var productIfYouWait = new Product
-            {
+            await downloadService.InsertDownload(downloadIfYouWait2);
+            var productIfYouWait = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "If You Wait",
@@ -8593,16 +8308,14 @@ namespace Grand.Services.Installation
             };
             allProducts.Add(productIfYouWait);
 
-            productIfYouWait.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_IfYouWait.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productIfYouWait.Name)).Id,
+            productIfYouWait.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_IfYouWait.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productIfYouWait.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productIfYouWait);
+            await _productRepository.InsertAsync(productIfYouWait);
 
 
-            var downloadScienceAndFaith = new Download
-            {
+            var downloadScienceAndFaith = new Download {
                 DownloadGuid = Guid.NewGuid(),
                 ContentType = "application/x-zip-co",
                 DownloadBinary = File.ReadAllBytes(sampleDownloadsPath + "product_ScienceAndFaith_1.zip"),
@@ -8610,9 +8323,8 @@ namespace Grand.Services.Installation
                 Filename = "Science_And_Faith",
                 IsNew = true,
             };
-            downloadService.InsertDownload(downloadScienceAndFaith);
-            var productScienceAndFaith = new Product
-            {
+            await downloadService.InsertDownload(downloadScienceAndFaith);
+            var productScienceAndFaith = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Science & Faith",
@@ -8649,12 +8361,11 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productScienceAndFaith);
-            productScienceAndFaith.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_ScienceAndFaith.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productScienceAndFaith.Name)).Id,
+            productScienceAndFaith.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_ScienceAndFaith.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productScienceAndFaith.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productScienceAndFaith);
+            await _productRepository.InsertAsync(productScienceAndFaith);
 
 
 
@@ -8662,8 +8373,7 @@ namespace Grand.Services.Installation
 
             #region Books
 
-            var productFahrenheit = new Product
-            {
+            var productFahrenheit = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Fahrenheit 451 by Ray Bradbury",
@@ -8702,17 +8412,15 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productFahrenheit);
-            productFahrenheit.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Fahrenheit451.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productFahrenheit.Name)).Id,
+            productFahrenheit.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_Fahrenheit451.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productFahrenheit.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productFahrenheit);
+            await _productRepository.InsertAsync(productFahrenheit);
 
 
 
-            var productFirstPrizePies = new Product
-            {
+            var productFirstPrizePies = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "First Prize Pies",
@@ -8750,15 +8458,13 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productFirstPrizePies);
-            productFirstPrizePies.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_FirstPrizePies.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productFirstPrizePies.Name)).Id,
+            productFirstPrizePies.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_FirstPrizePies.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productFirstPrizePies.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productFirstPrizePies);
+            await _productRepository.InsertAsync(productFirstPrizePies);
 
-            var productPrideAndPrejudice = new Product
-            {
+            var productPrideAndPrejudice = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Pride and Prejudice",
@@ -8796,12 +8502,11 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productPrideAndPrejudice);
-            productPrideAndPrejudice.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_PrideAndPrejudice.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productPrideAndPrejudice.Name)).Id,
+            productPrideAndPrejudice.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_PrideAndPrejudice.jpeg"), "image/jpeg", pictureService.GetPictureSeName(productPrideAndPrejudice.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productPrideAndPrejudice);
+            await _productRepository.InsertAsync(productPrideAndPrejudice);
 
 
 
@@ -8809,8 +8514,7 @@ namespace Grand.Services.Installation
 
             #region Jewelry
 
-            var productElegantGemstoneNecklace = new Product
-            {
+            var productElegantGemstoneNecklace = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Elegant Gemstone Necklace",
@@ -8848,16 +8552,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productElegantGemstoneNecklace);
-            productElegantGemstoneNecklace.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_GemstoneNecklaces.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productElegantGemstoneNecklace.Name)).Id,
+            productElegantGemstoneNecklace.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_GemstoneNecklaces.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productElegantGemstoneNecklace.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productElegantGemstoneNecklace);
+            await _productRepository.InsertAsync(productElegantGemstoneNecklace);
 
 
-            var productFlowerGirlBracelet = new Product
-            {
+            var productFlowerGirlBracelet = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Flower Girl Bracelet",
@@ -8895,16 +8597,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productFlowerGirlBracelet);
-            productFlowerGirlBracelet.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_FlowerBracelet.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productFlowerGirlBracelet.Name)).Id,
+            productFlowerGirlBracelet.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_FlowerBracelet.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productFlowerGirlBracelet.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productFlowerGirlBracelet);
+            await _productRepository.InsertAsync(productFlowerGirlBracelet);
 
 
-            var productEngagementRing = new Product
-            {
+            var productEngagementRing = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "Vintage Style Engagement Ring",
@@ -8941,12 +8641,11 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(productEngagementRing);
-            productEngagementRing.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_EngagementRing_1.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productEngagementRing.Name)).Id,
+            productEngagementRing.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_EngagementRing_1.jpg"), "image/pjpeg", pictureService.GetPictureSeName(productEngagementRing.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(productEngagementRing);
+            await _productRepository.InsertAsync(productEngagementRing);
 
 
 
@@ -8955,8 +8654,7 @@ namespace Grand.Services.Installation
             #region Gift Cards
 
 
-            var product25GiftCard = new Product
-            {
+            var product25GiftCard = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "$25 Virtual Gift Card",
@@ -8987,16 +8685,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(product25GiftCard);
-            product25GiftCard.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_25giftcart.jpeg"), "image/jpeg", pictureService.GetPictureSeName(product25GiftCard.Name)).Id,
+            product25GiftCard.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_25giftcart.jpeg"), "image/jpeg", pictureService.GetPictureSeName(product25GiftCard.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(product25GiftCard);
+            await _productRepository.InsertAsync(product25GiftCard);
 
 
-            var product50GiftCard = new Product
-            {
+            var product50GiftCard = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "$50 Physical Gift Card",
@@ -9034,16 +8730,14 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(product50GiftCard);
-            product50GiftCard.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_50giftcart.jpeg"), "image/jpeg", pictureService.GetPictureSeName(product50GiftCard.Name)).Id,
+            product50GiftCard.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_50giftcart.jpeg"), "image/jpeg", pictureService.GetPictureSeName(product50GiftCard.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(product50GiftCard);
+            await _productRepository.InsertAsync(product50GiftCard);
 
 
-            var product100GiftCard = new Product
-            {
+            var product100GiftCard = new Product {
                 ProductType = ProductType.SimpleProduct,
                 VisibleIndividually = true,
                 Name = "$100 Physical Gift Card",
@@ -9079,21 +8773,19 @@ namespace Grand.Services.Installation
                 }
             };
             allProducts.Add(product100GiftCard);
-            product100GiftCard.ProductPictures.Add(new ProductPicture
-            {
-                PictureId = pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_100giftcart.jpeg"), "image/jpeg", pictureService.GetPictureSeName(product100GiftCard.Name)).Id,
+            product100GiftCard.ProductPictures.Add(new ProductPicture {
+                PictureId = (await pictureService.InsertPicture(File.ReadAllBytes(sampleImagesPath + "product_100giftcart.jpeg"), "image/jpeg", pictureService.GetPictureSeName(product100GiftCard.Name))).Id,
                 DisplayOrder = 1,
             });
-            _productRepository.Insert(product100GiftCard);
+            await _productRepository.InsertAsync(product100GiftCard);
 
             #endregion
 
             //search engine names
             foreach (var product in allProducts)
             {
-                product.SeName = product.ValidateSeName("", product.Name, true);
-                _urlRecordRepository.Insert(new UrlRecord
-                {
+                product.SeName = SeoExtensions.GetSeName(product.Name, false, false);
+                await _urlRecordRepository.InsertAsync(new UrlRecord {
                     EntityId = product.Id,
                     EntityName = "Product",
                     LanguageId = "",
@@ -9101,7 +8793,7 @@ namespace Grand.Services.Installation
                     Slug = product.SeName,
                 });
 
-                _productRepository.Update(product);
+                await _productRepository.UpdateAsync(product);
             }
 
 
@@ -9110,512 +8802,436 @@ namespace Grand.Services.Installation
             //related products
 
             productFlowerGirlBracelet.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productFlowerGirlBracelet.Id,
                     ProductId2 = productEngagementRing.Id,
                 });
 
             productFlowerGirlBracelet.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productFlowerGirlBracelet.Id,
                     ProductId2 = productElegantGemstoneNecklace.Id,
                 });
 
             productEngagementRing.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productEngagementRing.Id,
                     ProductId2 = productFlowerGirlBracelet.Id,
                 });
 
             productEngagementRing.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productEngagementRing.Id,
                     ProductId2 = productElegantGemstoneNecklace.Id,
                 });
 
             productElegantGemstoneNecklace.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productElegantGemstoneNecklace.Id,
                     ProductId2 = productFlowerGirlBracelet.Id,
                 });
 
             productElegantGemstoneNecklace.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productElegantGemstoneNecklace.Id,
                     ProductId2 = productEngagementRing.Id,
                 });
 
             productIfYouWait.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productIfYouWait.Id,
                     ProductId2 = productNightVision.Id,
                 });
 
             productIfYouWait.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productIfYouWait.Id,
                     ProductId2 = productScienceAndFaith.Id,
                 });
 
             productNightVision.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productNightVision.Id,
                     ProductId2 = productIfYouWait.Id,
                 });
 
             productNightVision.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productNightVision.Id,
                     ProductId2 = productScienceAndFaith.Id,
                 });
 
             productPrideAndPrejudice.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productPrideAndPrejudice.Id,
                     ProductId2 = productFirstPrizePies.Id,
                 });
 
             productPrideAndPrejudice.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productPrideAndPrejudice.Id,
                     ProductId2 = productFahrenheit.Id,
                 });
 
             productFirstPrizePies.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productFirstPrizePies.Id,
                     ProductId2 = productPrideAndPrejudice.Id,
                 });
 
             productFirstPrizePies.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productFirstPrizePies.Id,
                     ProductId2 = productFahrenheit.Id,
                 });
 
             productFahrenheit.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productFahrenheit.Id,
                     ProductId2 = productFirstPrizePies.Id,
                 });
 
             productFahrenheit.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productFahrenheit.Id,
                     ProductId2 = productPrideAndPrejudice.Id,
                 });
 
             productAsusN551JK.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAsusN551JK.Id,
                     ProductId2 = productLenovoThinkpad.Id,
                 });
 
             productAsusN551JK.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAsusN551JK.Id,
                     ProductId2 = productAppleMacBookPro.Id,
                 });
 
             productAsusN551JK.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAsusN551JK.Id,
                     ProductId2 = productSamsungSeries.Id,
                 });
 
             productAsusN551JK.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAsusN551JK.Id,
                     ProductId2 = productHpSpectre.Id,
                 });
 
             productLenovoThinkpad.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLenovoThinkpad.Id,
                     ProductId2 = productAsusN551JK.Id,
                 });
 
             productLenovoThinkpad.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLenovoThinkpad.Id,
                     ProductId2 = productAppleMacBookPro.Id,
                 });
 
             productLenovoThinkpad.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLenovoThinkpad.Id,
                     ProductId2 = productSamsungSeries.Id,
                 });
 
             productLenovoThinkpad.RelatedProducts.Add(
-                 new RelatedProduct
-                 {
+                 new RelatedProduct {
                      ProductId1 = productLenovoThinkpad.Id,
                      ProductId2 = productHpEnvy.Id,
                  });
 
             productAppleMacBookPro.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAppleMacBookPro.Id,
                     ProductId2 = productLenovoThinkpad.Id,
                 });
 
             productAppleMacBookPro.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAppleMacBookPro.Id,
                     ProductId2 = productSamsungSeries.Id,
                 });
 
             productAppleMacBookPro.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAppleMacBookPro.Id,
                     ProductId2 = productAsusN551JK.Id,
                 });
 
             productAppleMacBookPro.RelatedProducts.Add(
-                 new RelatedProduct
-                 {
+                 new RelatedProduct {
                      ProductId1 = productAppleMacBookPro.Id,
                      ProductId2 = productHpSpectre.Id,
                  });
 
             productHpSpectre.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHpSpectre.Id,
                     ProductId2 = productLenovoThinkpad.Id,
                 });
 
             productHpSpectre.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHpSpectre.Id,
                     ProductId2 = productSamsungSeries.Id,
                 });
 
             productHpSpectre.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHpSpectre.Id,
                     ProductId2 = productAsusN551JK.Id,
                 });
 
             productHpSpectre.RelatedProducts.Add(
-                 new RelatedProduct
-                 {
+                 new RelatedProduct {
                      ProductId1 = productHpSpectre.Id,
                      ProductId2 = productHpEnvy.Id,
                  });
 
             productHpEnvy.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHpEnvy.Id,
                     ProductId2 = productAsusN551JK.Id,
                 });
 
             productHpEnvy.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHpEnvy.Id,
                     ProductId2 = productAppleMacBookPro.Id,
                 });
 
             productHpEnvy.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHpEnvy.Id,
                     ProductId2 = productHpSpectre.Id,
                 });
 
             productHpEnvy.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHpEnvy.Id,
                     ProductId2 = productSamsungSeries.Id,
                 });
             productSamsungSeries.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productSamsungSeries.Id,
                     ProductId2 = productAsusN551JK.Id,
                 });
             productSamsungSeries.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productSamsungSeries.Id,
                     ProductId2 = productAppleMacBookPro.Id,
                 });
 
             productSamsungSeries.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productSamsungSeries.Id,
                     ProductId2 = productHpEnvy.Id,
                 });
             productSamsungSeries.RelatedProducts.Add(
-                 new RelatedProduct
-                 {
+                 new RelatedProduct {
                      ProductId1 = productSamsungSeries.Id,
                      ProductId2 = productHpSpectre.Id,
                  });
             productLeica.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLeica.Id,
                     ProductId2 = productHtcOneMini.Id,
                 });
 
             productLeica.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLeica.Id,
                     ProductId2 = productNikonD5500DSLR.Id,
                 });
 
             productLeica.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLeica.Id,
                     ProductId2 = productAppleICam.Id,
                 });
 
             productLeica.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLeica.Id,
                     ProductId2 = productNokiaLumia.Id,
                 });
             productHtcOne.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHtcOne.Id,
                     ProductId2 = productHtcOneMini.Id,
                 });
 
             productHtcOne.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHtcOne.Id,
                     ProductId2 = productNokiaLumia.Id,
                 });
             productHtcOne.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHtcOne.Id,
                     ProductId2 = productBeatsPill.Id,
                 });
 
             productHtcOne.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHtcOne.Id,
                     ProductId2 = productPortableSoundSpeakers.Id,
                 });
 
             productHtcOneMini.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHtcOneMini.Id,
                     ProductId2 = productHtcOne.Id,
                 });
             productHtcOneMini.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHtcOneMini.Id,
                     ProductId2 = productNokiaLumia.Id,
                 });
 
             productHtcOneMini.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHtcOneMini.Id,
                     ProductId2 = productBeatsPill.Id,
                 });
             productHtcOneMini.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productHtcOneMini.Id,
                     ProductId2 = productPortableSoundSpeakers.Id,
                 });
             productNokiaLumia.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productNokiaLumia.Id,
                     ProductId2 = productHtcOne.Id,
                 });
             productNokiaLumia.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productNokiaLumia.Id,
                     ProductId2 = productHtcOneMini.Id,
                 });
 
             productNokiaLumia.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productNokiaLumia.Id,
                     ProductId2 = productBeatsPill.Id,
                 });
             productNokiaLumia.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productNokiaLumia.Id,
                     ProductId2 = productPortableSoundSpeakers.Id,
                 });
 
             productAdidas.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAdidas.Id,
                     ProductId2 = productLeviJeans.Id,
                 });
 
             productAdidas.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAdidas.Id,
                     ProductId2 = productNikeFloral.Id,
                 });
 
             productAdidas.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAdidas.Id,
                     ProductId2 = productNikeZoom.Id,
                 });
             productAdidas.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productAdidas.Id,
                     ProductId2 = productNikeTailwind.Id,
                 });
             productLeviJeans.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLeviJeans.Id,
                     ProductId2 = productAdidas.Id,
                 });
             productLeviJeans.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLeviJeans.Id,
                     ProductId2 = productNikeFloral.Id,
                 });
 
             productLeviJeans.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLeviJeans.Id,
                     ProductId2 = productNikeZoom.Id,
                 });
             productLeviJeans.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLeviJeans.Id,
                     ProductId2 = productNikeTailwind.Id,
                 });
 
             productCustomTShirt.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productCustomTShirt.Id,
                     ProductId2 = productLeviJeans.Id,
                 });
 
             productCustomTShirt.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productCustomTShirt.Id,
                     ProductId2 = productNikeTailwind.Id,
                 });
             productCustomTShirt.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productCustomTShirt.Id,
                     ProductId2 = productOversizedWomenTShirt.Id,
                 });
             productCustomTShirt.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productCustomTShirt.Id,
                     ProductId2 = productObeyHat.Id,
                 });
             productDigitalStorm.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productDigitalStorm.Id,
                     ProductId2 = productBuildComputer.Id,
                 });
             productDigitalStorm.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productDigitalStorm.Id,
                     ProductId2 = productLenovoIdeaCentre.Id,
                 });
             productDigitalStorm.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productDigitalStorm.Id,
                     ProductId2 = productLenovoThinkpad.Id,
                 });
             productDigitalStorm.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productDigitalStorm.Id,
                     ProductId2 = productAppleMacBookPro.Id,
                 });
 
             productLenovoIdeaCentre.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLenovoIdeaCentre.Id,
                     ProductId2 = productBuildComputer.Id,
                 });
 
             productLenovoIdeaCentre.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLenovoIdeaCentre.Id,
                     ProductId2 = productDigitalStorm.Id,
                 });
 
             productLenovoIdeaCentre.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLenovoIdeaCentre.Id,
                     ProductId2 = productLenovoThinkpad.Id,
                 });
 
             productLenovoIdeaCentre.RelatedProducts.Add(
-                new RelatedProduct
-                {
+                new RelatedProduct {
                     ProductId1 = productLenovoIdeaCentre.Id,
                     ProductId2 = productAppleMacBookPro.Id,
                 });
@@ -9626,97 +9242,97 @@ namespace Grand.Services.Installation
             #region Product Tags
 
             //product tags
-            AddProductTag(product25GiftCard, "nice");
-            AddProductTag(product25GiftCard, "gift");
-            AddProductTag(productNikeTailwind, "cool");
-            AddProductTag(productNikeTailwind, "apparel");
-            AddProductTag(productNikeTailwind, "shirt");
-            AddProductTag(productBeatsPill, "computer");
-            AddProductTag(productBeatsPill, "cool");
-            AddProductTag(productNikeFloral, "cool");
-            AddProductTag(productNikeFloral, "shoes");
-            AddProductTag(productNikeFloral, "apparel");
-            AddProductTag(productAdobePhotoshop, "computer");
-            AddProductTag(productAdobePhotoshop, "awesome");
-            AddProductTag(productUniversalTabletCover, "computer");
-            AddProductTag(productUniversalTabletCover, "cool");
-            AddProductTag(productOversizedWomenTShirt, "cool");
-            AddProductTag(productOversizedWomenTShirt, "apparel");
-            AddProductTag(productOversizedWomenTShirt, "shirt");
-            AddProductTag(productAppleMacBookPro, "compact");
-            AddProductTag(productAppleMacBookPro, "awesome");
-            AddProductTag(productAppleMacBookPro, "computer");
-            AddProductTag(productAsusN551JK, "compact");
-            AddProductTag(productAsusN551JK, "awesome");
-            AddProductTag(productAsusN551JK, "computer");
-            AddProductTag(productFahrenheit, "awesome");
-            AddProductTag(productFahrenheit, "book");
-            AddProductTag(productFahrenheit, "nice");
-            AddProductTag(productHtcOne, "cell");
-            AddProductTag(productHtcOne, "compact");
-            AddProductTag(productHtcOne, "awesome");
-            AddProductTag(productBuildComputer, "awesome");
-            AddProductTag(productBuildComputer, "computer");
-            AddProductTag(productNikonD5500DSLR, "cool");
-            AddProductTag(productNikonD5500DSLR, "camera");
-            AddProductTag(productLeica, "camera");
-            AddProductTag(productLeica, "cool");
-            AddProductTag(productDigitalStorm, "cool");
-            AddProductTag(productDigitalStorm, "computer");
-            AddProductTag(productWindows8Pro, "awesome");
-            AddProductTag(productWindows8Pro, "computer");
-            AddProductTag(productCustomTShirt, "cool");
-            AddProductTag(productCustomTShirt, "shirt");
-            AddProductTag(productCustomTShirt, "apparel");
-            AddProductTag(productElegantGemstoneNecklace, "jewelry");
-            AddProductTag(productElegantGemstoneNecklace, "awesome");
-            AddProductTag(productFlowerGirlBracelet, "awesome");
-            AddProductTag(productFlowerGirlBracelet, "jewelry");
-            AddProductTag(productFirstPrizePies, "book");
-            AddProductTag(productAdidas, "cool");
-            AddProductTag(productAdidas, "shoes");
-            AddProductTag(productAdidas, "apparel");
-            AddProductTag(productLenovoIdeaCentre, "awesome");
-            AddProductTag(productLenovoIdeaCentre, "computer");
-            AddProductTag(productSamsungSeries, "nice");
-            AddProductTag(productSamsungSeries, "computer");
-            AddProductTag(productSamsungSeries, "compact");
-            AddProductTag(productHpSpectre, "nice");
-            AddProductTag(productHpSpectre, "computer");
-            AddProductTag(productHpEnvy, "computer");
-            AddProductTag(productHpEnvy, "cool");
-            AddProductTag(productHpEnvy, "compact");
-            AddProductTag(productObeyHat, "apparel");
-            AddProductTag(productObeyHat, "cool");
-            AddProductTag(productLeviJeans, "cool");
-            AddProductTag(productLeviJeans, "jeans");
-            AddProductTag(productLeviJeans, "apparel");
-            AddProductTag(productSoundForge, "game");
-            AddProductTag(productSoundForge, "computer");
-            AddProductTag(productSoundForge, "cool");
-            AddProductTag(productNightVision, "awesome");
-            AddProductTag(productNightVision, "digital");
-            AddProductTag(productSunglasses, "apparel");
-            AddProductTag(productSunglasses, "cool");
-            AddProductTag(productHtcOneMini, "awesome");
-            AddProductTag(productHtcOneMini, "compact");
-            AddProductTag(productHtcOneMini, "cell");
-            AddProductTag(productIfYouWait, "digital");
-            AddProductTag(productIfYouWait, "awesome");
-            AddProductTag(productNokiaLumia, "awesome");
-            AddProductTag(productNokiaLumia, "cool");
-            AddProductTag(productNokiaLumia, "camera");
-            AddProductTag(productScienceAndFaith, "digital");
-            AddProductTag(productScienceAndFaith, "awesome");
-            AddProductTag(productPrideAndPrejudice, "book");
-            AddProductTag(productLenovoThinkpad, "awesome");
-            AddProductTag(productLenovoThinkpad, "computer");
-            AddProductTag(productLenovoThinkpad, "compact");
-            AddProductTag(productNikeZoom, "jeans");
-            AddProductTag(productNikeZoom, "cool");
-            AddProductTag(productNikeZoom, "apparel");
-            AddProductTag(productEngagementRing, "jewelry");
-            AddProductTag(productEngagementRing, "awesome");
+            await AddProductTag(product25GiftCard, "nice");
+            await AddProductTag(product25GiftCard, "gift");
+            await AddProductTag(productNikeTailwind, "cool");
+            await AddProductTag(productNikeTailwind, "apparel");
+            await AddProductTag(productNikeTailwind, "shirt");
+            await AddProductTag(productBeatsPill, "computer");
+            await AddProductTag(productBeatsPill, "cool");
+            await AddProductTag(productNikeFloral, "cool");
+            await AddProductTag(productNikeFloral, "shoes");
+            await AddProductTag(productNikeFloral, "apparel");
+            await AddProductTag(productAdobePhotoshop, "computer");
+            await AddProductTag(productAdobePhotoshop, "awesome");
+            await AddProductTag(productUniversalTabletCover, "computer");
+            await AddProductTag(productUniversalTabletCover, "cool");
+            await AddProductTag(productOversizedWomenTShirt, "cool");
+            await AddProductTag(productOversizedWomenTShirt, "apparel");
+            await AddProductTag(productOversizedWomenTShirt, "shirt");
+            await AddProductTag(productAppleMacBookPro, "compact");
+            await AddProductTag(productAppleMacBookPro, "awesome");
+            await AddProductTag(productAppleMacBookPro, "computer");
+            await AddProductTag(productAsusN551JK, "compact");
+            await AddProductTag(productAsusN551JK, "awesome");
+            await AddProductTag(productAsusN551JK, "computer");
+            await AddProductTag(productFahrenheit, "awesome");
+            await AddProductTag(productFahrenheit, "book");
+            await AddProductTag(productFahrenheit, "nice");
+            await AddProductTag(productHtcOne, "cell");
+            await AddProductTag(productHtcOne, "compact");
+            await AddProductTag(productHtcOne, "awesome");
+            await AddProductTag(productBuildComputer, "awesome");
+            await AddProductTag(productBuildComputer, "computer");
+            await AddProductTag(productNikonD5500DSLR, "cool");
+            await AddProductTag(productNikonD5500DSLR, "camera");
+            await AddProductTag(productLeica, "camera");
+            await AddProductTag(productLeica, "cool");
+            await AddProductTag(productDigitalStorm, "cool");
+            await AddProductTag(productDigitalStorm, "computer");
+            await AddProductTag(productWindows8Pro, "awesome");
+            await AddProductTag(productWindows8Pro, "computer");
+            await AddProductTag(productCustomTShirt, "cool");
+            await AddProductTag(productCustomTShirt, "shirt");
+            await AddProductTag(productCustomTShirt, "apparel");
+            await AddProductTag(productElegantGemstoneNecklace, "jewelry");
+            await AddProductTag(productElegantGemstoneNecklace, "awesome");
+            await AddProductTag(productFlowerGirlBracelet, "awesome");
+            await AddProductTag(productFlowerGirlBracelet, "jewelry");
+            await AddProductTag(productFirstPrizePies, "book");
+            await AddProductTag(productAdidas, "cool");
+            await AddProductTag(productAdidas, "shoes");
+            await AddProductTag(productAdidas, "apparel");
+            await AddProductTag(productLenovoIdeaCentre, "awesome");
+            await AddProductTag(productLenovoIdeaCentre, "computer");
+            await AddProductTag(productSamsungSeries, "nice");
+            await AddProductTag(productSamsungSeries, "computer");
+            await AddProductTag(productSamsungSeries, "compact");
+            await AddProductTag(productHpSpectre, "nice");
+            await AddProductTag(productHpSpectre, "computer");
+            await AddProductTag(productHpEnvy, "computer");
+            await AddProductTag(productHpEnvy, "cool");
+            await AddProductTag(productHpEnvy, "compact");
+            await AddProductTag(productObeyHat, "apparel");
+            await AddProductTag(productObeyHat, "cool");
+            await AddProductTag(productLeviJeans, "cool");
+            await AddProductTag(productLeviJeans, "jeans");
+            await AddProductTag(productLeviJeans, "apparel");
+            await AddProductTag(productSoundForge, "game");
+            await AddProductTag(productSoundForge, "computer");
+            await AddProductTag(productSoundForge, "cool");
+            await AddProductTag(productNightVision, "awesome");
+            await AddProductTag(productNightVision, "digital");
+            await AddProductTag(productSunglasses, "apparel");
+            await AddProductTag(productSunglasses, "cool");
+            await AddProductTag(productHtcOneMini, "awesome");
+            await AddProductTag(productHtcOneMini, "compact");
+            await AddProductTag(productHtcOneMini, "cell");
+            await AddProductTag(productIfYouWait, "digital");
+            await AddProductTag(productIfYouWait, "awesome");
+            await AddProductTag(productNokiaLumia, "awesome");
+            await AddProductTag(productNokiaLumia, "cool");
+            await AddProductTag(productNokiaLumia, "camera");
+            await AddProductTag(productScienceAndFaith, "digital");
+            await AddProductTag(productScienceAndFaith, "awesome");
+            await AddProductTag(productPrideAndPrejudice, "book");
+            await AddProductTag(productLenovoThinkpad, "awesome");
+            await AddProductTag(productLenovoThinkpad, "computer");
+            await AddProductTag(productLenovoThinkpad, "compact");
+            await AddProductTag(productNikeZoom, "jeans");
+            await AddProductTag(productNikeZoom, "cool");
+            await AddProductTag(productNikeZoom, "apparel");
+            await AddProductTag(productEngagementRing, "jewelry");
+            await AddProductTag(productEngagementRing, "awesome");
 
 
             #endregion
@@ -9734,8 +9350,7 @@ namespace Grand.Services.Installation
 
                 //rating from 4 to 5
                 var rating = random.Next(4, 6);
-                var productReview = new ProductReview
-                {
+                var productReview = new ProductReview {
                     CustomerId = defaultCustomer.Id,
                     ProductId = product.Id,
                     IsApproved = true,
@@ -9748,29 +9363,27 @@ namespace Grand.Services.Installation
                     CreatedOnUtc = DateTime.UtcNow,
 
                 };
-                _productReviewRepository.Insert(productReview);
+                await _productReviewRepository.InsertAsync(productReview);
 
                 product.ApprovedRatingSum = rating;
                 product.ApprovedTotalReviews = product.ApprovedTotalReviews + 1;
 
             }
-            _productRepository.Update(allProducts);
+            await _productRepository.UpdateAsync(allProducts);
         }
 
-        protected virtual void InstallForums()
+        protected virtual async Task InstallForums()
         {
-            var forumGroup = new ForumGroup
-            {
+            var forumGroup = new ForumGroup {
                 Name = "General",
                 DisplayOrder = 5,
                 CreatedOnUtc = DateTime.UtcNow,
                 UpdatedOnUtc = DateTime.UtcNow,
             };
 
-            _forumGroupRepository.Insert(forumGroup);
+            await _forumGroupRepository.InsertAsync(forumGroup);
 
-            var newProductsForum = new Forum
-            {
+            var newProductsForum = new Forum {
                 ForumGroupId = forumGroup.Id,
                 Name = "New Products",
                 Description = "Discuss new products and industry trends",
@@ -9782,10 +9395,9 @@ namespace Grand.Services.Installation
                 CreatedOnUtc = DateTime.UtcNow,
                 UpdatedOnUtc = DateTime.UtcNow,
             };
-            _forumRepository.Insert(newProductsForum);
+            await _forumRepository.InsertAsync(newProductsForum);
 
-            var mobileDevicesForum = new Forum
-            {
+            var mobileDevicesForum = new Forum {
                 ForumGroupId = forumGroup.Id,
                 Name = "Mobile Devices Forum",
                 Description = "Discuss the mobile phone market",
@@ -9797,10 +9409,9 @@ namespace Grand.Services.Installation
                 CreatedOnUtc = DateTime.UtcNow,
                 UpdatedOnUtc = DateTime.UtcNow,
             };
-            _forumRepository.Insert(mobileDevicesForum);
+            await _forumRepository.InsertAsync(mobileDevicesForum);
 
-            var packagingShippingForum = new Forum
-            {
+            var packagingShippingForum = new Forum {
                 ForumGroupId = forumGroup.Id,
                 Name = "Packaging & Shipping",
                 Description = "Discuss packaging & shipping",
@@ -9811,10 +9422,10 @@ namespace Grand.Services.Installation
                 CreatedOnUtc = DateTime.UtcNow,
                 UpdatedOnUtc = DateTime.UtcNow,
             };
-            _forumRepository.Insert(packagingShippingForum);
+            await _forumRepository.InsertAsync(packagingShippingForum);
         }
 
-        protected virtual void InstallDiscounts()
+        protected virtual async Task InstallDiscounts()
         {
             var discounts = new List<Discount>
                                 {
@@ -9836,32 +9447,34 @@ namespace Grand.Services.Installation
                                             UsePercentage = true,
                                             DiscountPercentage = 20,
                                             StartDateUtc = new DateTime(2010,1,1),
-                                            EndDateUtc = new DateTime(2020,1,1),
+                                            EndDateUtc = new DateTime(2030,1,1),
                                             RequiresCouponCode = true,
                                             IsEnabled = true
                                         },
                                 };
-            _discountRepository.Insert(discounts);
-            var coupon1 = new DiscountCoupon();
-            coupon1.CouponCode = "123";
-            coupon1.DiscountId = _discountRepository.Table.Where(x => x.Name == "Sample discount with coupon code").FirstOrDefault().Id;
-            _discountCouponRepository.Insert(coupon1);
+            await _discountRepository.InsertAsync(discounts);
+            var coupon1 = new DiscountCoupon {
+                CouponCode = "123",
+                DiscountId = _discountRepository.Table.Where(x => x.Name == "Sample discount with coupon code").FirstOrDefault().Id
+            };
+            await _discountCouponRepository.InsertAsync(coupon1);
 
-            var coupon2 = new DiscountCoupon();
-            coupon2.CouponCode = "456";
-            coupon2.DiscountId = _discountRepository.Table.Where(x => x.Name == "'20% order total' discount").FirstOrDefault().Id;
-            _discountCouponRepository.Insert(coupon2);
+            var coupon2 = new DiscountCoupon {
+                CouponCode = "456",
+                DiscountId = _discountRepository.Table.Where(x => x.Name == "'20% order total' discount").FirstOrDefault().Id
+            };
+            await _discountCouponRepository.InsertAsync(coupon2);
 
         }
 
-        protected virtual void InstallBlogPosts()
+        protected virtual async Task InstallBlogPosts()
         {
             var defaultLanguage = _languageRepository.Table.FirstOrDefault();
             var blogPosts = new List<BlogPost>
                                 {
                                     new BlogPost
                                         {
-                                             AllowComments = true,
+                                             AllowComments = false,
                                              Title = "How a blog can help your growing e-Commerce business",
                                              BodyOverview = "<p>When you start an online business, your main aim is to sell the products, right? As a business owner, you want to showcase your store to more audience. So, you decide to go on social media, why? Because everyone is doing it, then why shouldn&rsquo;t you? It is tempting as everyone is aware of the hype that it is the best way to market your brand.</p><p>Do you know having a blog for your online store can be very helpful? Many businesses do not understand the importance of having a blog because they don&rsquo;t have time to post quality content.</p><p>Today, we will talk about how a blog can play an important role for the growth of your e-Commerce business. Later, we will also discuss some tips that will be helpful to you for writing business related blog posts.</p>",
                                              Body = "<p>When you start an online business, your main aim is to sell the products, right? As a business owner, you want to showcase your store to more audience. So, you decide to go on social media, why? Because everyone is doing it, then why shouldn&rsquo;t you? It is tempting as everyone is aware of the hype that it is the best way to market your brand.</p><p>Do you know having a blog for your online store can be very helpful? Many businesses do not understand the importance of having a blog because they don&rsquo;t have time to post quality content.</p><p>Today, we will talk about how a blog can play an important role for the growth of your e-Commerce business. Later, we will also discuss some tips that will be helpful to you for writing business related blog posts.</p><h3>1) Blog is useful in educating your customers</h3><p>Blogging is one of the best way by which you can educate your customers about your products/services that you offer. This helps you as a business owner to bring more value to your brand. When you provide useful information to the customers about your products, they are more likely to buy products from you. You can use your blog for providing tutorials in regard to the use of your products.</p><p><strong>For example:</strong> If you have an online store that offers computer parts. You can write tutorials about how to build a computer or how to make your computer&rsquo;s performance better. While talking about these things, you can mention products in the tutorials and provide link to your products within the blog post from your website. Your potential customers might get different ideas of using your product and will likely to buy products from your online store.</p><h3>2) Blog helps your business in Search Engine Optimization (SEO)</h3><p>Blog posts create more internal links to your website which helps a lot in SEO. Blog is a great way to have quality content on your website related to your products/services which is indexed by all major search engines like Google, Bing and Yahoo. The more original content you write in your blog post, the better ranking you will get in search engines. SEO is an on-going process and posting blog posts regularly keeps your site active all the time which is beneficial when it comes to search engine optimization.</p><p><strong>For example:</strong> Let&rsquo;s say you sell &ldquo;Sony Television Model XYZ&rdquo; and you regularly publish blog posts about your product. Now, whenever someone searches for &ldquo;Sony Television Model XYZ&rdquo;, Google will crawl on your website knowing that you have something to do with this particular product. Hence, your website will show up on the search result page whenever this item is being searched.</p><h3>3) Blog helps in boosting your sales by convincing the potential customers to buy</h3><p>If you own an online business, there are so many ways you can share different stories with your audience in regard your products/services that you offer. Talk about how you started your business, share stories that educate your audience about what&rsquo;s new in your industry, share stories about how your product/service was beneficial to someone or share anything that you think your audience might find interesting (it does not have to be related to your product). This kind of blogging shows that you are an expert in your industry and interested in educating your audience. It sets you apart in the competitive market. This gives you an opportunity to showcase your expertise by educating the visitors and it can turn your audience into buyers.</p><p><strong>Fun Fact:</strong> Did you know that 92% of companies who decided to blog acquired customers through their blog?</p><p><a href=\"http://www.grandnode.com/\">grandnode</a> is great e-Commerce solution that also offers a variety of CMS features including blog. A store owner has full access for managing the blog posts and related comments.</p>",
@@ -9870,7 +9483,7 @@ namespace Grand.Services.Installation
                                         },
                                     new BlogPost
                                         {
-                                             AllowComments = true,
+                                             AllowComments = false,
                                              Title = "Why your online store needs a wish list",
                                              BodyOverview = "<p>What comes to your mind, when you hear the term&rdquo; wish list&rdquo;? The application of this feature is exactly how it sounds like: a list of things that you wish to get. As an online store owner, would you like your customers to be able to save products in a wish list so that they review or buy them later? Would you like your customers to be able to share their wish list with friends and family for gift giving?</p><p>Offering your customers a feature of wish list as part of shopping cart is a great way to build loyalty to your store site. Having the feature of wish list on a store site allows online businesses to engage with their customers in a smart way as it allows the shoppers to create a list of what they desire and their preferences for future purchase.</p>",
                                              Body = "<p>What comes to your mind, when you hear the term&rdquo; wish list&rdquo;? The application of this feature is exactly how it sounds like: a list of things that you wish to get. As an online store owner, would you like your customers to be able to save products in a wish list so that they review or buy them later? Would you like your customers to be able to share their wish list with friends and family for gift giving?</p><p>Offering your customers a feature of wish list as part of shopping cart is a great way to build loyalty to your store site. Having the feature of wish list on a store site allows online businesses to engage with their customers in a smart way as it allows the shoppers to create a list of what they desire and their preferences for future purchase.</p><p>Does every e-Commerce store needs a wish list? The answer to this question in most cases is yes, because of the following reasons:</p><p><strong>Understanding the needs of your customers</strong> - A wish list is a great way to know what is in your customer&rsquo;s mind. Try to think the purchase history as a small portion of the customer&rsquo;s preferences. But, the wish list is like a wide open door that can give any online business a lot of valuable information about their customer and what they like or desire.</p><p><strong>Shoppers like to share their wish list with friends and family</strong> - Providing your customers a way to email their wish list to their friends and family is a pleasant way to make online shopping enjoyable for the shoppers. It is always a good idea to make the wish list sharable by a unique link so that it can be easily shared though different channels like email or on social media sites.</p><p><strong>Wish list can be a great marketing tool</strong> &ndash; Another way to look at wish list is a great marketing tool because it is extremely targeted and the recipients are always motivated to use it. For example: when your younger brother tells you that his wish list is on a certain e-Commerce store. What is the first thing you are going to do? You are most likely to visit the e-Commerce store, check out the wish list and end up buying something for your younger brother.</p><p>So, how a wish list is a marketing tool? The reason is quite simple, it introduce your online store to new customers just how it is explained in the above example.</p><p><strong>Encourage customers to return to the store site</strong> &ndash; Having a feature of wish list on the store site can increase the return traffic because it encourages customers to come back and buy later. Allowing the customers to save the wish list to their online accounts gives them a reason return to the store site and login to the account at any time to view or edit the wish list items.</p><p><strong>Wish list can be used for gifts for different occasions like weddings or birthdays. So, what kind of benefits a gift-giver gets from a wish list?</strong></p><ul><li>It gives them a surety that they didn&rsquo;t buy a wrong gift</li><li>It guarantees that the recipient will like the gift</li><li>It avoids any awkward moments when the recipient unwraps the gift and as a gift-giver you got something that the recipient do not want</li></ul><p><strong>Wish list is a great feature to have on a store site &ndash; So, what kind of benefits a business owner gets from a wish list</strong></p><ul><li>It is a great way to advertise an online store as many people do prefer to shop where their friend or family shop online</li><li>It allows the current customers to return to the store site and open doors for the new customers</li><li>It allows store admins to track what&rsquo;s in customers wish list and run promotions accordingly to target specific customer segments</li></ul><p><a href=\"http://www.grandnode.com/\">grandnode</a> offers the feature of wish list that allows customers to create a list of products that they desire or planning to buy in future.</p>",
@@ -9878,14 +9491,13 @@ namespace Grand.Services.Installation
                                              CreatedOnUtc = DateTime.UtcNow.AddSeconds(1),
                                         },
                                 };
-            _blogPostRepository.Insert(blogPosts);
+            await _blogPostRepository.InsertAsync(blogPosts);
 
             //search engine names
             foreach (var blogPost in blogPosts)
             {
-                var seName = blogPost.ValidateSeName("", blogPost.Title, true);
-                _urlRecordRepository.Insert(new UrlRecord
-                {
+                var seName = SeoExtensions.GetSeName(blogPost.Title, false, false);
+                await _urlRecordRepository.InsertAsync(new UrlRecord {
                     EntityId = blogPost.Id,
                     EntityName = "BlogPost",
                     LanguageId = "",
@@ -9893,19 +9505,19 @@ namespace Grand.Services.Installation
                     Slug = seName
                 });
                 blogPost.SeName = seName;
-                _blogPostRepository.Update(blogPost);
+                await _blogPostRepository.UpdateAsync(blogPost);
 
             }
         }
 
-        protected virtual void InstallBlogPosts(string defaultUserEmail)
+        protected virtual async Task InstallBlogPosts(string defaultUserEmail)
         {
             var defaultLanguage = _languageRepository.Table.FirstOrDefault();
             var blogPosts = new List<BlogPost>
                                 {
                                     new BlogPost
                                         {
-                                             AllowComments = true,
+                                             AllowComments = false,
                                              Title = "How a blog can help your growing e-Commerce business",
                                              BodyOverview = "<p>When you start an online business, your main aim is to sell the products, right? As a business owner, you want to showcase your store to more audience. So, you decide to go on social media, why? Because everyone is doing it, then why shouldn&rsquo;t you? It is tempting as everyone is aware of the hype that it is the best way to market your brand.</p><p>Do you know having a blog for your online store can be very helpful? Many businesses do not understand the importance of having a blog because they don&rsquo;t have time to post quality content.</p><p>Today, we will talk about how a blog can play an important role for the growth of your e-Commerce business. Later, we will also discuss some tips that will be helpful to you for writing business related blog posts.</p>",
                                              Body = "<p>When you start an online business, your main aim is to sell the products, right? As a business owner, you want to showcase your store to more audience. So, you decide to go on social media, why? Because everyone is doing it, then why shouldn&rsquo;t you? It is tempting as everyone is aware of the hype that it is the best way to market your brand.</p><p>Do you know having a blog for your online store can be very helpful? Many businesses do not understand the importance of having a blog because they don&rsquo;t have time to post quality content.</p><p>Today, we will talk about how a blog can play an important role for the growth of your e-Commerce business. Later, we will also discuss some tips that will be helpful to you for writing business related blog posts.</p><h3>1) Blog is useful in educating your customers</h3><p>Blogging is one of the best way by which you can educate your customers about your products/services that you offer. This helps you as a business owner to bring more value to your brand. When you provide useful information to the customers about your products, they are more likely to buy products from you. You can use your blog for providing tutorials in regard to the use of your products.</p><p><strong>For example:</strong> If you have an online store that offers computer parts. You can write tutorials about how to build a computer or how to make your computer&rsquo;s performance better. While talking about these things, you can mention products in the tutorials and provide link to your products within the blog post from your website. Your potential customers might get different ideas of using your product and will likely to buy products from your online store.</p><h3>2) Blog helps your business in Search Engine Optimization (SEO)</h3><p>Blog posts create more internal links to your website which helps a lot in SEO. Blog is a great way to have quality content on your website related to your products/services which is indexed by all major search engines like Google, Bing and Yahoo. The more original content you write in your blog post, the better ranking you will get in search engines. SEO is an on-going process and posting blog posts regularly keeps your site active all the time which is beneficial when it comes to search engine optimization.</p><p><strong>For example:</strong> Let&rsquo;s say you sell &ldquo;Sony Television Model XYZ&rdquo; and you regularly publish blog posts about your product. Now, whenever someone searches for &ldquo;Sony Television Model XYZ&rdquo;, Google will crawl on your website knowing that you have something to do with this particular product. Hence, your website will show up on the search result page whenever this item is being searched.</p><h3>3) Blog helps in boosting your sales by convincing the potential customers to buy</h3><p>If you own an online business, there are so many ways you can share different stories with your audience in regard your products/services that you offer. Talk about how you started your business, share stories that educate your audience about what&rsquo;s new in your industry, share stories about how your product/service was beneficial to someone or share anything that you think your audience might find interesting (it does not have to be related to your product). This kind of blogging shows that you are an expert in your industry and interested in educating your audience. It sets you apart in the competitive market. This gives you an opportunity to showcase your expertise by educating the visitors and it can turn your audience into buyers.</p><p><strong>Fun Fact:</strong> Did you know that 92% of companies who decided to blog acquired customers through their blog?</p><p><a href=\"http://www.grandnode.com/\">Grandnode</a> is great e-Commerce solution that also offers a variety of CMS features including blog. A store owner has full access for managing the blog posts and related comments.</p>",
@@ -9914,7 +9526,7 @@ namespace Grand.Services.Installation
                                         },
                                     new BlogPost
                                         {
-                                             AllowComments = true,
+                                             AllowComments = false,
                                              Title = "Why your online store needs a wish list",
                                              BodyOverview = "<p>What comes to your mind, when you hear the term&rdquo; wish list&rdquo;? The application of this feature is exactly how it sounds like: a list of things that you wish to get. As an online store owner, would you like your customers to be able to save products in a wish list so that they review or buy them later? Would you like your customers to be able to share their wish list with friends and family for gift giving?</p><p>Offering your customers a feature of wish list as part of shopping cart is a great way to build loyalty to your store site. Having the feature of wish list on a store site allows online businesses to engage with their customers in a smart way as it allows the shoppers to create a list of what they desire and their preferences for future purchase.</p>",
                                              Body = "<p>What comes to your mind, when you hear the term&rdquo; wish list&rdquo;? The application of this feature is exactly how it sounds like: a list of things that you wish to get. As an online store owner, would you like your customers to be able to save products in a wish list so that they review or buy them later? Would you like your customers to be able to share their wish list with friends and family for gift giving?</p><p>Offering your customers a feature of wish list as part of shopping cart is a great way to build loyalty to your store site. Having the feature of wish list on a store site allows online businesses to engage with their customers in a smart way as it allows the shoppers to create a list of what they desire and their preferences for future purchase.</p><p>Does every e-Commerce store needs a wish list? The answer to this question in most cases is yes, because of the following reasons:</p><p><strong>Understanding the needs of your customers</strong> - A wish list is a great way to know what is in your customer&rsquo;s mind. Try to think the purchase history as a small portion of the customer&rsquo;s preferences. But, the wish list is like a wide open door that can give any online business a lot of valuable information about their customer and what they like or desire.</p><p><strong>Shoppers like to share their wish list with friends and family</strong> - Providing your customers a way to email their wish list to their friends and family is a pleasant way to make online shopping enjoyable for the shoppers. It is always a good idea to make the wish list sharable by a unique link so that it can be easily shared though different channels like email or on social media sites.</p><p><strong>Wish list can be a great marketing tool</strong> &ndash; Another way to look at wish list is a great marketing tool because it is extremely targeted and the recipients are always motivated to use it. For example: when your younger brother tells you that his wish list is on a certain e-Commerce store. What is the first thing you are going to do? You are most likely to visit the e-Commerce store, check out the wish list and end up buying something for your younger brother.</p><p>So, how a wish list is a marketing tool? The reason is quite simple, it introduce your online store to new customers just how it is explained in the above example.</p><p><strong>Encourage customers to return to the store site</strong> &ndash; Having a feature of wish list on the store site can increase the return traffic because it encourages customers to come back and buy later. Allowing the customers to save the wish list to their online accounts gives them a reason return to the store site and login to the account at any time to view or edit the wish list items.</p><p><strong>Wish list can be used for gifts for different occasions like weddings or birthdays. So, what kind of benefits a gift-giver gets from a wish list?</strong></p><ul><li>It gives them a surety that they didn&rsquo;t buy a wrong gift</li><li>It guarantees that the recipient will like the gift</li><li>It avoids any awkward moments when the recipient unwraps the gift and as a gift-giver you got something that the recipient do not want</li></ul><p><strong>Wish list is a great feature to have on a store site &ndash; So, what kind of benefits a business owner gets from a wish list</strong></p><ul><li>It is a great way to advertise an online store as many people do prefer to shop where their friend or family shop online</li><li>It allows the current customers to return to the store site and open doors for the new customers</li><li>It allows store admins to track what&rsquo;s in customers wish list and run promotions accordingly to target specific customer segments</li></ul><p><a href=\"http://www.grandnode.com/\">grandnode</a> offers the feature of wish list that allows customers to create a list of products that they desire or planning to buy in future.</p>",
@@ -9922,32 +9534,32 @@ namespace Grand.Services.Installation
                                              CreatedOnUtc = DateTime.UtcNow.AddSeconds(1),
                                         },
                                 };
-            _blogPostRepository.Insert(blogPosts);
+
+            await _blogPostRepository.InsertAsync(blogPosts);
 
             //search engine names
             foreach (var blogPost in blogPosts)
             {
-                blogPost.SeName = blogPost.ValidateSeName("", blogPost.Title, true);
-                _urlRecordRepository.Insert(new UrlRecord
-                {
+                blogPost.SeName = SeoExtensions.GetSeName(blogPost.Title, false, false);
+                await _urlRecordRepository.InsertAsync(new UrlRecord {
                     EntityId = blogPost.Id,
                     EntityName = "BlogPost",
                     LanguageId = "",
                     IsActive = true,
                     Slug = blogPost.SeName
                 });
-                _blogPostRepository.Update(blogPost);
+                await _blogPostRepository.UpdateAsync(blogPost);
             }
 
         }
-        protected virtual void InstallNews()
+        protected virtual async Task InstallNews()
         {
             var defaultLanguage = _languageRepository.Table.FirstOrDefault();
             var news = new List<NewsItem>
                                 {
                                     new NewsItem
                                     {
-                                         AllowComments = true,
+                                         AllowComments = false,
                                          Title = "About Grandnode",
                                          Short = "It's stable and highly usable. From downloads to documentation, www.grandnode.com offers a comprehensive base of information, resources, and support to the grandnode community.",
                                          Full = "<p>For full feature list go to <a href=\"http://www.grandnode.com\">grandnode.com</a></p><p>Providing outstanding custom search engine optimization, web development services and e-commerce development solutions to our clients at a fair price in a professional manner.</p>",
@@ -9956,7 +9568,7 @@ namespace Grand.Services.Installation
                                     },
                                     new NewsItem
                                     {
-                                         AllowComments = true,
+                                         AllowComments = false,
                                          Title = "Grandnode new release!",
                                          Short = "grandnode includes everything you need to begin your e-commerce online store. We have thought of everything and it's all included! grandnode is a fully customizable shopping cart",
                                          Full = "<p>Grandnode includes everything you need to begin your e-commerce online store. We have thought of everything and it's all included!</p>",
@@ -9965,7 +9577,7 @@ namespace Grand.Services.Installation
                                     },
                                     new NewsItem
                                     {
-                                         AllowComments = true,
+                                         AllowComments = false,
                                          Title = "New online store is open!",
                                          Short = "The new grandnode store is open now! We are very excited to offer our new range of products. We will be constantly adding to our range so please register on our site.",
                                          Full = "<p>Our online store is officially up and running. Stock up for the holiday season! We have a great selection of items. We will be constantly adding to our range so please register on our site, this will enable you to keep up to date with any new products.</p><p>All shipping is worldwide and will leave the same day an order is placed! Happy Shopping and spread the word!!</p>",
@@ -9974,66 +9586,60 @@ namespace Grand.Services.Installation
                                     },
 
                                 };
-            _newsItemRepository.Insert(news);
+            await _newsItemRepository.InsertAsync(news);
 
             //search engine names
             foreach (var newsItem in news)
             {
-                newsItem.SeName = newsItem.ValidateSeName("", newsItem.Title, true);
-                _urlRecordRepository.Insert(new UrlRecord
-                {
+                newsItem.SeName = SeoExtensions.GetSeName(newsItem.Title, false, false);
+                await _urlRecordRepository.InsertAsync(new UrlRecord {
                     EntityId = newsItem.Id,
                     EntityName = "NewsItem",
                     LanguageId = "",
                     IsActive = true,
                     Slug = newsItem.SeName
                 });
-                _newsItemRepository.Update(newsItem);
+                await _newsItemRepository.UpdateAsync(newsItem);
             }
+
         }
 
-        protected virtual void InstallPolls()
+        protected virtual async Task InstallPolls()
         {
             var defaultLanguage = _languageRepository.Table.FirstOrDefault();
-            var poll1 = new Poll
-            {
+            var poll1 = new Poll {
                 Name = "Do you like Grandnode for MongoDB?",
                 SystemKeyword = "",
                 Published = true,
                 ShowOnHomePage = true,
                 DisplayOrder = 1,
             };
-            poll1.PollAnswers.Add(new PollAnswer
-            {
+            poll1.PollAnswers.Add(new PollAnswer {
                 Name = "Like very much",
                 DisplayOrder = 1,
             });
-            poll1.PollAnswers.Add(new PollAnswer
-            {
+            poll1.PollAnswers.Add(new PollAnswer {
                 Name = "Like",
                 DisplayOrder = 2,
             });
-            poll1.PollAnswers.Add(new PollAnswer
-            {
+            poll1.PollAnswers.Add(new PollAnswer {
                 Name = "Neither Like nor Dislike",
                 DisplayOrder = 3,
             });
-            poll1.PollAnswers.Add(new PollAnswer
-            {
+            poll1.PollAnswers.Add(new PollAnswer {
                 Name = "Dislike",
                 DisplayOrder = 4,
 
             });
-            poll1.PollAnswers.Add(new PollAnswer
-            {
+            poll1.PollAnswers.Add(new PollAnswer {
                 Name = "Dislike very much",
                 DisplayOrder = 5,
 
             });
-            _pollRepository.Insert(poll1);
+            await _pollRepository.InsertAsync(poll1);
         }
 
-        protected virtual void InstallActivityLogTypes()
+        protected virtual async Task InstallActivityLogTypes()
         {
             var activityLogTypes = new List<ActivityLogType>
                                       {
@@ -10073,6 +9679,18 @@ namespace Grand.Services.Installation
                                                   SystemKeyword = "AddNewDiscount",
                                                   Enabled = true,
                                                   Name = "Add a new discount"
+                                              },
+                                          new ActivityLogType
+                                              {
+                                                  SystemKeyword = "AddNewDocument",
+                                                  Enabled = false,
+                                                  Name = "Add a new document"
+                                              },
+                                          new ActivityLogType
+                                              {
+                                                  SystemKeyword = "AddNewDocumentType",
+                                                  Enabled = false,
+                                                  Name = "Add a new document type"
                                               },
                                           new ActivityLogType
                                               {
@@ -10163,6 +9781,19 @@ namespace Grand.Services.Installation
                                                   SystemKeyword = "DeleteDiscount",
                                                   Enabled = true,
                                                   Name = "Delete a discount"
+                                              },
+
+                                          new ActivityLogType
+                                              {
+                                                  SystemKeyword = "DeleteDocument",
+                                                  Enabled = false,
+                                                  Name = "Delete document"
+                                              },
+                                          new ActivityLogType
+                                              {
+                                                  SystemKeyword = "DeleteDocumentType",
+                                                  Enabled = false,
+                                                  Name = "Delete document type"
                                               },
                                           new ActivityLogType
                                               {
@@ -10259,6 +9890,18 @@ namespace Grand.Services.Installation
                                                   SystemKeyword = "EditDiscount",
                                                   Enabled = true,
                                                   Name = "Edit a discount"
+                                              },
+                                          new ActivityLogType
+                                              {
+                                                  SystemKeyword = "EditDocument",
+                                                  Enabled = false,
+                                                  Name = "Edit document"
+                                              },
+                                          new ActivityLogType
+                                              {
+                                                  SystemKeyword = "EditDocumentType",
+                                                  Enabled = false,
+                                                  Name = "Edit document type"
                                               },
                                           new ActivityLogType
                                               {
@@ -10368,6 +10011,18 @@ namespace Grand.Services.Installation
                                                   SystemKeyword = "PublicStore.ViewProduct",
                                                   Enabled = false,
                                                   Name = "Public store. View a product"
+                                              },
+                                          new ActivityLogType
+                                              {
+                                                  SystemKeyword = "PublicStore.ViewCourse",
+                                                  Enabled = false,
+                                                  Name = "Public store. View a course"
+                                              },
+                                          new ActivityLogType
+                                              {
+                                                  SystemKeyword = "PublicStore.ViewLesson",
+                                                  Enabled = false,
+                                                  Name = "Public store. View a lesson"
                                               },
                                           new ActivityLogType
                                               {
@@ -10586,10 +10241,10 @@ namespace Grand.Services.Installation
                                                   Name = "Delete knowledgebase category"
                                               },
                                       };
-            _activityLogTypeRepository.Insert(activityLogTypes);
+            await _activityLogTypeRepository.InsertAsync(activityLogTypes);
         }
 
-        protected virtual void InstallProductTemplates()
+        protected virtual async Task InstallProductTemplates()
         {
             var productTemplates = new List<ProductTemplate>
                                {
@@ -10606,10 +10261,10 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 100
                                        },
                                };
-            _productTemplateRepository.Insert(productTemplates);
+            await _productTemplateRepository.InsertAsync(productTemplates);
         }
 
-        protected virtual void InstallCategoryTemplates()
+        protected virtual async Task InstallCategoryTemplates()
         {
             var categoryTemplates = new List<CategoryTemplate>
                                {
@@ -10620,10 +10275,10 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1
                                        },
                                };
-            _categoryTemplateRepository.Insert(categoryTemplates);
+            await _categoryTemplateRepository.InsertAsync(categoryTemplates);
         }
 
-        protected virtual void InstallManufacturerTemplates()
+        protected virtual async Task InstallManufacturerTemplates()
         {
             var manufacturerTemplates = new List<ManufacturerTemplate>
                                {
@@ -10634,10 +10289,10 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1
                                        },
                                };
-            _manufacturerTemplateRepository.Insert(manufacturerTemplates);
+            await _manufacturerTemplateRepository.InsertAsync(manufacturerTemplates);
         }
 
-        protected virtual void InstallTopicTemplates()
+        protected virtual async Task InstallTopicTemplates()
         {
             var topicTemplates = new List<TopicTemplate>
                                {
@@ -10648,10 +10303,10 @@ namespace Grand.Services.Installation
                                            DisplayOrder = 1
                                        },
                                };
-            _topicTemplateRepository.Insert(topicTemplates);
+            await _topicTemplateRepository.InsertAsync(topicTemplates);
         }
 
-        protected virtual void InstallScheduleTasks()
+        protected virtual async Task InstallScheduleTasks()
         {
             //these tasks are default - they are created in order to insert them into database
             //and nothing above it
@@ -10664,13 +10319,7 @@ namespace Grand.Services.Installation
                     Type = "Grand.Services.Tasks.QueuedMessagesSendScheduleTask, Grand.Services",
                     Enabled = true,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryMinutes,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1
                 },
                 new ScheduleTask
                 {
@@ -10678,13 +10327,7 @@ namespace Grand.Services.Installation
                     Type = "Grand.Services.Tasks.DeleteGuestsScheduleTask, Grand.Services",
                     Enabled = true,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryMinutes,
-                    TimeInterval = 10,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
@@ -10692,27 +10335,15 @@ namespace Grand.Services.Installation
                     Type = "Grand.Services.Tasks.ClearCacheScheduleTask, Grand.Services",
                     Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryMinutes,
-                    TimeInterval = 10,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 120
                 },
                 new ScheduleTask
                 {
                     ScheduleTaskName = "Clear log",
-                    Type = "Grand.Services.Tasks.ClearLogScheduleTask",
+                    Type = "Grand.Services.Tasks.ClearLogScheduleTask, Grand.Services",
                     Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryHours,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
@@ -10720,111 +10351,63 @@ namespace Grand.Services.Installation
                     Type = "Grand.Services.Tasks.UpdateExchangeRateScheduleTask, Grand.Services",
                     Enabled = true,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryHours,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
                     ScheduleTaskName = "Customer reminder - AbandonedCart",
                     Type = "Grand.Services.Tasks.CustomerReminderAbandonedCartScheduleTask, Grand.Services",
-                    Enabled = true,
+                    Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryHours,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 20
                 },
                 new ScheduleTask
                 {
                     ScheduleTaskName = "Customer reminder - RegisteredCustomer",
                     Type = "Grand.Services.Tasks.CustomerReminderRegisteredCustomerScheduleTask, Grand.Services",
-                    Enabled = true,
+                    Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryDays,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
                     ScheduleTaskName = "Customer reminder - LastActivity",
                     Type = "Grand.Services.Tasks.CustomerReminderLastActivityScheduleTask, Grand.Services",
-                    Enabled = true,
+                    Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryDays,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
                     ScheduleTaskName = "Customer reminder - LastPurchase",
                     Type = "Grand.Services.Tasks.CustomerReminderLastPurchaseScheduleTask, Grand.Services",
-                    Enabled = true,
+                    Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryDays,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
                     ScheduleTaskName = "Customer reminder - Birthday",
                     Type = "Grand.Services.Tasks.CustomerReminderBirthdayScheduleTask, Grand.Services",
-                    Enabled = true,
+                    Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryDays,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
                     ScheduleTaskName = "Customer reminder - Completed order",
                     Type = "Grand.Services.Tasks.CustomerReminderCompletedOrderScheduleTask, Grand.Services",
-                    Enabled = true,
+                    Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryDays,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
                     ScheduleTaskName = "Customer reminder - Unpaid order",
                     Type = "Grand.Services.Tasks.CustomerReminderUnpaidOrderScheduleTask, Grand.Services",
-                    Enabled = true,
+                    Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryDays,
-                    TimeInterval = 1,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 1440
                 },
                 new ScheduleTask
                 {
@@ -10832,19 +10415,13 @@ namespace Grand.Services.Installation
                     Type = "Grand.Services.Tasks.EndAuctionsTask, Grand.Services",
                     Enabled = false,
                     StopOnError = false,
-                    TimeIntervalChoice = TimeIntervalChoice.EveryHours,
-                    TimeInterval = 10,
-                    MinuteOfHour = 1,
-                    HourOfDay = 1,
-                    DayOfWeek  = DayOfWeek.Thursday,
-                    MonthOptionChoice = MonthOptionChoice.OnSpecificDay,
-                    DayOfMonth = 1
+                    TimeInterval = 60
                 },
             };
-            _scheduleTaskRepository.Insert(tasks);
+            await _scheduleTaskRepository.InsertAsync(tasks);
         }
 
-        protected virtual void InstallReturnRequestReasons()
+        protected virtual async Task InstallReturnRequestReasons()
         {
             var returnRequestReasons = new List<ReturnRequestReason>
                                 {
@@ -10864,9 +10441,9 @@ namespace Grand.Services.Installation
                                             DisplayOrder = 3
                                         }
                                 };
-            _returnRequestReasonRepository.Insert(returnRequestReasons);
+            await _returnRequestReasonRepository.InsertAsync(returnRequestReasons);
         }
-        protected virtual void InstallReturnRequestActions()
+        protected virtual async Task InstallReturnRequestActions()
         {
             var returnRequestActions = new List<ReturnRequestAction>
                                 {
@@ -10886,13 +10463,12 @@ namespace Grand.Services.Installation
                                             DisplayOrder = 3
                                         }
                                 };
-            _returnRequestActionRepository.Insert(returnRequestActions);
+            await _returnRequestActionRepository.InsertAsync(returnRequestActions);
         }
 
-        protected virtual void InstallWarehouses()
+        protected virtual async Task InstallWarehouses()
         {
-            var warehouse1address = new Address
-            {
+            var warehouse1address = new Address {
                 Address1 = "21 West 52nd Street",
                 City = "New York",
                 StateProvinceId = _stateProvinceRepository.Table.FirstOrDefault(sp => sp.Name == "New York").Id,
@@ -10900,9 +10476,8 @@ namespace Grand.Services.Installation
                 ZipPostalCode = "10021",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            _addressRepository.Insert(warehouse1address);
-            var warehouse2address = new Address
-            {
+            await _addressRepository.InsertAsync(warehouse1address);
+            var warehouse2address = new Address {
                 Address1 = "300 South Spring Stree",
                 City = "Los Angeles",
                 StateProvinceId = _stateProvinceRepository.Table.FirstOrDefault(sp => sp.Name == "California").Id,
@@ -10910,7 +10485,7 @@ namespace Grand.Services.Installation
                 ZipPostalCode = "90013",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            _addressRepository.Insert(warehouse2address);
+            await _addressRepository.InsertAsync(warehouse2address);
             var warehouses = new List<Warehouse>
             {
                 new Warehouse
@@ -10925,13 +10500,12 @@ namespace Grand.Services.Installation
                 }
             };
 
-            _warehouseRepository.Insert(warehouses);
+            await _warehouseRepository.InsertAsync(warehouses);
         }
 
-        protected virtual void InstallPickupPoints()
+        protected virtual async Task InstallPickupPoints()
         {
-            var addresspoint = new Address
-            {
+            var addresspoint = new Address {
                 Address1 = "21 West 52nd Street",
                 City = "New York",
                 StateProvinceId = _stateProvinceRepository.Table.FirstOrDefault(sp => sp.Name == "New York").Id,
@@ -10939,17 +10513,16 @@ namespace Grand.Services.Installation
                 ZipPostalCode = "10021",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            _addressRepository.Insert(addresspoint);
+            await _addressRepository.InsertAsync(addresspoint);
 
-            var point = new PickupPoint()
-            {
+            var point = new PickupPoint() {
                 Address = addresspoint,
                 Name = "My Store - New York",
             };
-            _pickupPointsRepository.Insert(point);
+            await _pickupPointsRepository.InsertAsync(point);
         }
 
-        protected virtual void InstallVendors()
+        protected virtual async Task InstallVendors()
         {
             var vendors = new List<Vendor>
             {
@@ -10981,14 +10554,13 @@ namespace Grand.Services.Installation
                 }
             };
 
-            _vendorRepository.Insert(vendors);
+            await _vendorRepository.InsertAsync(vendors);
 
             //search engine names
             foreach (var vendor in vendors)
             {
-                var seName = vendor.ValidateSeName(vendor.SeName, vendor.Name, true);
-                _urlRecordRepository.Insert(new UrlRecord
-                {
+                var seName = SeoExtensions.GetSeName(vendor.Name, false, false);
+                await _urlRecordRepository.InsertAsync(new UrlRecord {
                     EntityId = vendor.Id,
                     EntityName = "Vendor",
                     LanguageId = "",
@@ -10996,16 +10568,13 @@ namespace Grand.Services.Installation
                     Slug = seName
                 });
                 vendor.SeName = seName;
-                _vendorRepository.Update(vendor);
+                await _vendorRepository.UpdateAsync(vendor);
             }
-
-
         }
 
-        protected virtual void InstallAffiliates()
+        protected virtual async Task InstallAffiliates()
         {
-            var affiliateAddress = new Address
-            {
+            var affiliateAddress = new Address {
                 FirstName = "John",
                 LastName = "Smith",
                 Email = "affiliate_email@gmail.com",
@@ -11018,221 +10587,216 @@ namespace Grand.Services.Installation
                 CountryId = _countryRepository.Table.FirstOrDefault(c => c.ThreeLetterIsoCode == "USA").Id,
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            _addressRepository.Insert(affiliateAddress);
-            var affilate = new Affiliate
-            {
+            await _addressRepository.InsertAsync(affiliateAddress);
+            var affilate = new Affiliate {
                 Active = true,
                 Address = affiliateAddress
             };
-            _affiliateRepository.Insert(affilate);
+            await _affiliateRepository.InsertAsync(affilate);
         }
 
-        private void AddProductTag(Product product, string tag)
+        private async Task AddProductTag(Product product, string tag)
         {
             var productTag = _productTagRepository.Table.FirstOrDefault(pt => pt.Name == tag);
             if (productTag == null)
             {
-                productTag = new ProductTag
-                {
+                productTag = new ProductTag {
                     Name = tag,
+                    SeName = SeoExtensions.GetSeName(tag, false, false),
                 };
 
-                _productTagRepository.Insert(productTag);
+                await _productTagRepository.InsertAsync(productTag);
             }
             productTag.Count = productTag.Count + 1;
-            _productTagRepository.Update(productTag);
-            product.ProductTags.Add(productTag.Id);
-            _productRepository.Update(product);
+            await _productTagRepository.UpdateAsync(productTag);
+            product.ProductTags.Add(productTag.Name);
+            await _productRepository.UpdateAsync(product);
         }
 
-        private void CreateIndexes()
+        private async Task CreateIndexes()
         {
-            var indexOptionId = new CreateIndexOptions();
-            indexOptionId.Name = "db";
-            indexOptionId.Unique = true;
-            var grandNodeVersionIndex = new CreateIndexModel<GrandNodeVersion>((Builders<GrandNodeVersion>.IndexKeys.Ascending(x => x.DataBaseVersion)), indexOptionId);
-
-            _versionRepository.Collection.Indexes.CreateOne(grandNodeVersionIndex);
+            //version
+            await _versionRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<GrandNodeVersion>((Builders<GrandNodeVersion>.IndexKeys.Ascending(x => x.DataBaseVersion)), new CreateIndexOptions() { Name = "DataBaseVersion", Unique = true }));
 
             //Store
-            _storeRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Store>((Builders<Store>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder" }));
+            await _storeRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Store>((Builders<Store>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder" }));
 
             //Language
-            _lsrRepository.Collection.Indexes.CreateOne(new CreateIndexModel<LocaleStringResource>((Builders<LocaleStringResource>.IndexKeys.Ascending(x => x.LanguageId).Ascending(x => x.ResourceName)), new CreateIndexOptions() { Name = "Language" }));
-            _lsrRepository.Collection.Indexes.CreateOne(new CreateIndexModel<LocaleStringResource>((Builders<LocaleStringResource>.IndexKeys.Ascending(x => x.ResourceName)), new CreateIndexOptions() { Name = "ResourceName" }));
+            await _lsrRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<LocaleStringResource>((Builders<LocaleStringResource>.IndexKeys.Ascending(x => x.LanguageId).Ascending(x => x.ResourceName)), new CreateIndexOptions() { Name = "Language" }));
+            await _lsrRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<LocaleStringResource>((Builders<LocaleStringResource>.IndexKeys.Ascending(x => x.ResourceName)), new CreateIndexOptions() { Name = "ResourceName" }));
 
             //customer
-            _customerRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Customer>((Builders<Customer>.IndexKeys.Descending(x => x.CreatedOnUtc).Ascending(x => x.Deleted).Ascending("CustomerRoles._id")), new CreateIndexOptions() { Name = "CreatedOnUtc_1_CustomerRoles._id_1", Unique = false }));
-            _customerRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Customer>((Builders<Customer>.IndexKeys.Ascending(x => x.LastActivityDateUtc)), new CreateIndexOptions() { Name = "LastActivityDateUtc_1", Unique = false }));
-            _customerRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Customer>((Builders<Customer>.IndexKeys.Ascending(x => x.CustomerGuid)), new CreateIndexOptions() { Name = "CustomerGuid_1", Unique = false }));
-            _customerRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Customer>((Builders<Customer>.IndexKeys.Ascending(x => x.Email)), new CreateIndexOptions() { Name = "Email_1", Unique = false }));
+            await _customerRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Customer>((Builders<Customer>.IndexKeys.Descending(x => x.CreatedOnUtc).Ascending(x => x.Deleted).Ascending("CustomerRoles._id")), new CreateIndexOptions() { Name = "CreatedOnUtc_1_CustomerRoles._id_1", Unique = false }));
+            await _customerRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Customer>((Builders<Customer>.IndexKeys.Ascending(x => x.LastActivityDateUtc)), new CreateIndexOptions() { Name = "LastActivityDateUtc_1", Unique = false }));
+            await _customerRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Customer>((Builders<Customer>.IndexKeys.Ascending(x => x.CustomerGuid)), new CreateIndexOptions() { Name = "CustomerGuid_1", Unique = false }));
+            await _customerRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Customer>((Builders<Customer>.IndexKeys.Ascending(x => x.Email)), new CreateIndexOptions() { Name = "Email_1", Unique = false }));
 
             //customer role
-            _customerRoleProductRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerRoleProduct>((Builders<CustomerRoleProduct>.IndexKeys.Ascending(x => x.Id).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "CustomerRoleId_DisplayOrder", Unique = false }));
+            await _customerRoleProductRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerRoleProduct>((Builders<CustomerRoleProduct>.IndexKeys.Ascending(x => x.Id).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "CustomerRoleId_DisplayOrder", Unique = false }));
 
             //customer personalize product 
-            _customerProductRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerProduct>((Builders<CustomerProduct>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "CustomerProduct", Unique = false }));
-            _customerProductRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerProduct>((Builders<CustomerProduct>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.ProductId)), new CreateIndexOptions() { Name = "CustomerProduct_Unique", Unique = true }));
+            await _customerProductRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerProduct>((Builders<CustomerProduct>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "CustomerProduct", Unique = false }));
+            await _customerProductRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerProduct>((Builders<CustomerProduct>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.ProductId)), new CreateIndexOptions() { Name = "CustomerProduct_Unique", Unique = true }));
 
             //customer product price
-            _customerProductPriceRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerProductPrice>((Builders<CustomerProductPrice>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.ProductId)), new CreateIndexOptions() { Name = "CustomerProduct", Unique = true }));
+            await _customerProductPriceRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerProductPrice>((Builders<CustomerProductPrice>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.ProductId)), new CreateIndexOptions() { Name = "CustomerProduct", Unique = true }));
 
             //customer tag history
-            _customerTagProductRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerTagProduct>((Builders<CustomerTagProduct>.IndexKeys.Ascending(x => x.Id).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "CustomerTagId_DisplayOrder", Unique = false }));
+            await _customerTagProductRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerTagProduct>((Builders<CustomerTagProduct>.IndexKeys.Ascending(x => x.Id).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "CustomerTagId_DisplayOrder", Unique = false }));
 
             //customer history password
-            _customerHistoryPasswordRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerHistoryPassword>((Builders<CustomerHistoryPassword>.IndexKeys.Ascending(x => x.CustomerId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CustomerId", Unique = false }));
+            await _customerHistoryPasswordRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerHistoryPassword>((Builders<CustomerHistoryPassword>.IndexKeys.Ascending(x => x.CustomerId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CustomerId", Unique = false }));
 
             //customer note
-            _customerNoteRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerNote>((Builders<CustomerNote>.IndexKeys.Ascending(x => x.CustomerId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CustomerId", Unique = false, Background = true }));
+            await _customerNoteRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerNote>((Builders<CustomerNote>.IndexKeys.Ascending(x => x.CustomerId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CustomerId", Unique = false, Background = true }));
 
+            //user api
+            await _userapiRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<UserApi>((Builders<UserApi>.IndexKeys.Ascending(x => x.Email)), new CreateIndexOptions() { Name = "Email", Unique = true, Background = true }));
 
             //specificationAttribute
-            _specificationAttributeRepository.Collection.Indexes.CreateOne(new CreateIndexModel<SpecificationAttribute>((Builders<SpecificationAttribute>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder" }));
+            await _specificationAttributeRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<SpecificationAttribute>((Builders<SpecificationAttribute>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder" }));
 
             //checkoutAttribute
-            _checkoutAttributeRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CheckoutAttribute>((Builders<CheckoutAttribute>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder" }));
+            await _checkoutAttributeRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CheckoutAttribute>((Builders<CheckoutAttribute>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder" }));
 
             //category
-            _categoryRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Category>((Builders<Category>.IndexKeys.Ascending(x => x.ShowOnHomePage).Ascending(x => x.Published).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "ShowOnHomePage_DisplayOrder_1", Unique = false }));
-            _categoryRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Category>((Builders<Category>.IndexKeys.Ascending(x => x.ParentCategoryId).Ascending(x => x.Published).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "ParentCategoryId_1_DisplayOrder_1", Unique = false }));
-            _categoryRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Category>((Builders<Category>.IndexKeys.Ascending(x => x.FeaturedProductsOnHomaPage).Ascending(x => x.Published).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "FeaturedProductsOnHomaPage_DisplayOrder_1", Unique = false }));
+            await _categoryRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Category>((Builders<Category>.IndexKeys.Ascending(x => x.ShowOnHomePage).Ascending(x => x.Published).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "ShowOnHomePage_DisplayOrder_1", Unique = false }));
+            await _categoryRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Category>((Builders<Category>.IndexKeys.Ascending(x => x.ParentCategoryId).Ascending(x => x.Published).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "ParentCategoryId_1_DisplayOrder_1", Unique = false }));
+            await _categoryRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Category>((Builders<Category>.IndexKeys.Ascending(x => x.FeaturedProductsOnHomaPage).Ascending(x => x.Published).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "FeaturedProductsOnHomaPage_DisplayOrder_1", Unique = false }));
 
             //manufacturer
-            _manufacturerRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Manufacturer>((Builders<Manufacturer>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder_1", Unique = false }));
-            _manufacturerRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Manufacturer>((Builders<Manufacturer>.IndexKeys.Ascending("AppliedDiscounts")), new CreateIndexOptions() { Name = "AppliedDiscounts._id_1", Unique = false }));
+            await _manufacturerRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Manufacturer>((Builders<Manufacturer>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder_1", Unique = false }));
+            await _manufacturerRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Manufacturer>((Builders<Manufacturer>.IndexKeys.Ascending("AppliedDiscounts")), new CreateIndexOptions() { Name = "AppliedDiscounts._id_1", Unique = false }));
 
             //Product
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.MarkAsNew).Ascending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "MarkAsNew_1_CreatedOnUtc_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.Published).Ascending(x => x.ShowOnHomePage).Ascending(x => x.DisplayOrder).Ascending(x => x.Name)), new CreateIndexOptions() { Name = "ShowOnHomePage_1_Published_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.ParentGroupedProductId).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "ParentGroupedProductId_1_DisplayOrder_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.ProductTags).Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Name)), new CreateIndexOptions() { Name = "ProductTags._id_1_Name_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.Name)), new CreateIndexOptions() { Name = "Name_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.MarkAsNew).Ascending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "MarkAsNew_1_CreatedOnUtc_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.Published).Ascending(x => x.ShowOnHomePage).Ascending(x => x.DisplayOrder).Ascending(x => x.Name)), new CreateIndexOptions() { Name = "ShowOnHomePage_1_Published_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.ParentGroupedProductId).Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "ParentGroupedProductId_1_DisplayOrder_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.ProductTags).Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Name)), new CreateIndexOptions() { Name = "ProductTags._id_1_Name_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.Name)), new CreateIndexOptions() { Name = "Name_1", Unique = false }));
 
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending("ProductCategories.DisplayOrder")), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_DisplayOrder_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.DisplayOrderCategory)), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_OrderCategory_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Name)), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_Name_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Sold)), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_Sold_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending("ProductCategories.IsFeaturedProduct").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually)), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_IsFeaturedProduct_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending("ProductCategories.DisplayOrder")), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_DisplayOrder_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.DisplayOrderCategory)), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_OrderCategory_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Name)), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_Name_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Sold)), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_Sold_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductCategories.CategoryId").Ascending("ProductCategories.IsFeaturedProduct").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually)), new CreateIndexOptions() { Name = "ProductCategories.CategoryId_1_IsFeaturedProduct_1", Unique = false }));
 
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductManufacturers.ManufacturerId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.DisplayOrderManufacturer)), new CreateIndexOptions() { Name = "ProductManufacturers.ManufacturerId_1_OrderCategory_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductManufacturers.ManufacturerId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Name)), new CreateIndexOptions() { Name = "ProductManufacturers.ManufacturerId_1_Name_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductManufacturers.ManufacturerId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Sold)), new CreateIndexOptions() { Name = "ProductManufacturers.ManufacturerId_1_Sold_1", Unique = false }));
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductManufacturers.ManufacturerId").Ascending("ProductManufacturers.IsFeaturedProduct").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually)), new CreateIndexOptions() { Name = "ProductManufacturers.ManufacturerId_1_IsFeaturedProduct_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductManufacturers.ManufacturerId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.DisplayOrderManufacturer)), new CreateIndexOptions() { Name = "ProductManufacturers.ManufacturerId_1_OrderCategory_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductManufacturers.ManufacturerId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Name)), new CreateIndexOptions() { Name = "ProductManufacturers.ManufacturerId_1_Name_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductManufacturers.ManufacturerId").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending(x => x.Sold)), new CreateIndexOptions() { Name = "ProductManufacturers.ManufacturerId_1_Sold_1", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending("ProductManufacturers.ManufacturerId").Ascending("ProductManufacturers.IsFeaturedProduct").Ascending(x => x.Published).Ascending(x => x.VisibleIndividually)), new CreateIndexOptions() { Name = "ProductManufacturers.ManufacturerId_1_IsFeaturedProduct_1", Unique = false }));
 
-            _productRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending("ProductSpecificationAttributes.SpecificationAttributeOptionId").Ascending("ProductSpecificationAttributes.AllowFiltering")), new CreateIndexOptions() { Name = "ProductSpecificationAttributes", Unique = false }));
+            await _productRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Product>((Builders<Product>.IndexKeys.Ascending(x => x.Published).Ascending(x => x.VisibleIndividually).Ascending("ProductSpecificationAttributes.SpecificationAttributeOptionId").Ascending("ProductSpecificationAttributes.AllowFiltering")), new CreateIndexOptions() { Name = "ProductSpecificationAttributes", Unique = false }));
 
             //productreseration
-            _productReservationRepository.Collection.Indexes.CreateOne(new CreateIndexModel<ProductReservation>((Builders<ProductReservation>.IndexKeys.Ascending(x => x.ProductId).Ascending(x => x.Date)), new CreateIndexOptions() { Name = "ProductReservation", Unique = false }));
+            await _productReservationRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ProductReservation>((Builders<ProductReservation>.IndexKeys.Ascending(x => x.ProductId).Ascending(x => x.Date)), new CreateIndexOptions() { Name = "ProductReservation", Unique = false }));
 
             //bid
-            _bidRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Bid>((Builders<Bid>.IndexKeys.Ascending(x => x.ProductId).Ascending(x => x.CustomerId).Descending(x => x.Date)), new CreateIndexOptions() { Name = "ProductCustomer", Unique = false }));
-            _bidRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Bid>((Builders<Bid>.IndexKeys.Ascending(x => x.ProductId).Descending(x => x.Date)), new CreateIndexOptions() { Name = "ProductDate", Unique = false }));
+            await _bidRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Bid>((Builders<Bid>.IndexKeys.Ascending(x => x.ProductId).Ascending(x => x.CustomerId).Descending(x => x.Date)), new CreateIndexOptions() { Name = "ProductCustomer", Unique = false }));
+            await _bidRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Bid>((Builders<Bid>.IndexKeys.Ascending(x => x.ProductId).Descending(x => x.Date)), new CreateIndexOptions() { Name = "ProductDate", Unique = false }));
 
             //ProductReview
-            _productReviewRepository.Collection.Indexes.CreateOne(new CreateIndexModel<ProductReview>((Builders<ProductReview>.IndexKeys.Ascending(x => x.ProductId).Ascending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "ProductId", Unique = false }));
+            await _productReviewRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ProductReview>((Builders<ProductReview>.IndexKeys.Ascending(x => x.ProductId).Ascending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "ProductId", Unique = false }));
 
             //Recently Viewed Products
-            _recentlyViewedProductRepository.Collection.Indexes.CreateOne(new CreateIndexModel<RecentlyViewedProduct>((Builders<RecentlyViewedProduct>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.ProductId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CustomerId.ProductId" }));
+            await _recentlyViewedProductRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<RecentlyViewedProduct>((Builders<RecentlyViewedProduct>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.ProductId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CustomerId.ProductId" }));
 
             //Product also purchased
-            _productalsopurchasedRepository.Collection.Indexes.CreateOne(new CreateIndexModel<ProductAlsoPurchased>((Builders<ProductAlsoPurchased>.IndexKeys.Ascending(x => x.ProductId)), new CreateIndexOptions() { Name = "ProductId", Unique = false, Background = true }));
+            await _productalsopurchasedRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ProductAlsoPurchased>((Builders<ProductAlsoPurchased>.IndexKeys.Ascending(x => x.ProductId)), new CreateIndexOptions() { Name = "ProductId", Unique = false, Background = true }));
 
             //url record
-            _urlRecordRepository.Collection.Indexes.CreateOne(new CreateIndexModel<UrlRecord>((Builders<UrlRecord>.IndexKeys.Ascending(x => x.Slug).Ascending(x => x.IsActive)), new CreateIndexOptions() { Name = "Slug" }));
-            _urlRecordRepository.Collection.Indexes.CreateOne(new CreateIndexModel<UrlRecord>((Builders<UrlRecord>.IndexKeys.Ascending(x => x.EntityId).Ascending(x => x.EntityName).Ascending(x => x.LanguageId).Ascending(x => x.IsActive)), new CreateIndexOptions() { Name = "UrlRecord" }));
+            await _urlRecordRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<UrlRecord>((Builders<UrlRecord>.IndexKeys.Ascending(x => x.Slug).Ascending(x => x.IsActive)), new CreateIndexOptions() { Name = "Slug" }));
+            await _urlRecordRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<UrlRecord>((Builders<UrlRecord>.IndexKeys.Ascending(x => x.EntityId).Ascending(x => x.EntityName).Ascending(x => x.LanguageId).Ascending(x => x.IsActive)), new CreateIndexOptions() { Name = "UrlRecord" }));
 
 
             //message template
-            _messageTemplateRepository.Collection.Indexes.CreateOne(new CreateIndexModel<MessageTemplate>((Builders<MessageTemplate>.IndexKeys.Ascending(x => x.Name)), new CreateIndexOptions() { Name = "Name", Unique = false }));
+            await _messageTemplateRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<MessageTemplate>((Builders<MessageTemplate>.IndexKeys.Ascending(x => x.Name)), new CreateIndexOptions() { Name = "Name", Unique = false }));
 
             //forum
-            _forumPostVote.Collection.Indexes.CreateOne(new CreateIndexModel<ForumPostVote>((Builders<ForumPostVote>.IndexKeys.Ascending(x => x.ForumPostId).Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "Vote", Unique = true }));
+            await _forumPostVote.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ForumPostVote>((Builders<ForumPostVote>.IndexKeys.Ascending(x => x.ForumPostId).Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "Vote", Unique = true }));
 
             // Country and Stateprovince
-            _countryRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Country>((Builders<Country>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder" }));
-            _stateProvinceRepository.Collection.Indexes.CreateOne(new CreateIndexModel<StateProvince>((Builders<StateProvince>.IndexKeys.Ascending(x => x.CountryId).Ascending(x => x.DisplayOrder).Ascending(x => x.Id)), new CreateIndexOptions() { Name = "Country" }));
+            await _countryRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Country>((Builders<Country>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder" }));
+            await _stateProvinceRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<StateProvince>((Builders<StateProvince>.IndexKeys.Ascending(x => x.CountryId).Ascending(x => x.DisplayOrder).Ascending(x => x.Id)), new CreateIndexOptions() { Name = "Country" }));
 
             //discount
-            _discountCouponRepository.Collection.Indexes.CreateOne(new CreateIndexModel<DiscountCoupon>((Builders<DiscountCoupon>.IndexKeys.Ascending(x => x.CouponCode)), new CreateIndexOptions() { Name = "CouponCode", Unique = true }));
-            _discountCouponRepository.Collection.Indexes.CreateOne(new CreateIndexModel<DiscountCoupon>((Builders<DiscountCoupon>.IndexKeys.Ascending(x => x.DiscountId)), new CreateIndexOptions() { Name = "DiscountId", Unique = false }));
+            await _discountCouponRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<DiscountCoupon>((Builders<DiscountCoupon>.IndexKeys.Ascending(x => x.CouponCode)), new CreateIndexOptions() { Name = "CouponCode", Unique = true }));
+            await _discountCouponRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<DiscountCoupon>((Builders<DiscountCoupon>.IndexKeys.Ascending(x => x.DiscountId)), new CreateIndexOptions() { Name = "DiscountId", Unique = false }));
 
-            _discountusageRepository.Collection.Indexes.CreateOne(new CreateIndexModel<DiscountUsageHistory>((Builders<DiscountUsageHistory>.IndexKeys.Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "CustomerId" }));
-            _discountusageRepository.Collection.Indexes.CreateOne(new CreateIndexModel<DiscountUsageHistory>((Builders<DiscountUsageHistory>.IndexKeys.Ascending(x => x.DiscountId)), new CreateIndexOptions() { Name = "DiscountId" }));
-            _discountusageRepository.Collection.Indexes.CreateOne(new CreateIndexModel<DiscountUsageHistory>((Builders<DiscountUsageHistory>.IndexKeys.Ascending(x => x.OrderId)), new CreateIndexOptions() { Name = "OrderId" }));
-
+            await _discountusageRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<DiscountUsageHistory>((Builders<DiscountUsageHistory>.IndexKeys.Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "CustomerId" }));
+            await _discountusageRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<DiscountUsageHistory>((Builders<DiscountUsageHistory>.IndexKeys.Ascending(x => x.DiscountId)), new CreateIndexOptions() { Name = "DiscountId" }));
+            await _discountusageRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<DiscountUsageHistory>((Builders<DiscountUsageHistory>.IndexKeys.Ascending(x => x.OrderId)), new CreateIndexOptions() { Name = "OrderId" }));
 
             //knowledgebase
-            _knowledgebaseArticleRepository.Collection.Indexes.CreateOne(new CreateIndexModel<KnowledgebaseArticle>((Builders<KnowledgebaseArticle>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder", Unique = false }));
-            _knowledgebaseCategoryRepository.Collection.Indexes.CreateOne(new CreateIndexModel<KnowledgebaseCategory>((Builders<KnowledgebaseCategory>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder", Unique = false }));
+            await _knowledgebaseArticleRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<KnowledgebaseArticle>((Builders<KnowledgebaseArticle>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder", Unique = false }));
+            await _knowledgebaseCategoryRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<KnowledgebaseCategory>((Builders<KnowledgebaseCategory>.IndexKeys.Ascending(x => x.DisplayOrder)), new CreateIndexOptions() { Name = "DisplayOrder", Unique = false }));
 
             //topic
-            _topicRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Topic>((Builders<Topic>.IndexKeys.Ascending(x => x.SystemName)), new CreateIndexOptions() { Name = "SystemName", Unique = false }));
+            await _topicRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Topic>((Builders<Topic>.IndexKeys.Ascending(x => x.SystemName)), new CreateIndexOptions() { Name = "SystemName", Unique = false }));
 
             //news
-            _newsItemRepository.Collection.Indexes.CreateOne(new CreateIndexModel<NewsItem>((Builders<NewsItem>.IndexKeys.Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CreatedOnUtc", Unique = false }));
+            await _newsItemRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<NewsItem>((Builders<NewsItem>.IndexKeys.Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CreatedOnUtc", Unique = false }));
 
             //newsletter
-            _newslettersubscriptionRepository.Collection.Indexes.CreateOne(new CreateIndexModel<NewsLetterSubscription>((Builders<NewsLetterSubscription>.IndexKeys.Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "CustomerId", Unique = false }));
-            _newslettersubscriptionRepository.Collection.Indexes.CreateOne(new CreateIndexModel<NewsLetterSubscription>((Builders<NewsLetterSubscription>.IndexKeys.Ascending(x => x.Email)), new CreateIndexOptions() { Name = "Email", Unique = false }));
-
+            await _newslettersubscriptionRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<NewsLetterSubscription>((Builders<NewsLetterSubscription>.IndexKeys.Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "CustomerId", Unique = false }));
+            await _newslettersubscriptionRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<NewsLetterSubscription>((Builders<NewsLetterSubscription>.IndexKeys.Ascending(x => x.Email)), new CreateIndexOptions() { Name = "Email", Unique = false }));
 
             //Log
-            _logRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Log>((Builders<Log>.IndexKeys.Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CreatedOnUtc", Unique = false }));
-
+            await _logRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Log>((Builders<Log>.IndexKeys.Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CreatedOnUtc", Unique = false }));
 
             //Campaign history
-            _campaignHistoryRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CampaignHistory>((Builders<CampaignHistory>.IndexKeys.Ascending(x => x.CampaignId).Descending(x => x.CreatedDateUtc)), new CreateIndexOptions() { Name = "CampaignId", Unique = false }));
-
+            await _campaignHistoryRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CampaignHistory>((Builders<CampaignHistory>.IndexKeys.Ascending(x => x.CampaignId).Descending(x => x.CreatedDateUtc)), new CreateIndexOptions() { Name = "CampaignId", Unique = false }));
 
             //reward points
-            _rewardpointshistoryRepository.Collection.Indexes.CreateOne(new CreateIndexModel<RewardPointsHistory>((Builders<RewardPointsHistory>.IndexKeys.Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "CustomerId" }));
+            await _rewardpointshistoryRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<RewardPointsHistory>((Builders<RewardPointsHistory>.IndexKeys.Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "CustomerId" }));
 
             //search term
-            _searchtermRepository.Collection.Indexes.CreateOne(new CreateIndexModel<SearchTerm>((Builders<SearchTerm>.IndexKeys.Descending(x => x.Count)), new CreateIndexOptions() { Name = "Count", Unique = false }));
+            await _searchtermRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<SearchTerm>((Builders<SearchTerm>.IndexKeys.Descending(x => x.Count)), new CreateIndexOptions() { Name = "Count", Unique = false }));
 
             //setting
-            _settingRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Setting>((Builders<Setting>.IndexKeys.Ascending(x => x.Name)), new CreateIndexOptions() { Name = "Name", Unique = false }));
+            await _settingRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Setting>((Builders<Setting>.IndexKeys.Ascending(x => x.Name)), new CreateIndexOptions() { Name = "Name", Unique = false }));
 
             //shipment
-            _shipmentRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Shipment>((Builders<Shipment>.IndexKeys.Ascending(x => x.ShipmentNumber)), new CreateIndexOptions() { Name = "ShipmentNumber", Unique = true }));
-            _shipmentRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Shipment>((Builders<Shipment>.IndexKeys.Ascending(x => x.OrderId)), new CreateIndexOptions() { Name = "OrderId" }));
+            await _shipmentRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Shipment>((Builders<Shipment>.IndexKeys.Ascending(x => x.ShipmentNumber)), new CreateIndexOptions() { Name = "ShipmentNumber", Unique = true }));
+            await _shipmentRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Shipment>((Builders<Shipment>.IndexKeys.Ascending(x => x.OrderId)), new CreateIndexOptions() { Name = "OrderId" }));
 
             //order
-            _orderRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Ascending(x => x.CustomerId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CustomerId_1_CreatedOnUtc_-1", Unique = false }));
-            _orderRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CreatedOnUtc_-1", Unique = false }));
-            _orderRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Descending(x => x.OrderNumber)), new CreateIndexOptions() { Name = "OrderNumber", Unique = true }));
-            _orderRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Ascending("OrderItems.ProductId")), new CreateIndexOptions() { Name = "OrderItemsProductId" }));
-            _orderRepository.Collection.Indexes.CreateOne(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Ascending("OrderItems._id")), new CreateIndexOptions() { Name = "OrderItemId" }));
+            await _orderRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Ascending(x => x.CustomerId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CustomerId_1_CreatedOnUtc_-1", Unique = false }));
+            await _orderRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CreatedOnUtc_-1", Unique = false }));
+            await _orderRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Descending(x => x.OrderNumber)), new CreateIndexOptions() { Name = "OrderNumber", Unique = false }));
+            await _orderRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Ascending(x => x.Code)), new CreateIndexOptions() { Name = "OrderCode", Unique = false }));
+            await _orderRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Ascending("OrderItems.ProductId")), new CreateIndexOptions() { Name = "OrderItemsProductId" }));
+            await _orderRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<Order>((Builders<Order>.IndexKeys.Ascending("OrderItems._id")), new CreateIndexOptions() { Name = "OrderItemId" }));
 
-            _orderNoteRepository.Collection.Indexes.CreateOne(new CreateIndexModel<OrderNote>((Builders<OrderNote>.IndexKeys.Ascending(x => x.OrderId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "Id", Unique = false, Background = true }));
+            await _orderNoteRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<OrderNote>((Builders<OrderNote>.IndexKeys.Ascending(x => x.OrderId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "Id", Unique = false, Background = true }));
 
             //permision
-            _permissionRepository.Collection.Indexes.CreateOne(new CreateIndexModel<PermissionRecord>((Builders<PermissionRecord>.IndexKeys.Ascending(x => x.SystemName)), new CreateIndexOptions() { Name = "SystemName", Unique = true }));
+            await _permissionRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<PermissionRecord>((Builders<PermissionRecord>.IndexKeys.Ascending(x => x.SystemName)), new CreateIndexOptions() { Name = "SystemName", Unique = true }));
 
             //externalauth
-            _externalAuthenticationRepository.Collection.Indexes.CreateOne(new CreateIndexModel<ExternalAuthenticationRecord>((Builders<ExternalAuthenticationRecord>.IndexKeys.Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "CustomerId" }));
+            await _externalAuthenticationRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ExternalAuthenticationRecord>((Builders<ExternalAuthenticationRecord>.IndexKeys.Ascending(x => x.CustomerId)), new CreateIndexOptions() { Name = "CustomerId" }));
 
             //return request
-            _returnrequestRepository.Collection.Indexes.CreateOne(new CreateIndexModel<ReturnRequest>((Builders<ReturnRequest>.IndexKeys.Ascending(x => x.ReturnNumber)), new CreateIndexOptions() { Name = "ReturnNumber", Unique = true }));
+            await _returnRequestRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ReturnRequest>((Builders<ReturnRequest>.IndexKeys.Ascending(x => x.ReturnNumber)), new CreateIndexOptions() { Name = "ReturnNumber", Unique = true }));
+            await _returnRequestNoteRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ReturnRequestNote>((Builders<ReturnRequestNote>.IndexKeys.Ascending(x => x.ReturnRequestId).Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "Id", Unique = false, Background = true }));
 
             //contactus
-            _contactUsRepository.Collection.Indexes.CreateOne(new CreateIndexModel<ContactUs>((Builders<ContactUs>.IndexKeys.Ascending(x => x.Email)), new CreateIndexOptions() { Name = "Email", Unique = false }));
-            _contactUsRepository.Collection.Indexes.CreateOne(new CreateIndexModel<ContactUs>((Builders<ContactUs>.IndexKeys.Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CreatedOnUtc", Unique = false }));
+            await _contactUsRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ContactUs>((Builders<ContactUs>.IndexKeys.Ascending(x => x.Email)), new CreateIndexOptions() { Name = "Email", Unique = false }));
+            await _contactUsRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<ContactUs>((Builders<ContactUs>.IndexKeys.Descending(x => x.CreatedOnUtc)), new CreateIndexOptions() { Name = "CreatedOnUtc", Unique = false }));
 
             //customer action
-            _customerAction.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerAction>((Builders<CustomerAction>.IndexKeys.Ascending(x => x.ActionTypeId)), new CreateIndexOptions() { Name = "ActionTypeId", Unique = false }));
+            await _customerAction.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerAction>((Builders<CustomerAction>.IndexKeys.Ascending(x => x.ActionTypeId)), new CreateIndexOptions() { Name = "ActionTypeId", Unique = false }));
 
-            _customerActionHistory.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerActionHistory>((Builders<CustomerActionHistory>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.CustomerActionId)), new CreateIndexOptions() { Name = "Customer_Action", Unique = false }));
+            await _customerActionHistory.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerActionHistory>((Builders<CustomerActionHistory>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.CustomerActionId)), new CreateIndexOptions() { Name = "Customer_Action", Unique = false }));
 
             //banner
-            _popupArchive.Collection.Indexes.CreateOne(new CreateIndexModel<PopupArchive>((Builders<PopupArchive>.IndexKeys.Ascending(x => x.CustomerActionId)), new CreateIndexOptions() { Name = "CustomerActionId", Unique = false }));
+            await _popupArchive.Collection.Indexes.CreateOneAsync(new CreateIndexModel<PopupArchive>((Builders<PopupArchive>.IndexKeys.Ascending(x => x.CustomerActionId)), new CreateIndexOptions() { Name = "CustomerActionId", Unique = false }));
 
             //customer reminder
-            _customerReminderHistoryRepository.Collection.Indexes.CreateOne(new CreateIndexModel<CustomerReminderHistory>((Builders<CustomerReminderHistory>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.CustomerReminderId)), new CreateIndexOptions() { Name = "CustomerId", Unique = false }));
+            await _customerReminderHistoryRepository.Collection.Indexes.CreateOneAsync(new CreateIndexModel<CustomerReminderHistory>((Builders<CustomerReminderHistory>.IndexKeys.Ascending(x => x.CustomerId).Ascending(x => x.CustomerReminderId)), new CreateIndexOptions() { Name = "CustomerId", Unique = false }));
         }
 
-        private void CreateTables(string local)
+        private async Task CreateTables(string local)
         {
             if (string.IsNullOrEmpty(local))
                 local = "en";
@@ -11245,13 +10809,12 @@ namespace Grand.Services.Installation
                 var dataSettingsManager = new DataSettingsManager();
                 var connectionString = dataSettingsManager.LoadSettings().DataConnectionString;
                 var mongoDBContext = new MongoDBContext(connectionString);
-                var typeFinder = EngineContext.Current.Resolve<ITypeFinder>();
+                var typeFinder = _serviceProvider.GetRequiredService<ITypeFinder>();
                 var q = typeFinder.GetAssemblies().FirstOrDefault(x => x.GetName().Name == "Grand.Core");
                 foreach (var item in q.GetTypes().Where(x => x.Namespace != null && x.Namespace.StartsWith("Grand.Core.Domain")))
                 {
-                    if (item.BaseType != null)
-                        if (item.IsClass && item.BaseType == typeof(BaseEntity))
-                            mongoDBContext.Database().CreateCollection(item.Name, options);
+                    if (item.BaseType != null && item.IsClass && item.BaseType == typeof(BaseEntity))
+                        await mongoDBContext.Database().CreateCollectionAsync(item.Name, options);
                 }
             }
             catch (Exception ex)
@@ -11265,55 +10828,55 @@ namespace Grand.Services.Installation
         #region Methods
 
 
-        public virtual void InstallData(string defaultUserEmail,
+        public virtual async Task InstallData(string defaultUserEmail,
             string defaultUserPassword, string collation, bool installSampleData = true)
         {
 
             defaultUserEmail = defaultUserEmail.ToLower();
-            CreateTables(collation);
-            CreateIndexes();
-            InstallVersion();
-            InstallStores();
-            InstallMeasures();
-            InstallTaxCategories();
-            InstallLanguages();
-            InstallCurrencies();
-            InstallCountriesAndStates();
-            InstallShippingMethods();
-            InstallDeliveryDates();
-            InstallCustomersAndUsers(defaultUserEmail, defaultUserPassword);
-            InstallEmailAccounts();
-            InstallMessageTemplates();
-            InstallCustomerAction();
-            InstallSettings(installSampleData);
-            InstallTopicTemplates();
-            InstallTopics();
-            InstallLocaleResources();
-            InstallActivityLogTypes();
-            HashDefaultCustomerPassword(defaultUserEmail, defaultUserPassword);
-            InstallProductTemplates();
-            InstallCategoryTemplates();
-            InstallManufacturerTemplates();
-            InstallScheduleTasks();
-            InstallReturnRequestReasons();
-            InstallReturnRequestActions();
+            await CreateTables(collation);
+            await CreateIndexes();
+            await InstallVersion();
+            await InstallStores();
+            await InstallMeasures();
+            await InstallTaxCategories();
+            await InstallLanguages();
+            await InstallCurrencies();
+            await InstallCountriesAndStates();
+            await InstallShippingMethods();
+            await InstallDeliveryDates();
+            await InstallCustomersAndUsers(defaultUserEmail, defaultUserPassword);
+            await InstallEmailAccounts();
+            await InstallMessageTemplates();
+            await InstallCustomerAction();
+            await InstallSettings(installSampleData);
+            await InstallTopicTemplates();
+            await InstallTopics();
+            await InstallLocaleResources();
+            await InstallActivityLogTypes();
+            await HashDefaultCustomerPassword(defaultUserEmail, defaultUserPassword);
+            await InstallProductTemplates();
+            await InstallCategoryTemplates();
+            await InstallManufacturerTemplates();
+            await InstallScheduleTasks();
+            await InstallReturnRequestReasons();
+            await InstallReturnRequestActions();
             if (installSampleData)
             {
-                InstallCheckoutAttributes();
-                InstallSpecificationAttributes();
-                InstallProductAttributes();
-                InstallCategories();
-                InstallManufacturers();
-                InstallProducts(defaultUserEmail);
-                InstallForums();
-                InstallDiscounts();
-                InstallBlogPosts();
-                InstallNews();
-                InstallPolls();
-                InstallWarehouses();
-                InstallPickupPoints();
-                InstallVendors();
-                InstallAffiliates();
+                await InstallCheckoutAttributes();
+                await InstallSpecificationAttributes();
+                await InstallProductAttributes();
+                await InstallCategories();
+                await InstallManufacturers();
+                await InstallProducts(defaultUserEmail);
+                await InstallForums();
+                await InstallDiscounts();
+                await InstallBlogPosts();
+                await InstallNews();
+                await InstallPolls();
+                await InstallWarehouses();
+                await InstallPickupPoints();
+                await InstallVendors();
+                await InstallAffiliates();
             }
         }
 

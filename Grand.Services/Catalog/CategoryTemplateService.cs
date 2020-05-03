@@ -1,10 +1,12 @@
 using Grand.Core.Data;
 using Grand.Core.Domain.Catalog;
 using Grand.Services.Events;
+using MediatR;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Catalog
 {
@@ -16,7 +18,7 @@ namespace Grand.Services.Catalog
         #region Fields
 
         private readonly IRepository<CategoryTemplate> _categoryTemplateRepository;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         #endregion
         
@@ -26,12 +28,12 @@ namespace Grand.Services.Catalog
         /// Ctor
         /// </summary>
         /// <param name="categoryTemplateRepository">Category template repository</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public CategoryTemplateService(IRepository<CategoryTemplate> categoryTemplateRepository, 
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
-            this._categoryTemplateRepository = categoryTemplateRepository;
-            this._eventPublisher = eventPublisher;
+            _categoryTemplateRepository = categoryTemplateRepository;
+            _mediator = mediator;
         }
 
         #endregion
@@ -42,24 +44,25 @@ namespace Grand.Services.Catalog
         /// Delete category template
         /// </summary>
         /// <param name="categoryTemplate">Category template</param>
-        public virtual void DeleteCategoryTemplate(CategoryTemplate categoryTemplate)
+        public virtual async Task DeleteCategoryTemplate(CategoryTemplate categoryTemplate)
         {
             if (categoryTemplate == null)
                 throw new ArgumentNullException("categoryTemplate");
 
-            _categoryTemplateRepository.Delete(categoryTemplate);
+            await _categoryTemplateRepository.DeleteAsync(categoryTemplate);
 
             //event notification
-            _eventPublisher.EntityDeleted(categoryTemplate);
+            await _mediator.EntityDeleted(categoryTemplate);
         }
 
         /// <summary>
         /// Gets all category templates
         /// </summary>
         /// <returns>Category templates</returns>
-        public virtual IList<CategoryTemplate> GetAllCategoryTemplates()
+        public virtual async Task<IList<CategoryTemplate>> GetAllCategoryTemplates()
         {
-            return _categoryTemplateRepository.Collection.AsQueryable().OrderBy(x => x.DisplayOrder).ToList();
+            var query = await _categoryTemplateRepository.Table.ToListAsync();
+            return query.OrderBy(x => x.DisplayOrder).ToList();
         }
  
         /// <summary>
@@ -67,39 +70,39 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="categoryTemplateId">Category template identifier</param>
         /// <returns>Category template</returns>
-        public virtual CategoryTemplate GetCategoryTemplateById(string categoryTemplateId)
+        public virtual Task<CategoryTemplate> GetCategoryTemplateById(string categoryTemplateId)
         {
-            return _categoryTemplateRepository.GetById(categoryTemplateId);
+            return _categoryTemplateRepository.GetByIdAsync(categoryTemplateId);
         }
 
         /// <summary>
         /// Inserts category template
         /// </summary>
         /// <param name="categoryTemplate">Category template</param>
-        public virtual void InsertCategoryTemplate(CategoryTemplate categoryTemplate)
+        public virtual async Task InsertCategoryTemplate(CategoryTemplate categoryTemplate)
         {
             if (categoryTemplate == null)
                 throw new ArgumentNullException("categoryTemplate");
 
-            _categoryTemplateRepository.Insert(categoryTemplate);
+            await _categoryTemplateRepository.InsertAsync(categoryTemplate);
 
             //event notification
-            _eventPublisher.EntityInserted(categoryTemplate);
+            await _mediator.EntityInserted(categoryTemplate);
         }
 
         /// <summary>
         /// Updates the category template
         /// </summary>
         /// <param name="categoryTemplate">Category template</param>
-        public virtual void UpdateCategoryTemplate(CategoryTemplate categoryTemplate)
+        public virtual async Task UpdateCategoryTemplate(CategoryTemplate categoryTemplate)
         {
             if (categoryTemplate == null)
                 throw new ArgumentNullException("categoryTemplate");
 
-            _categoryTemplateRepository.Update(categoryTemplate);
+            await _categoryTemplateRepository.UpdateAsync(categoryTemplate);
 
             //event notification
-            _eventPublisher.EntityUpdated(categoryTemplate);
+            await _mediator.EntityUpdated(categoryTemplate);
         }
         
         #endregion

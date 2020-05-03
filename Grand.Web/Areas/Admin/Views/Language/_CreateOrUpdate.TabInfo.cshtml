@@ -1,6 +1,7 @@
 ﻿@model LanguageModel
 
 <div class="form-horizontal">
+    <vc:admin-widget widget-zone="language_details_info_top" additional-data="Model" />
     <div class="form-body">
         <div class="form-group">
             <admin-label asp-for="Name" />
@@ -32,12 +33,12 @@
                 <span asp-validation-for="UniqueSeoCode"></span>
             </div>
         </div>
-         
+
         <div class="form-group">
             <admin-label asp-for="FlagImageFileName" />
             <div class="col-md-3 col-sm-3">
                 <select id="FlagImageFileName" class="form-control" Name="FlagImageFileName">
-                    @foreach (var fileName in Model.FlagFileNames.OrderBy(x=>x))
+                    @foreach (var fileName in Model.FlagFileNames.OrderBy(x => x))
                     {
                         <option value="@fileName" img="@Url.Content("~/content/images/flags/" + fileName)">
                             @fileName
@@ -52,9 +53,9 @@
         <div class="form-group">
             <admin-label asp-for="Rtl" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="Rtl" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="Rtl"></span>
             </div>
@@ -69,9 +70,9 @@
         <div class="form-group">
             <admin-label asp-for="Published" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="Published" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="Published"></span>
             </div>
@@ -84,6 +85,7 @@
             </div>
         </div>
     </div>
+    <vc:admin-widget widget-zone="language_details_info_bottom" additional-data="Model" />
 </div>
 <script>
     $().ready(function () {

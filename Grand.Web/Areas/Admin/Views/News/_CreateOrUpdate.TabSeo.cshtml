@@ -1,6 +1,6 @@
 ﻿@model NewsItemModel
-
-@(Html.LocalizedEditor<NewsItemModel, NewsLocalizedModel>("newsitem-seo-localized",
+<vc:admin-widget widget-zone="news_details_seo_top" additional-data="Model" />
+@(await Html.LocalizedEditor<NewsItemModel, NewsLocalizedModel>("newsitem-seo-localized",
     @<div class="form-horizontal">
         <div class="form-body">
             <div class="form-group">
@@ -68,3 +68,4 @@
         </div>
     </div>
     ))
+<vc:admin-widget widget-zone="news_details_seo_bottom" additional-data="Model" />

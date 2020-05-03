@@ -2,6 +2,7 @@ using Grand.Core;
 using Grand.Core.Domain.Blogs;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Blogs
 {
@@ -14,14 +15,14 @@ namespace Grand.Services.Blogs
         /// Deletes a blog post
         /// </summary>
         /// <param name="blogPost">Blog post</param>
-        void DeleteBlogPost(BlogPost blogPost);
+        Task DeleteBlogPost(BlogPost blogPost);
 
         /// <summary>
         /// Gets a blog post
         /// </summary>
         /// <param name="blogPostId">Blog post identifier</param>
         /// <returns>Blog post</returns>
-        BlogPost GetBlogPostById(string blogPostId);
+        Task<BlogPost> GetBlogPostById(string blogPostId);
 
         /// <summary>
         /// Gets all blog posts
@@ -33,10 +34,11 @@ namespace Grand.Services.Blogs
         /// <param name="pageSize">Page size</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <param name="blogPostName">Blog post name</param>
+        /// <param name="categoryId">Category id</param>
         /// <returns>Blog posts</returns>
-        IPagedList<BlogPost> GetAllBlogPosts(string storeId = "", 
+        Task<IPagedList<BlogPost>> GetAllBlogPosts(string storeId = "", 
             DateTime? dateFrom = null, DateTime? dateTo = null, 
-            int pageIndex = 0, int pageSize = int.MaxValue, bool showHidden = false, string tag = null, string blogPostName = "");
+            int pageIndex = 0, int pageSize = int.MaxValue, bool showHidden = false, string tag = null, string blogPostName = "", string categoryId = "");
 
         /// <summary>
         /// Gets all blog posts
@@ -47,7 +49,7 @@ namespace Grand.Services.Blogs
         /// <param name="pageSize">Page size</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Blog posts</returns>
-        IPagedList<BlogPost> GetAllBlogPostsByTag(string storeId = "",
+        Task<IPagedList<BlogPost>> GetAllBlogPostsByTag(string storeId = "",
             string tag = "",
             int pageIndex = 0, int pageSize = int.MaxValue, bool showHidden = false);
 
@@ -57,48 +59,113 @@ namespace Grand.Services.Blogs
         /// <param name="storeId">The store identifier; pass "" to load all records</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Blog post tags</returns>
-        IList<BlogPostTag> GetAllBlogPostTags(string storeId, bool showHidden = false);
+        Task<IList<BlogPostTag>> GetAllBlogPostTags(string storeId, bool showHidden = false);
 
         /// <summary>
         /// Inserts an blog post
         /// </summary>
         /// <param name="blogPost">Blog post</param>
-        void InsertBlogPost(BlogPost blogPost);
+        Task InsertBlogPost(BlogPost blogPost);
 
         /// <summary>
         /// Inserts a blog post comment
         /// </summary>
         /// <param name="blogPost">Blog post comment</param>
-        void InsertBlogComment(BlogComment blogComment);
+        Task InsertBlogComment(BlogComment blogComment);
 
         /// <summary>
         /// Updates the blog post
         /// </summary>
         /// <param name="blogPost">Blog post</param>
-        void UpdateBlogPost(BlogPost blogPost);
+        Task UpdateBlogPost(BlogPost blogPost);
 
         /// <summary>
         /// Gets all comments
         /// </summary>
         /// <param name="customerId">Customer identifier; "" to load all records</param>
+        /// <param name="storeId">Store identifier</param>
         /// <returns>Comments</returns>
-        IList<BlogComment> GetAllComments(string customerId);
+        Task<IList<BlogComment>> GetAllComments(string customerId, string storeId);
 
         /// <summary>
         /// Gets a blog comment
         /// </summary>
         /// <param name="blogCommentId">Blog comment identifier</param>
         /// <returns>Blog comment</returns>
-        BlogComment GetBlogCommentById(string blogCommentId);
+        Task<BlogComment> GetBlogCommentById(string blogCommentId);
 
         /// <summary>
         /// Get blog comments by identifiers
         /// </summary>
         /// <param name="commentIds">Blog comment identifiers</param>
         /// <returns>Blog comments</returns>
-        IList<BlogComment> GetBlogCommentsByIds(string[] commentIds);
+        Task<IList<BlogComment>> GetBlogCommentsByIds(string[] commentIds);
 
-        IList<BlogComment> GetBlogCommentsByBlogPostId(string blogPostId);
-        void DeleteBlogComment(BlogComment blogComment);
+        Task<IList<BlogComment>> GetBlogCommentsByBlogPostId(string blogPostId);
+
+        Task DeleteBlogComment(BlogComment blogComment);
+
+        /// <summary>
+        /// Get category by id
+        /// </summary>
+        /// <param name="blogCategoryId">Blog category id</param>
+        /// <returns></returns>
+        Task<BlogCategory> GetBlogCategoryById(string blogCategoryId);
+
+        /// <summary>
+        /// Get all blog categories
+        /// </summary>
+        /// <returns></returns>
+        Task<IList<BlogCategory>> GetAllBlogCategories(string storeId = "");
+
+        /// <summary>
+        /// Inserts an blog category
+        /// </summary>
+        /// <param name="blogCategory">Blog category</param>
+        Task<BlogCategory> InsertBlogCategory(BlogCategory blogCategory);
+
+        /// <summary>
+        /// Updates the blog category
+        /// </summary>
+        /// <param name="blogCategory">Blog category</param>
+        Task<BlogCategory> UpdateBlogCategory(BlogCategory blogCategory);
+
+        /// <summary>
+        /// Delete blog category
+        /// </summary>
+        /// <param name="blogCategory">Blog category</param>
+        Task DeleteBlogCategory(BlogCategory blogCategory);
+
+        /// <summary>
+        /// Gets a blog product
+        /// </summary>
+        /// <param name="id">id</param>
+        /// <returns>Blog product</returns>
+        Task<BlogProduct> GetBlogProductById(string id);
+
+        /// <summary>
+        /// Insert an blog product
+        /// </summary>
+        /// <param name="blogProduct">Blog product</param>
+        Task InsertBlogProduct(BlogProduct blogProduct);
+
+        /// <summary>
+        /// Update an blog product
+        /// </summary>
+        /// <param name="blogProduct">Blog product</param>
+        Task UpdateBlogProduct(BlogProduct blogProduct);
+
+        /// <summary>
+        /// Delete an blog product
+        /// </summary>
+        /// <param name="blogProduct">Blog product</param>
+        Task DeleteBlogProduct(BlogProduct blogProduct);
+
+        /// <summary>
+        /// Get all product by blog post id
+        /// </summary>
+        /// <returns></returns>
+        /// <param name="blogPostId">Blog post id</param>
+        Task<IList<BlogProduct>> GetProductsByBlogPostId(string blogPostId);
     }
 }

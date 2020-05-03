@@ -8,21 +8,21 @@
 
 <form asp-controller="Order" asp-action="AddProductToOrderDetails" asp-route-orderId="@Model.OrderId"
       asp-route-productId="@Model.ProductId" enctype="multipart/form-data" method="post" id="product-details-form">
-    
-    <antiforgery-token />
-    <div asp-validation-summary="All"></div>
 
+    
+    <div asp-validation-summary="All"></div>
+    <vc:admin-widget widget-zone="order_add_products_details_top" additional-data="Model" />
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-cubes"></i>
                         @string.Format(T("Admin.Orders.Products.AddNew.Title2").Text, Model.Name, Model.OrderNumber)
                         @Html.ActionLink("(" + T("Admin.Orders.Products.AddNew.BackToList") + ")", "AddProductToOrder", new { orderId = Model.OrderId })
                     </div>
                 </div>
-                <div class="portlet-body form">
+                <div class="x_content form">
                     <div class="col-md-offset-1 col-md-11 col-sm-11">
                         @if (Model.Warnings.Count > 0)
                         {
@@ -85,7 +85,7 @@
                                             <div class="note note-info">
                                                 <strong>@T("Admin.Orders.Products.AddNew.Note2")</strong>
                                             </div>
-                                            <input type="submit" class="btn default" value="@T("Admin.Orders.Products.AddNew")" />
+                                            <input type="submit" class="k-button" value="@T("Admin.Orders.Products.AddNew")" />
                                         </div>
                                     </div>
                                 </div>
@@ -118,4 +118,5 @@
             </div>
         </div>
     </div>
+    <vc:admin-widget widget-zone="order_add_products_details_bottom" additional-data="Model" />
 </form>

@@ -2,18 +2,20 @@
     //page title
     ViewBag.Title = T("Admin.Configuration.Payment.Methods").Text;
 }
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
-                <div class="caption">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
+                <div class="caption level-caption">
                     <i class="fa fa-money"></i>
                     @T("Admin.Configuration.Payment.Methods")
                 </div>
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
+                <vc:admin-widget widget-zone="payment_method_list_top" additional-data="Model" />
                 <div id="paymentmethods-grid"></div>
+                <vc:admin-widget widget-zone="payment_method_list_bottom" additional-data="Model" />
             </div>
         </div>
     </div>
@@ -84,10 +86,12 @@
             columns: [{
                 field: "FriendlyName",
                 title: "@T("Admin.Configuration.Payment.Methods.Fields.FriendlyName")",
+                template: '<a class="k-link" href="#=ConfigurationUrl#">#=FriendlyName#</a>',
                 width: 250
             }, {
                 field: "SystemName",
-                title: "@T("Admin.Configuration.Payment.Methods.Fields.SystemName")",
+                    title: "@T("Admin.Configuration.Payment.Methods.Fields.SystemName")",
+                    template: '<a class="k-link" href="#=ConfigurationUrl#">#=SystemName#</a>',
                 width: 150
             }, {
                 field: "LogoUrl",
@@ -139,11 +143,6 @@
                 headerAttributes: { style: "text-align:center" },
                 attributes: { style: "text-align:center" },
                 template: '# if(IsActive) {# <i class="fa fa-check" aria-hidden="true" style="color:green"></i> #} else {# <i class="fa fa-times" aria-hidden="true" style="color:red"></i> #} #'
-            }, {
-                field: "SystemName",
-                title: "@T("Admin.Configuration.Payment.Methods.Configure")",
-                width: 100,
-                template: '<a class="k-link" href="#=ConfigurationUrl#">@T("Admin.Configuration.Payment.Methods.Configure")</a>'
             }, {
                 command: {
                     name: "edit",

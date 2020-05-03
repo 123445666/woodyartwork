@@ -10,44 +10,48 @@
 {
     @await Component.InvokeAsync("CustomerNavigation", new { selectedTabId = CustomerNavigationEnum.Addresses })
 }
-<div class="page account-page address-list-page pl-lg-3">
-    <button type="button" class="btn btn-info btn-sm add-address-button float-sm-right" onclick="location.href='@Url.RouteUrl("CustomerAddressAdd")'">
-        <i class="fa fa-plus" aria-hidden="true"></i> @T("Common.AddNew")
-    </button>
-    <h1 class="h2 generalTitle">@T("Account.CustomerAddresses")</h1>
-    @if (Model.Addresses.Any())
-    {
-            <div class="col-12 address-list">
-                <div class="row px-0">
+    <div class="page account-page address-list-page pl-lg-3 pt-lg-0 pt-3">
+        @Html.AntiForgeryToken()
+        <a class="js-offcanvas-trigger blog-filter filter-button btn btn-outline-info d-lg-none d-flex mb-3" data-offcanvas-trigger="leftSide" href="#leftSide"><span class="mdi mdi-tune"></span><span class="ml-3">@T("Account.Navigation")</span></a>
+        <button type="button" class="btn btn-info btn-sm add-address-button float-sm-right" onclick="location.href='@Url.RouteUrl("CustomerAddressAdd")'">
+            <i class="fa fa-plus" aria-hidden="true"></i> @T("Common.AddNew")
+        </button>
+        <h1 class="h2 generalTitle">@T("Account.CustomerAddresses")</h1>
+        @if (Model.Addresses.Any())
+        {
+            <div class="col-12 px-0">
+                <div class="row address-list">
                     @for (int i = 0; i < Model.Addresses.Count; i++)
                     {
                         var address = Model.Addresses[i];
-                        <div class="col-md-6 col-12 pl-lg-0">
+                        <div class="col-md-6 col-12 mb-3">
                             <div class="card">
+                                <div class="card-header">
+                                    <div class="card-title">
+                                        <h4><strong>@address.FirstName @address.LastName</strong></h4>
+                                    </div>
+                                </div>
                                 <div class="card-body">
                                     <div class="address-item">
-                                        <div class="card-title">
-                                            <h4><strong>@address.FirstName @address.LastName</strong></h4>
-                                        </div>
-                                        <ul class="info">
+                                        <ul class="info mb-0">
                                             <li class="name">
                                                 @address.FirstName @address.LastName
                                             </li>
                                             <li class="email">
-                                                <label>@T("Address.Fields.Email"):</label>
+                                                <label class="mb-0"><strong>@T("Address.Fields.Email"):</strong></label>
                                                 @address.Email
                                             </li>
                                             @if (address.PhoneEnabled)
                                             {
                                                 <li class="phone">
-                                                    <label>@T("Address.Fields.PhoneNumber"):</label>
+                                                    <label class="mb-0"><strong>@T("Address.Fields.PhoneNumber"):</strong></label>
                                                     @address.PhoneNumber
                                                 </li>
                                             }
                                             @if (address.FaxEnabled)
                                             {
                                                 <li class="fax">
-                                                    <label>@T("Address.Fields.FaxNumber"):</label>
+                                                    <label class="mb-0"><strong>@T("Address.Fields.FaxNumber"):</strong></label>
                                                     @address.FaxNumber
                                                 </li>
                                             }
@@ -117,9 +121,9 @@
                                         </ul>
                                     </div>
                                 </div>
-                                <div class="card-footer buttons text-xs-center btn-group btn-group-sm" role="group">
+                                <div class="card-footer px-0 buttons text-xs-center btn-group btn-group-sm" role="group">
                                     <input type="button" class="btn btn-secondary edit-address-button" onclick="location.href='@(Url.RouteUrl("CustomerAddressEdit", new { addressId = address.Id }))'" value='@T("Common.Edit")' />
-                                    <input type="button" class="btn btn-secondary delete-address-button" onclick="deletecustomeraddress('@(address.Id)')" value="@T("Common.Delete")" />
+                                    <input type="button" class="btn btn-danger delete-address-button" onclick="deletecustomeraddress('@(address.Id)')" value="@T("Common.Delete")" />
                                 </div>
                             </div>
                         </div>
@@ -150,11 +154,11 @@
                     }
                 }
             </script>
-    }
-    else
-    {
-        <div class="no-data">
-            @T("Account.CustomerAddresses.NoAddresses")
-        </div>
-    }
-</div>
+        }
+        else
+        {
+            <div class="no-data">
+                @T("Account.CustomerAddresses.NoAddresses")
+            </div>
+        }
+    </div>

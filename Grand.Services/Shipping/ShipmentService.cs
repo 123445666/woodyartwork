@@ -3,11 +3,13 @@ using Grand.Core.Data;
 using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Shipping;
 using Grand.Services.Events;
+using MediatR;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Shipping
 {
@@ -19,8 +21,9 @@ namespace Grand.Services.Shipping
         #region Fields
 
         private readonly IRepository<Shipment> _shipmentRepository;
-        private readonly IEventPublisher _eventPublisher;
-        
+        private readonly IRepository<ShipmentNote> _shipmentNoteRepository;
+        private readonly IMediator _mediator;
+
         #endregion
 
         #region Ctor
@@ -29,12 +32,14 @@ namespace Grand.Services.Shipping
         /// Ctor
         /// </summary>
         /// <param name="shipmentRepository">Shipment repository</param>
-        /// <param name="eventPublisher">Event published</param>
-        public ShipmentService(IRepository<Shipment> shipmentRepository,
-            IEventPublisher eventPublisher)
+        /// <param name="shipmentNoteRepository">Order note repository</param>
+        /// <param name="mediator">Mediator</param>
+        public ShipmentService(IRepository<Shipment> shipmentRepository,IRepository<ShipmentNote> shipmentNoteRepository,
+            IMediator mediator)
         {
-            this._shipmentRepository = shipmentRepository;
-            this._eventPublisher = eventPublisher;
+            _shipmentRepository = shipmentRepository;
+            _shipmentNoteRepository = shipmentNoteRepository;
+            _mediator = mediator;
         }
 
         #endregion
@@ -45,21 +50,22 @@ namespace Grand.Services.Shipping
         /// Deletes a shipment
         /// </summary>
         /// <param name="shipment">Shipment</param>
-        public virtual void DeleteShipment(Shipment shipment)
+        public virtual async Task DeleteShipment(Shipment shipment)
         {
             if (shipment == null)
                 throw new ArgumentNullException("shipment");
 
-            _shipmentRepository.Delete(shipment);
+            await _shipmentRepository.DeleteAsync(shipment);
 
             //event notification
-            _eventPublisher.EntityDeleted(shipment);
+            await _mediator.EntityDeleted(shipment);
         }
-        
+
         /// <summary>
         /// Search shipments
         /// </summary>
         /// <param name="vendorId">Vendor identifier; "" to load all records</param>
+        /// <param name="storeId">Store identifier</param>
         /// <param name="warehouseId">Warehouse identifier, only shipments with products from a specified warehouse will be loaded; 0 to load all orders</param>
         /// <param name="shippingCountryId">Shipping country identifier; "" to load all records</param>
         /// <param name="shippingStateId">Shipping state identifier; "" to load all records</param>
@@ -71,7 +77,7 @@ namespace Grand.Services.Shipping
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Shipments</returns>
-        public virtual IPagedList<Shipment> GetAllShipments(string vendorId = "", string warehouseId = "",
+        public virtual async Task<IPagedList<Shipment>> GetAllShipments(string storeId = "", string vendorId = "", string warehouseId = "",
             string shippingCountryId = "",
             int shippingStateId = 0,
             string shippingCity = null,
@@ -84,12 +90,15 @@ namespace Grand.Services.Shipping
             var builder = Builders<Shipment>.Filter;
             var filter = builder.Where(s => s.OrderId != "");
 
-            if(!String.IsNullOrEmpty(vendorId))
+            if (!string.IsNullOrEmpty(storeId))
+            {
+                filter = filter & builder.Where(x => x.StoreId == storeId);
+            }
+            if (!string.IsNullOrEmpty(vendorId))
             {
                 filter = filter & builder.Where(x => x.VendorId == vendorId);
             }
-            
-            if (!String.IsNullOrEmpty(trackingNumber))
+            if (!string.IsNullOrEmpty(trackingNumber))
                 filter = filter & builder.Where(s => s.TrackingNumber.Contains(trackingNumber));
 
             if (loadNotShipped)
@@ -98,11 +107,11 @@ namespace Grand.Services.Shipping
                 filter = filter & builder.Where(s => createdFromUtc.Value <= s.CreatedOnUtc);
             if (createdToUtc.HasValue)
                 filter = filter & builder.Where(s => createdToUtc.Value >= s.CreatedOnUtc);
+
             var builderSort = Builders<Shipment>.Sort.Descending(x => x.CreatedOnUtc);
 
             var query = _shipmentRepository.Collection;
-            var shipments = new PagedList<Shipment>(query, filter, builderSort, pageIndex, pageSize);
-
+            var shipments = await PagedList<Shipment>.Create(query, filter, builderSort, pageIndex, pageSize);
             return shipments;
             
         }
@@ -112,7 +121,7 @@ namespace Grand.Services.Shipping
         /// </summary>
         /// <param name="shipmentIds">Shipment identifiers</param>
         /// <returns>Shipments</returns>
-        public virtual IList<Shipment> GetShipmentsByIds(string[] shipmentIds)
+        public virtual async Task<IList<Shipment>> GetShipmentsByIds(string[] shipmentIds)
         {
             if (shipmentIds == null || shipmentIds.Length == 0)
                 return new List<Shipment>();
@@ -120,7 +129,8 @@ namespace Grand.Services.Shipping
             var query = from o in _shipmentRepository.Table
                         where shipmentIds.Contains(o.Id)
                         select o;
-            var shipments = query.ToList();
+            var shipments = await query.ToListAsync();
+
             //sort by passed identifiers
             var sortedOrders = new List<Shipment>();
             foreach (string id in shipmentIds)
@@ -133,9 +143,9 @@ namespace Grand.Services.Shipping
         }
 
 
-        public virtual IList<Shipment> GetShipmentsByOrder(string orderId)
+        public virtual async Task<IList<Shipment>> GetShipmentsByOrder(string orderId)
         {
-            return _shipmentRepository.Collection.Find(x => x.OrderId == orderId).ToListAsync().Result;
+            return await _shipmentRepository.Collection.Find(x => x.OrderId == orderId).ToListAsync();
         }
 
         /// <summary>
@@ -143,40 +153,40 @@ namespace Grand.Services.Shipping
         /// </summary>
         /// <param name="shipmentId">Shipment identifier</param>
         /// <returns>Shipment</returns>
-        public virtual Shipment GetShipmentById(string shipmentId)
+        public virtual Task<Shipment> GetShipmentById(string shipmentId)
         {
-            return _shipmentRepository.GetById(shipmentId);
+            return _shipmentRepository.GetByIdAsync(shipmentId);
         }
 
         /// <summary>
         /// Inserts a shipment
         /// </summary>
         /// <param name="shipment">Shipment</param>
-        public virtual void InsertShipment(Shipment shipment)
+        public virtual async Task InsertShipment(Shipment shipment)
         {
             if (shipment == null)
                 throw new ArgumentNullException("shipment");
             var shipmentExists = _shipmentRepository.Table.FirstOrDefault();
             shipment.ShipmentNumber = shipmentExists != null ? _shipmentRepository.Table.Max(x=>x.ShipmentNumber) + 1 : 1;
-            _shipmentRepository.Insert(shipment);
+            await _shipmentRepository.InsertAsync(shipment);
 
             //event notification
-            _eventPublisher.EntityInserted(shipment);
+            await _mediator.EntityInserted(shipment);
         }
 
         /// <summary>
         /// Updates the shipment
         /// </summary>
         /// <param name="shipment">Shipment</param>
-        public virtual void UpdateShipment(Shipment shipment)
+        public virtual async Task UpdateShipment(Shipment shipment)
         {
             if (shipment == null)
                 throw new ArgumentNullException("shipment");
 
-            _shipmentRepository.Update(shipment);
+            await _shipmentRepository.UpdateAsync(shipment);
 
             //event notification
-            _eventPublisher.EntityUpdated(shipment);
+            await _mediator.EntityUpdated(shipment);
         }
 
         /// <summary>
@@ -187,7 +197,7 @@ namespace Grand.Services.Shipping
         /// <param name="ignoreShipped">Ignore already shipped shipments</param>
         /// <param name="ignoreDelivered">Ignore already delivered shipments</param>
         /// <returns>Quantity</returns>
-        public virtual int GetQuantityInShipments(Product product, string attributexml, string warehouseId,
+        public virtual async Task<int> GetQuantityInShipments(Product product, string attributexml, string warehouseId,
             bool ignoreShipped, bool ignoreDelivered)
         {
             if (product == null)
@@ -211,12 +221,65 @@ namespace Grand.Services.Shipping
             if(!string.IsNullOrEmpty(attributexml))
                 query = query.Where(si => si.ShipmentItems.Any(x => x.AttributeXML == attributexml));
 
-            var result = query.SelectMany(x => x.ShipmentItems).Where(x => x.ProductId == product.Id).Sum(x => x.Quantity);
+            var result = await query.SelectMany(x => x.ShipmentItems).Where(x => x.ProductId == product.Id).SumAsync(x => x.Quantity);
 
             return result;
         }
 
+        #region Shipment notes
 
+        /// <summary>
+        /// Deletes an order note
+        /// </summary>
+        /// <param name="shipmentNote">The order note</param>
+        public virtual async Task DeleteShipmentNote(ShipmentNote shipmentNote)
+        {
+            if (shipmentNote == null)
+                throw new ArgumentNullException("shipmentNote");
+
+            await _shipmentNoteRepository.DeleteAsync(shipmentNote);
+
+            //event notification
+            await _mediator.EntityDeleted(shipmentNote);
+        }
+
+        /// <summary>
+        /// Deletes an shipment note
+        /// </summary>
+        /// <param name="shipmentNote">The shipment note</param>
+        public virtual async Task InsertShipmentNote(ShipmentNote shipmentNote)
+        {
+            if (shipmentNote == null)
+                throw new ArgumentNullException("shipmentNote");
+
+            await _shipmentNoteRepository.InsertAsync(shipmentNote);
+
+            //event notification
+            await _mediator.EntityInserted(shipmentNote);
+        }
+
+        public virtual async Task<IList<ShipmentNote>> GetShipmentNotes(string shipmentId)
+        {
+            var query = from shipmentNote in _shipmentNoteRepository.Table
+                        where shipmentNote.ShipmentId == shipmentId
+                        orderby shipmentNote.CreatedOnUtc descending
+                        select shipmentNote;
+
+            return await query.ToListAsync();
+        }
+
+        /// <summary>
+        /// Get shipmentnote by id
+        /// </summary>
+        /// <param name="shipmentnoteId">Shipment note identifier</param>
+        /// <returns>shipmentNote</returns>
+        public virtual Task<ShipmentNote> GetShipmentNote(string shipmentnoteId)
+        {
+            return _shipmentNoteRepository.Table.Where(x => x.Id == shipmentnoteId).FirstOrDefaultAsync();
+        }
+
+
+        #endregion
         #endregion
     }
 }

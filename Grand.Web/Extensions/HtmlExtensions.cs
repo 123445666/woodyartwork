@@ -1,18 +1,18 @@
 ﻿using Grand.Core;
-using Grand.Core.Caching;
-using Grand.Core.Infrastructure;
 using Grand.Framework;
 using Grand.Framework.UI.Paging;
 using Grand.Services.Localization;
 using Grand.Services.Seo;
 using Grand.Services.Topics;
-using Grand.Web.Infrastructure.Cache;
 using Grand.Web.Models.Boards;
 using Grand.Web.Models.Common;
 using Microsoft.AspNetCore.Html;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Extensions
 {
@@ -25,11 +25,11 @@ namespace Grand.Web.Extensions
         /// <param name="html">HTML Helper</param>
         /// <param name="name">Name</param>
         /// <returns>Editor</returns>
-        public static IHtmlContent BBCodeEditor<TModel>(this IHtmlHelper<TModel> html, string name)
+        public static IHtmlContent BBCodeEditor<TModel>(this IHtmlHelper<TModel> html, IWebHelper webHelper, string name)
         {
             var sb = new StringBuilder();
 
-            var storeLocation = EngineContext.Current.Resolve<IWebHelper>().GetStoreLocation();
+            var storeLocation = webHelper.GetStoreLocation();
             string bbEditorWebRoot = String.Format("{0}content/", storeLocation);
 
             sb.AppendFormat("<script src=\"{0}content/bbeditor/ed.js\" ></script>", storeLocation);
@@ -47,12 +47,10 @@ namespace Grand.Web.Extensions
         //we have two pagers:
         //The first one can have custom routes
         //The second one just adds query string parameter
-        public static IHtmlContent Pager<TModel>(this IHtmlHelper<TModel> html, PagerModel model)
+        public static IHtmlContent Pager<TModel>(this IHtmlHelper<TModel> html, ILocalizationService localizationService, PagerModel model)
         {
             if (model.TotalRecords == 0)
                 return null;
-
-            var localizationService = EngineContext.Current.Resolve<ILocalizationService>();
 
             var links = new StringBuilder();
             if (model.ShowTotalSummary && (model.TotalPages > 0))
@@ -175,10 +173,8 @@ namespace Grand.Web.Extensions
             }
             return new HtmlString(result);
         }
-        public static IHtmlContent ForumTopicSmallPager<TModel>(this IHtmlHelper<TModel> html, ForumTopicRowModel model)
+        public static IHtmlContent ForumTopicSmallPager<TModel>(this IHtmlHelper<TModel> html, ILocalizationService localizationService, ForumTopicRowModel model)
         {
-            var localizationService = EngineContext.Current.Resolve<ILocalizationService>();
-
             var forumTopicId = model.Id;
             var forumTopicSlug = model.SeName;
             var totalPages = model.TotalPostPages;
@@ -224,31 +220,23 @@ namespace Grand.Web.Extensions
             return new Pager(pagination, helper.ViewContext);
         }
 
-        /// <summary>
-        /// Get topic system name
-        /// </summary>
-        /// <typeparam name="T">T</typeparam>
-        /// <param name="html">HTML helper</param>
-        /// <param name="systemName">System name</param>
-        /// <returns>Topic SEO Name</returns>
-        public static string GetTopicSeName<T>(this IHtmlHelper<T> html, string systemName)
+        ///// <summary>
+        ///// Get topic system name
+        ///// </summary>
+        ///// <typeparam name="T">T</typeparam>
+        ///// <param name="html">HTML helper</param>
+        ///// <param name="systemName">System name</param>
+        ///// <returns>Topic SEO Name</returns>
+        public static async Task<string> GetTopicSeName<T>(this IHtmlHelper<T> html, string systemName, HttpContext httpContext)
         {
-            var workContext = EngineContext.Current.Resolve<IWorkContext>();
-            var storeContext = EngineContext.Current.Resolve<IStoreContext>();
+            var storeContext = httpContext.RequestServices.GetRequiredService<IStoreContext>();
+            var topicService = httpContext.RequestServices.GetRequiredService<ITopicService>();
+            var topic = await topicService.GetTopicBySystemName(systemName, storeContext.CurrentStore.Id);
+            if (topic == null)
+                return "";
 
-            //static cache manager
-            var cacheManager = EngineContext.Current.Resolve<ICacheManager>();
-            var cacheKey = string.Format(ModelCacheEventConsumer.TOPIC_SENAME_BY_SYSTEMNAME, systemName, workContext.WorkingLanguage.Id, storeContext.CurrentStore.Id);
-            var cachedSeName = cacheManager.Get(cacheKey, () =>
-            {
-                var topicService = EngineContext.Current.Resolve<ITopicService>();
-                var topic = topicService.GetTopicBySystemName(systemName, storeContext.CurrentStore.Id);
-                if (topic == null)
-                    return "";
-
-                return topic.GetSeName();
-            });
-            return cachedSeName;
+            var workContext = httpContext.RequestServices.GetRequiredService<IWorkContext>();
+            return topic.GetSeName(workContext.WorkingLanguage.Id);
         }
 
     }

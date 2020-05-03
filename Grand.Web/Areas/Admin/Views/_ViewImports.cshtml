@@ -1,6 +1,7 @@
 ﻿@inherits Grand.Framework.Mvc.Razor.GrandRazorPage<TModel>
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @addTagHelper *, Grand.Framework
+@addTagHelper *, Grand.Web
 
 @using Microsoft.AspNetCore.Mvc.ViewFeatures
 @using System.Text
@@ -8,6 +9,7 @@
 @using Grand.Core.Domain.Common
 @using Grand.Core.Domain.Catalog
 @using Grand.Core.Domain.Directory
+@using Grand.Core.Domain.Documents
 @using Grand.Core.Domain.Orders
 @using Grand.Core.Infrastructure
 @using Grand.Services.Blogs
@@ -20,14 +22,18 @@
 @using Grand.Framework.Security.Honeypot
 @using Grand.Framework.Themes
 @using Grand.Framework.UI
+@using Grand.Framework.Mapping;
 @using Grand.Web.Areas.Admin.Models.Affiliates
 @using Grand.Web.Areas.Admin.Models.Blogs
 @using Grand.Web.Areas.Admin.Models.Catalog
 @using Grand.Web.Areas.Admin.Models.Cms
 @using Grand.Web.Areas.Admin.Models.Common
+@using Grand.Web.Areas.Admin.Models.Courses
+@using Grand.Web.Areas.Admin.Models.Country
 @using Grand.Web.Areas.Admin.Models.Customers
 @using Grand.Web.Areas.Admin.Models.Directory
 @using Grand.Web.Areas.Admin.Models.Discounts
+@using Grand.Web.Areas.Admin.Models.Documents
 @using Grand.Web.Areas.Admin.Models.ExternalAuthentication
 @using Grand.Web.Areas.Admin.Models.Forums
 @using Grand.Web.Areas.Admin.Models.Home

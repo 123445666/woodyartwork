@@ -1,10 +1,9 @@
 ﻿@model InstallModel
-@using Grand.Core.Infrastructure;
 @using Grand.Web.Models.Install;
-@using Grand.Web.Infrastructure.Installation;
+@using Grand.Services.Installation;
+@inject IInstallationLocalizationService ILS
 @{
     Layout = null;
-    var ILS = EngineContext.Current.Resolve<IInstallationLocalizationService>();
 }
 <!DOCTYPE html>
 <html>
@@ -190,7 +189,7 @@
                     </div>
                 </section>
                 <div class="row mx-0">
-                    <div class="py-3">
+                    <div class="py-3 col-12">
                         @ILS.GetResource("Documentation1") <a href="http://docs.grandnode.com/" target="_blank">@ILS.GetResource("Documentation2")</a>.
                     </div>
                     <div class="col-md-6 col-12 mb-3 px-0">

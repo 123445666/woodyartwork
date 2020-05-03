@@ -2,6 +2,7 @@
 using Grand.Core.Plugins;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Authentication.External;
 using Grand.Services.Configuration;
 using Grand.Services.Security;
@@ -10,9 +11,11 @@ using Grand.Web.Areas.Admin.Models.ExternalAuthentication;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.ExternalAuthenticationMethods)]
     public partial class ExternalAuthenticationController : BaseAdminController
 	{
 		#region Fields
@@ -20,7 +23,6 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly IExternalAuthenticationService _openAuthenticationService;
         private readonly ExternalAuthenticationSettings _externalAuthenticationSettings;
         private readonly ISettingService _settingService;
-        private readonly IPermissionService _permissionService;
         private readonly IPluginFinder _pluginFinder;
 
 		#endregion
@@ -29,13 +31,11 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         public ExternalAuthenticationController(IExternalAuthenticationService openAuthenticationService, 
             ExternalAuthenticationSettings externalAuthenticationSettings,
-            ISettingService settingService, IPermissionService permissionService,
-            IPluginFinder pluginFinder)
+            ISettingService settingService, IPluginFinder pluginFinder)
 		{
             this._openAuthenticationService = openAuthenticationService;
             this._externalAuthenticationSettings = externalAuthenticationSettings;
             this._settingService = settingService;
-            this._permissionService = permissionService;
             this._pluginFinder = pluginFinder;
 		}
 
@@ -43,20 +43,11 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Methods
 
-        public IActionResult Methods()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageExternalAuthenticationMethods))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult Methods() => View();
 
         [HttpPost]
         public IActionResult Methods(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageExternalAuthenticationMethods))
-                return AccessDeniedView();
-
             var methodsModel = new List<AuthenticationMethodModel>();
             var methods = _openAuthenticationService.LoadAllExternalAuthenticationMethods();
             foreach (var method in methods)
@@ -77,11 +68,8 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult MethodUpdate( AuthenticationMethodModel model)
+        public async Task<IActionResult> MethodUpdate(AuthenticationMethodModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageExternalAuthenticationMethods))
-                return AccessDeniedView();
-
             var eam = _openAuthenticationService.LoadExternalAuthenticationMethodBySystemName(model.SystemName);
             if (eam.IsMethodActive(_externalAuthenticationSettings))
             {
@@ -89,7 +77,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                 {
                     //mark as disabled
                     _externalAuthenticationSettings.ActiveAuthenticationMethodSystemNames.Remove(eam.PluginDescriptor.SystemName);
-                    _settingService.SaveSetting(_externalAuthenticationSettings);
+                    await _settingService.SaveSetting(_externalAuthenticationSettings);
                 }
             }
             else
@@ -98,7 +86,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                 {
                     //mark as active
                     _externalAuthenticationSettings.ActiveAuthenticationMethodSystemNames.Add(eam.PluginDescriptor.SystemName);
-                    _settingService.SaveSetting(_externalAuthenticationSettings);
+                    await _settingService.SaveSetting(_externalAuthenticationSettings);
                 }
             }
             var pluginDescriptor = eam.PluginDescriptor;

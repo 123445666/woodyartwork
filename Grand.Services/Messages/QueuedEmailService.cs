@@ -1,99 +1,91 @@
 ﻿using Grand.Core;
 using Grand.Core.Data;
-using Grand.Core.Domain.Common;
 using Grand.Core.Domain.Messages;
 using Grand.Services.Events;
+using MediatR;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Messages
 {
     public partial class QueuedEmailService : IQueuedEmailService
     {
         private readonly IRepository<QueuedEmail> _queuedEmailRepository;
-        private readonly IDataProvider _dataProvider;
-        private readonly CommonSettings _commonSettings;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         /// <summary>
         /// Ctor
         /// </summary>
         /// <param name="queuedEmailRepository">Queued email repository</param>
-        /// <param name="eventPublisher">Event published</param>
-        /// <param name="dbContext">DB context</param>
-        /// <param name="dataProvider">WeData provider</param>
-        /// <param name="commonSettings">Common settings</param>
+        /// <param name="mediator">Mediator</param>
         public QueuedEmailService(IRepository<QueuedEmail> queuedEmailRepository,
-            IEventPublisher eventPublisher,
-            IDataProvider dataProvider, 
-            CommonSettings commonSettings)
+            IMediator mediator)
         {
             _queuedEmailRepository = queuedEmailRepository;
-            _eventPublisher = eventPublisher;
-            this._dataProvider = dataProvider;
-            this._commonSettings = commonSettings;
+            _mediator = mediator;
         }
 
         /// <summary>
         /// Inserts a queued email
         /// </summary>
         /// <param name="queuedEmail">Queued email</param>        
-        public virtual void InsertQueuedEmail(QueuedEmail queuedEmail)
+        public virtual async Task InsertQueuedEmail(QueuedEmail queuedEmail)
         {
             if (queuedEmail == null)
                 throw new ArgumentNullException("queuedEmail");
 
-            _queuedEmailRepository.Insert(queuedEmail);
+            await _queuedEmailRepository.InsertAsync(queuedEmail);
 
             //event notification
-            _eventPublisher.EntityInserted(queuedEmail);
+            await _mediator.EntityInserted(queuedEmail);
         }
 
         /// <summary>
         /// Updates a queued email
         /// </summary>
         /// <param name="queuedEmail">Queued email</param>
-        public virtual void UpdateQueuedEmail(QueuedEmail queuedEmail)
+        public virtual async Task UpdateQueuedEmail(QueuedEmail queuedEmail)
         {
             if (queuedEmail == null)
                 throw new ArgumentNullException("queuedEmail");
 
-            _queuedEmailRepository.Update(queuedEmail);
+            await _queuedEmailRepository.UpdateAsync(queuedEmail);
 
             //event notification
-            _eventPublisher.EntityUpdated(queuedEmail);
+            await _mediator.EntityUpdated(queuedEmail);
         }
 
         /// <summary>
         /// Deleted a queued email
         /// </summary>
         /// <param name="queuedEmail">Queued email</param>
-        public virtual void DeleteQueuedEmail(QueuedEmail queuedEmail)
+        public virtual async Task DeleteQueuedEmail(QueuedEmail queuedEmail)
         {
             if (queuedEmail == null)
                 throw new ArgumentNullException("queuedEmail");
 
-            _queuedEmailRepository.Delete(queuedEmail);
+            await _queuedEmailRepository.DeleteAsync(queuedEmail);
 
             //event notification
-            _eventPublisher.EntityDeleted(queuedEmail);
+            await _mediator.EntityDeleted(queuedEmail);
         }
 
         /// <summary>
         /// Deleted a customer emails
         /// </summary>
         /// <param name="email">email</param>
-        public virtual void DeleteCustomerEmail(string email)
+        public virtual async Task DeleteCustomerEmail(string email)
         {
             if (email == null)
                 throw new ArgumentNullException("email");
 
             var builder = Builders<QueuedEmail>.Filter;
             var filter = builder.Eq(x => x.To, email);
-            _queuedEmailRepository.Collection.DeleteMany(filter);
+            await _queuedEmailRepository.Collection.DeleteManyAsync(filter);
         }
 
         /// <summary>
@@ -101,9 +93,9 @@ namespace Grand.Services.Messages
         /// </summary>
         /// <param name="queuedEmailId">Queued email identifier</param>
         /// <returns>Queued email</returns>
-        public virtual QueuedEmail GetQueuedEmailById(string queuedEmailId)
+        public virtual Task<QueuedEmail> GetQueuedEmailById(string queuedEmailId)
         {
-            return _queuedEmailRepository.GetById(queuedEmailId);
+            return _queuedEmailRepository.GetByIdAsync(queuedEmailId);
 
         }
 
@@ -112,7 +104,7 @@ namespace Grand.Services.Messages
         /// </summary>
         /// <param name="queuedEmailIds">queued email identifiers</param>
         /// <returns>Queued emails</returns>
-        public virtual IList<QueuedEmail> GetQueuedEmailsByIds(string[] queuedEmailIds)
+        public virtual async Task<IList<QueuedEmail>> GetQueuedEmailsByIds(string[] queuedEmailIds)
         {
             if (queuedEmailIds == null || queuedEmailIds.Length == 0)
                 return new List<QueuedEmail>();
@@ -120,7 +112,7 @@ namespace Grand.Services.Messages
             var query = from qe in _queuedEmailRepository.Table
                         where queuedEmailIds.Contains(qe.Id)
                         select qe;
-            var queuedEmails = query.ToList();
+            var queuedEmails = await query.ToListAsync();
             //sort by passed identifiers
             var sortedQueuedEmails = new List<QueuedEmail>();
             foreach (string id in queuedEmailIds)
@@ -145,7 +137,7 @@ namespace Grand.Services.Messages
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Email item list</returns>
-        public virtual IPagedList<QueuedEmail> SearchEmails(string fromEmail,
+        public virtual async Task<IPagedList<QueuedEmail>> SearchEmails(string fromEmail,
             string toEmail, DateTime? createdFromUtc, DateTime? createdToUtc, 
             bool loadNotSentItemsOnly, bool loadOnlyItemsToBeSent, int maxSendTries,
             bool loadNewest, int pageIndex = 0, int pageSize = int.MaxValue)
@@ -183,19 +175,15 @@ namespace Grand.Services.Messages
                 //load by priority
                 query = query.OrderByDescending(qe => qe.PriorityId).ThenBy(qe => qe.CreatedOnUtc);
             }
-
-            var queuedEmails = new PagedList<QueuedEmail>(query, pageIndex, pageSize);
-            return queuedEmails;
+            return await PagedList<QueuedEmail>.Create(query, pageIndex, pageSize);
         }
 
         /// <summary>
         /// Delete all queued emails
         /// </summary>
-        public virtual void DeleteAllEmails()
+        public virtual async Task DeleteAllEmails()
         {
-                var queuedEmails = _queuedEmailRepository.Table.ToList();
-                foreach (var qe in queuedEmails)
-                    _queuedEmailRepository.Delete(qe);
+            await _queuedEmailRepository.Collection.DeleteManyAsync(new MongoDB.Bson.BsonDocument());
         }
     }
 }

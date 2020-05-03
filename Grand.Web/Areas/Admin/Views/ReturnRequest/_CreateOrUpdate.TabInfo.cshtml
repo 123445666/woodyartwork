@@ -3,11 +3,18 @@
 @inject OrderSettings orderSettings
 
 <div class="form-horizontal">
+    <vc:admin-widget widget-zone="return_request_tab_info_top" additional-data="Model" />
     <div class="form-body">
         <div class="form-group">
             <admin-label asp-for="ReturnNumber" />
             <div class="col-md-9 col-sm-9">
                 <label class="control-label">@Model.ReturnNumber</label>
+            </div>
+        </div>
+        <div class="form-group">
+            <admin-label asp-for="ExternalId" />
+            <div class="col-md-9 col-sm-9">
+                <admin-input asp-for="ExternalId" />
             </div>
         </div>
         <div class="form-group">
@@ -25,7 +32,7 @@
         <div class="form-group">
             <admin-label asp-for="ReturnRequestStatusId" />
             <div class="col-md-9 col-sm-9">
-                <admin-select asp-for="ReturnRequestStatusId" asp-items="((ReturnRequestStatus)Model.ReturnRequestStatusId).ToSelectList()" />
+                <admin-select asp-for="ReturnRequestStatusId" asp-items="((ReturnRequestStatus)Model.ReturnRequestStatusId).ToSelectList(Context)" />
                 <span asp-validation-for="ReturnRequestStatusId"></span>
             </div>
         </div>
@@ -61,9 +68,9 @@
         <div class="form-group">
             <admin-label asp-for="NotifyCustomer" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="NotifyCustomer" />
-                    <span></span>
+                    <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="NotifyCustomer"></span>
             </div>
@@ -72,6 +79,7 @@
             <div id="products-grid"></div>
         </div>
     </div>
+    <vc:admin-widget widget-zone="return_request_tab_info_bottom" additional-data="Model" />
 </div>
 
 
@@ -115,7 +123,7 @@
                     field: "ProductName",
                     title: "@T("Admin.ReturnRequests.Fields.Item")",
                     width: 200,
-                    template: '<a class="k-link" href="@Url.Content("~/Admin/Product/Edit/")#=ProductId#">#=ProductName#</a>'
+                    template: '<a class="k-link" href="@Url.Content("~/Admin/Product/Edit/")#=ProductId#">#=kendo.htmlEncode(ProductName)#</a>'
                 }, {
                     field: "Quantity",
                     title: "@T("Admin.ReturnRequests.Fields.Quantity")",

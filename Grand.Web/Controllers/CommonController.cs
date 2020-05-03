@@ -5,80 +5,56 @@ using Grand.Core.Domain.Common;
 using Grand.Core.Domain.Customers;
 using Grand.Core.Domain.Localization;
 using Grand.Core.Domain.Media;
-using Grand.Core.Domain.Messages;
-using Grand.Core.Domain.Vendors;
-using Grand.Core.Infrastructure;
+using Grand.Core.Domain.Tax;
 using Grand.Framework.Localization;
 using Grand.Framework.Mvc.Filters;
-using Grand.Framework.Security;
 using Grand.Framework.Security.Captcha;
 using Grand.Framework.Themes;
 using Grand.Services.Common;
-using Grand.Services.Customers;
+using Grand.Services.Directory;
 using Grand.Services.Localization;
-using Grand.Services.Logging;
 using Grand.Services.Media;
 using Grand.Services.Messages;
 using Grand.Services.Stores;
-using Grand.Services.Vendors;
+using Grand.Web.Commands.Models.Common;
+using Grand.Web.Features.Models.Common;
 using Grand.Web.Models.Common;
-using Grand.Web.Services;
-using Microsoft.AspNetCore.Diagnostics;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Controllers
 {
     public partial class CommonController : BasePublicController
     {
         #region Fields
-        private readonly ICommonViewModelService _commonViewModelService;
         private readonly ILocalizationService _localizationService;
         private readonly IWorkContext _workContext;
         private readonly IStoreContext _storeContext;
-        private readonly ICustomerActivityService _customerActivityService;
-        private readonly ICustomerActionEventService _customerActionEventService;
-        private readonly IPopupService _popupService;
-        private readonly IContactAttributeService _contactAttributeService;
-        private readonly CommonSettings _commonSettings;
+        private readonly IMediator _mediator;
         private readonly CaptchaSettings _captchaSettings;
-        private readonly VendorSettings _vendorSettings;
 
         #endregion
 
         #region Constructors
 
         public CommonController(
-            ICommonViewModelService commonViewModelService,
             ILocalizationService localizationService,
             IWorkContext workContext,
             IStoreContext storeContext,
-            ICustomerActivityService customerActivityService,
-            ICustomerActionEventService customerActionEventService,
-            IPopupService popupService,
-            IContactAttributeService contactAttributeService,
-            CommonSettings commonSettings,
-            CaptchaSettings captchaSettings,
-            VendorSettings vendorSettings
-            )
+            IMediator mediator,
+            CaptchaSettings captchaSettings)
         {
-            this._commonViewModelService = commonViewModelService;
-            this._localizationService = localizationService;
-            this._workContext = workContext;
-            this._storeContext = storeContext;
-            this._customerActivityService = customerActivityService;
-            this._customerActionEventService = customerActionEventService;
-            this._popupService = popupService;
-            this._contactAttributeService = contactAttributeService;
-            this._commonSettings = commonSettings;
-            this._captchaSettings = captchaSettings;
-            this._vendorSettings = vendorSettings;
+            _localizationService = localizationService;
+            _workContext = workContext;
+            _storeContext = storeContext;
+            _mediator = mediator;
+            _captchaSettings = captchaSettings;
         }
 
         #endregion
@@ -86,18 +62,10 @@ namespace Grand.Web.Controllers
         #region Methods
 
         //page not found
-        public virtual IActionResult PageNotFound([FromServices] ILogger logger)
+        public virtual IActionResult PageNotFound()
         {
-            if (_commonSettings.Log404Errors)
-            {
-                var statusCodeReExecuteFeature = HttpContext?.Features?.Get<IStatusCodeReExecuteFeature>();
-                logger.Error(string.Format("Error 404. The requested page ({0}) was not found", statusCodeReExecuteFeature?.OriginalPath),
-                    customer: _workContext.CurrentCustomer);
-            }
-
-            this.Response.StatusCode = 404;
-            this.Response.ContentType = "text/html";
-
+            Response.StatusCode = 404;
+            Response.ContentType = "text/html";
             return View();
         }
 
@@ -105,13 +73,13 @@ namespace Grand.Web.Controllers
         [CheckAccessClosedStore(true)]
         //available even when navigation is not allowed
         [CheckAccessPublicStore(true)]
-        public virtual IActionResult SetLanguage(
+        public virtual async Task<IActionResult> SetLanguage(
             [FromServices] ILanguageService languageService,
             [FromServices] LocalizationSettings localizationSettings,
             string langid, string returnUrl = "")
         {
 
-            var language = languageService.GetLanguageById(langid);
+            var language = await languageService.GetLanguageById(langid);
             if (!language?.Published ?? false)
                 language = _workContext.WorkingLanguage;
 
@@ -127,14 +95,14 @@ namespace Grand.Web.Controllers
             if (localizationSettings.SeoFriendlyUrlsForLanguagesEnabled)
             {
                 //remove current language code if it's already localized URL
-                if (returnUrl.IsLocalizedUrl(this.Request.PathBase, true, out Language _))
+                if (await returnUrl.IsLocalizedUrlAsync(languageService, this.Request.PathBase, true))
                     returnUrl = returnUrl.RemoveLanguageSeoCodeFromUrl(this.Request.PathBase, true);
 
                 //and add code of passed language
                 returnUrl = returnUrl.AddLanguageSeoCodeToUrl(this.Request.PathBase, true, language);
             }
 
-            _workContext.WorkingLanguage = language;
+            await _workContext.SetWorkingLanguage(language);
 
             return Redirect(returnUrl);
         }
@@ -164,19 +132,22 @@ namespace Grand.Web.Controllers
                 permanentRedirect = false;
             }
 
-            if (permanentRedirect)
-                return RedirectPermanent(url);
-
             url = Uri.EscapeUriString(WebUtility.UrlDecode(url));
 
+            if (permanentRedirect)
+                return RedirectPermanent(url);
             return Redirect(url);
         }
 
         //available even when navigation is not allowed
         [CheckAccessPublicStore(true)]
-        public virtual IActionResult SetCurrency(string customerCurrency, string returnUrl = "")
+        public virtual async Task<IActionResult> SetCurrency(
+            [FromServices] ICurrencyService currencyService,
+            string customerCurrency, string returnUrl = "")
         {
-            _commonViewModelService.SetCurrency(customerCurrency);
+            var currency = await currencyService.GetCurrencyById(customerCurrency);
+            if (currency != null)
+                await _workContext.SetWorkingCurrency(currency);
 
             //home page
             if (String.IsNullOrEmpty(returnUrl))
@@ -191,16 +162,23 @@ namespace Grand.Web.Controllers
 
         //available even when navigation is not allowed
         [CheckAccessPublicStore(true)]
-        public virtual IActionResult SetStore(
+        public virtual async Task<IActionResult> SetStore(
             [FromServices] IStoreService storeService,
+            [FromServices] CommonSettings commonSettings,
             string store, string returnUrl = "")
         {
             var currentstoreid = _storeContext.CurrentStore.Id;
             if (currentstoreid != store)
-                _commonViewModelService.SetStore(store);
-
-            var prevStore = storeService.GetStoreById(currentstoreid);
-            var currStore = storeService.GetStoreById(store);
+            {
+                if (commonSettings.AllowToSelectStore)
+                {
+                    var selectedstore = await storeService.GetStoreById(store);
+                    if (selectedstore != null)
+                        await _storeContext.SetStoreCookie(store);
+                }
+            }
+            var prevStore = await storeService.GetStoreById(currentstoreid);
+            var currStore = await storeService.GetStoreById(store);
 
             if (prevStore != null && currStore != null)
             {
@@ -223,9 +201,10 @@ namespace Grand.Web.Controllers
 
         //available even when navigation is not allowed
         [CheckAccessPublicStore(true)]
-        public virtual IActionResult SetTaxType(int customerTaxType, string returnUrl = "")
+        public virtual async Task<IActionResult> SetTaxType(int customerTaxType, string returnUrl = "")
         {
-            _commonViewModelService.SetTaxType(customerTaxType);
+            var taxDisplayType = (TaxDisplayType)Enum.ToObject(typeof(TaxDisplayType), customerTaxType);
+            await _workContext.SetTaxDisplayType(taxDisplayType);
 
             //home page
             if (String.IsNullOrEmpty(returnUrl))
@@ -241,19 +220,22 @@ namespace Grand.Web.Controllers
         //contact us page
         //available even when a store is closed
         [CheckAccessClosedStore(true)]
-        public virtual IActionResult ContactUs()
+        public virtual async Task<IActionResult> ContactUs()
         {
-            var model = _commonViewModelService.PrepareContactUs();
+            var model = await _mediator.Send(new ContactUsCommand() {
+                Customer = _workContext.CurrentCustomer,
+                Language = _workContext.WorkingLanguage,
+                Store = _storeContext.CurrentStore
+            });
             return View(model);
         }
 
         [HttpPost, ActionName("ContactUs")]
-        [PublicAntiForgery]
+        [AutoValidateAntiforgeryToken]
         [ValidateCaptcha]
         //available even when a store is closed
         [CheckAccessClosedStore(true)]
-        public virtual IActionResult ContactUsSend(ContactUsModel model, IFormCollection form, bool captchaValid,
-            [FromServices] IContactAttributeFormatter contactAttributeFormatter)
+        public virtual async Task<IActionResult> ContactUsSend(ContactUsModel model, IFormCollection form, bool captchaValid)
         {
             //validate CAPTCHA
             if (_captchaSettings.Enabled && _captchaSettings.ShowOnContactUsPage && !captchaValid)
@@ -261,103 +243,72 @@ namespace Grand.Web.Controllers
                 ModelState.AddModelError("", _captchaSettings.GetWrongCaptchaMessage(_localizationService));
             }
 
-            //parse contact attributes
-            var attributeXml = _commonViewModelService.ParseContactAttributes(form);
-            var contactAttributeWarnings = _commonViewModelService.GetContactAttributesWarnings(attributeXml);
-            if (contactAttributeWarnings.Any())
+            var result = await _mediator.Send(new ContactUsSendCommand() {
+                CaptchaValid = captchaValid,
+                Form = form,
+                Model = model,
+                Store = _storeContext.CurrentStore
+            });
+
+            if (result.errors.Any())
             {
-                foreach (var item in contactAttributeWarnings)
+                foreach (var item in result.errors)
                 {
                     ModelState.AddModelError("", item);
                 }
             }
-
-            if (ModelState.IsValid)
+            else
             {
-                model.ContactAttributeXml = attributeXml;
-                model.ContactAttributeInfo = contactAttributeFormatter.FormatAttributes(attributeXml, _workContext.CurrentCustomer);
-                model = _commonViewModelService.SendContactUs(model);
-                //activity log
-                _customerActivityService.InsertActivity("PublicStore.ContactUs", "", _localizationService.GetResource("ActivityLog.PublicStore.ContactUs"));
+                model = result.model;
                 return View(model);
             }
 
             model.DisplayCaptcha = _captchaSettings.Enabled && _captchaSettings.ShowOnContactUsPage;
-            model.ContactAttributes = _commonViewModelService.PrepareContactAttributeModel(attributeXml);
 
             return View(model);
         }
-        //contact vendor page
-        public virtual IActionResult ContactVendor(string vendorId)
-        {
-            if (!_vendorSettings.AllowCustomersToContactVendors)
-                return RedirectToRoute("HomePage");
 
-            var vendor = EngineContext.Current.Resolve<IVendorService>().GetVendorById(vendorId);
-            if (vendor == null || !vendor.Active || vendor.Deleted)
-                return RedirectToRoute("HomePage");
-
-            var model = _commonViewModelService.PrepareContactVendor(vendor);
-
-            return View(model);
-        }
-        [HttpPost, ActionName("ContactVendor")]
-        [PublicAntiForgery]
-        [ValidateCaptcha]
-        public virtual IActionResult ContactVendorSend(ContactVendorModel model, bool captchaValid)
-        {
-            if (!_vendorSettings.AllowCustomersToContactVendors)
-                return RedirectToRoute("HomePage");
-
-            var vendor = EngineContext.Current.Resolve<IVendorService>().GetVendorById(model.VendorId);
-            if (vendor == null || !vendor.Active || vendor.Deleted)
-                return RedirectToRoute("HomePage");
-
-            //validate CAPTCHA
-            if (_captchaSettings.Enabled && _captchaSettings.ShowOnContactUsPage && !captchaValid)
-            {
-                ModelState.AddModelError("", _captchaSettings.GetWrongCaptchaMessage(_localizationService));
-            }
-
-            model.VendorName = vendor.GetLocalized(x => x.Name);
-
-            if (ModelState.IsValid)
-            {
-                model = _commonViewModelService.SendContactVendor(model, vendor);
-                return View(model);
-            }
-
-            model.DisplayCaptcha = _captchaSettings.Enabled && _captchaSettings.ShowOnContactUsPage;
-            return View(model);
-        }
 
         //sitemap page
-        public virtual IActionResult Sitemap()
+        public virtual async Task<IActionResult> Sitemap([FromServices] CommonSettings commonSettings)
         {
-            if (!_commonSettings.SitemapEnabled)
+            if (!commonSettings.SitemapEnabled)
                 return RedirectToRoute("HomePage");
 
-            var model = _commonViewModelService.PrepareSitemap();
+            var model = await _mediator.Send(new GetSitemap() {
+                Customer = _workContext.CurrentCustomer,
+                Language = _workContext.WorkingLanguage,
+                Store = _storeContext.CurrentStore
+            });
             return View(model);
         }
 
         //available even when a store is closed
         [CheckAccessClosedStore(true)]
-        public virtual IActionResult SitemapXml(int? id)
+        public virtual async Task<IActionResult> SitemapXml(int? id, 
+            [FromServices] CommonSettings commonSettings)
         {
-            if (!_commonSettings.SitemapEnabled)
+            if (!commonSettings.SitemapEnabled)
                 return RedirectToRoute("HomePage");
-            var siteMap = _commonViewModelService.SitemapXml(id, this.Url);
+
+            var siteMap = await _mediator.Send(new GetSitemapXml() {
+                Id = id,
+                Customer = _workContext.CurrentCustomer,
+                Language = _workContext.WorkingLanguage,
+                Store = _storeContext.CurrentStore,
+                UrlHelper = Url,
+            });
 
             return Content(siteMap, "text/xml");
         }
 
-        public virtual IActionResult SetStoreTheme(string themeName, string returnUrl = "")
+        public virtual async Task<IActionResult> SetStoreTheme(
+            [FromServices] IThemeContext themeContext, string themeName, string returnUrl = "")
         {
-            EngineContext.Current.Resolve<IThemeContext>().WorkingThemeName = themeName;
+            await themeContext.SetWorkingTheme(themeName);
 
             //home page
-            if (String.IsNullOrEmpty(returnUrl))
+            if (string.IsNullOrEmpty(returnUrl))
                 returnUrl = Url.RouteUrl("HomePage");
 
             //prevent open redirection attack
@@ -373,14 +324,16 @@ namespace Grand.Web.Controllers
         [CheckAccessClosedStore(true)]
         //available even when navigation is not allowed
         [CheckAccessPublicStore(true)]
-        public virtual IActionResult EuCookieLawAccept([FromServices] StoreInformationSettings storeInformationSettings)
+        public virtual async Task<IActionResult> EuCookieLawAccept(
+            [FromServices] StoreInformationSettings storeInformationSettings,
+            [FromServices] IGenericAttributeService genericAttributeService)
         {
             if (!storeInformationSettings.DisplayEuCookieLawWarning)
                 //disabled
                 return Json(new { stored = false });
 
             //save setting
-            EngineContext.Current.Resolve<IGenericAttributeService>().SaveAttribute(_workContext.CurrentCustomer, SystemCustomerAttributeNames.EuCookieLawAccepted, true, _storeContext.CurrentStore.Id);
+            await genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, SystemCustomerAttributeNames.EuCookieLawAccepted, true, _storeContext.CurrentStore.Id);
             return Json(new { stored = true });
         }
 
@@ -389,9 +342,9 @@ namespace Grand.Web.Controllers
         [CheckAccessClosedStore(true)]
         //available even when navigation is not allowed
         [CheckAccessPublicStore(true)]
-        public virtual IActionResult RobotsTextFile()
+        public virtual async Task<IActionResult> RobotsTextFile()
         {
-            var sb = _commonViewModelService.PrepareRobotsTextFile();
+            var sb = await _mediator.Send(new GetRobotsTextFile());
             return Content(sb, "text/plain");
         }
 
@@ -404,43 +357,28 @@ namespace Grand.Web.Controllers
         //store is closed
         //available even when a store is closed
         [CheckAccessClosedStore(true)]
-        public virtual IActionResult StoreClosed()
-        {
-            return View();
-        }
+        public virtual IActionResult StoreClosed() => View();
 
         [HttpPost]
-        public virtual IActionResult ContactAttributeChange(IFormCollection form,
-            [FromServices] IContactAttributeParser contactAttributeParser)
+        public virtual async Task<IActionResult> ContactAttributeChange(IFormCollection form)
         {
-            var attributeXml = _commonViewModelService.ParseContactAttributes(form);
-
-            var enabledAttributeIds = new List<string>();
-            var disabledAttributeIds = new List<string>();
-            var attributes = _contactAttributeService.GetAllContactAttributes(_storeContext.CurrentStore.Id);
-            foreach (var attribute in attributes)
-            {
-                var conditionMet = contactAttributeParser.IsConditionMet(attribute, attributeXml);
-                if (conditionMet.HasValue)
-                {
-                    if (conditionMet.Value)
-                        enabledAttributeIds.Add(attribute.Id);
-                    else
-                        disabledAttributeIds.Add(attribute.Id);
-                }
-            }
-
+            var result = await _mediator.Send(new ContactAttributeChangeCommand() {
+                Form = form,
+                Customer = _workContext.CurrentCustomer,
+                Store = _storeContext.CurrentStore
+            });
             return Json(new
             {
-                enabledattributeids = enabledAttributeIds.ToArray(),
-                disabledattributeids = disabledAttributeIds.ToArray()
+                enabledattributeids = result.enabledAttributeIds.ToArray(),
+                disabledattributeids = result.disabledAttributeIds.ToArray()
             });
         }
 
         [HttpPost]
-        public virtual IActionResult UploadFileContactAttribute(string attributeId)
+        public virtual async Task<IActionResult> UploadFileContactAttribute(string attributeId, [FromServices] IDownloadService downloadService,
+            [FromServices] IContactAttributeService contactAttributeService)
         {
-            var attribute = _contactAttributeService.GetContactAttributeById(attributeId);
+            var attribute = await contactAttributeService.GetContactAttributeById(attributeId);
             if (attribute == null || attribute.AttributeControlType != AttributeControlType.FileUpload)
             {
                 return Json(new
@@ -449,8 +387,8 @@ namespace Grand.Web.Controllers
                     downloadGuid = Guid.Empty,
                 });
             }
-
-            var httpPostedFile = Request.Form.Files.FirstOrDefault();
+            var form = await HttpContext.Request.ReadFormAsync();
+            var httpPostedFile = form.Files.FirstOrDefault();
             if (httpPostedFile == null)
             {
                 return Json(new
@@ -465,8 +403,8 @@ namespace Grand.Web.Controllers
 
             var qqFileNameParameter = "qqfilename";
             var fileName = httpPostedFile.FileName;
-            if (String.IsNullOrEmpty(fileName) && Request.Form.ContainsKey(qqFileNameParameter))
-                fileName = Request.Form[qqFileNameParameter].ToString();
+            if (String.IsNullOrEmpty(fileName) && form.ContainsKey(qqFileNameParameter))
+                fileName = form[qqFileNameParameter].ToString();
             //remove path (passed in IE)
             fileName = Path.GetFileName(fileName);
 
@@ -493,8 +431,7 @@ namespace Grand.Web.Controllers
                 }
             }
 
-            var download = new Download
-            {
+            var download = new Download {
                 DownloadGuid = Guid.NewGuid(),
                 UseDownloadUrl = false,
                 DownloadUrl = "",
@@ -506,7 +443,7 @@ namespace Grand.Web.Controllers
                 IsNew = true
             };
 
-            EngineContext.Current.Resolve<IDownloadService>().InsertDownload(download);
+            await downloadService.InsertDownload(download);
 
             //when returning JSON the mime-type must be set to text/plain
             //otherwise some browsers will pop-up a "Save As" dialog.
@@ -519,143 +456,16 @@ namespace Grand.Web.Controllers
             });
         }
 
-        //Get banner for customer
-        [HttpGet]
-        public virtual IActionResult GetActivePopup()
-        {
-            var result = _popupService.GetActivePopupByCustomerId(_workContext.CurrentCustomer.Id);
-            if (result != null)
-            {
-                return Json
-                    (
-                        new { Id = result.Id, Body = result.Body, PopupTypeId = result.PopupTypeId }
-                    );
-            }
-            else
-                return Json
-                    (
-                        new { empty = "" }
-                    );
-        }
-
-        [HttpPost]
-        public virtual IActionResult RemovePopup(string Id)
-        {
-            _popupService.MovepopupToArchive(Id, _workContext.CurrentCustomer.Id);
-            return Json("");
-        }
-
-
-        [HttpGet]
-        public virtual IActionResult CustomerActionEventUrl(string curl, string purl)
-        {
-            _customerActionEventService.Url(_workContext.CurrentCustomer, curl, purl);
-            return Json
-                (
-                    new { empty = "" }
-                );
-        }
 
         [HttpPost, ActionName("PopupInteractiveForm")]
-        public virtual IActionResult PopupInteractiveForm(IFormCollection formCollection,
-           [FromServices] IInteractiveFormService interactiveFormService)
+        public virtual async Task<IActionResult> PopupInteractiveForm(IFormCollection formCollection)
         {
-
-            var formid = formCollection["Id"];
-            var form = interactiveFormService.GetFormById(formid);
-            if (form == null)
-                return Content("");
-            string enquiry = "";
-
-            var queuedEmailService = EngineContext.Current.Resolve<IQueuedEmailService>();
-            var emailAccountService = EngineContext.Current.Resolve<IEmailAccountService>();
-            foreach (var item in form.FormAttributes)
-            {
-                enquiry += string.Format("{0}: {1} <br />", item.Name, formCollection[item.SystemName]);
-
-                if (!string.IsNullOrEmpty(item.RegexValidation))
-                {
-                    var valuesStr = formCollection[item.SystemName];
-                    Regex regex = new Regex(item.RegexValidation);
-                    Match match = regex.Match(valuesStr);
-                    if (!match.Success)
-                    {
-                        ModelState.AddModelError("", string.Format(_localizationService.GetResource("PopupInteractiveForm.Fields.Regex"), item.GetLocalized(a => a.Name)));
-                    }
-                }
-                if (item.IsRequired)
-                {
-                    var valuesStr = formCollection[item.SystemName];
-                    if (string.IsNullOrEmpty(valuesStr))
-                        ModelState.AddModelError("", string.Format(_localizationService.GetResource("PopupInteractiveForm.Fields.IsRequired"), item.GetLocalized(a => a.Name)));
-                }
-                if (item.ValidationMinLength.HasValue)
-                {
-                    if (item.AttributeControlType == FormControlType.TextBox ||
-                        item.AttributeControlType == FormControlType.MultilineTextbox)
-                    {
-                        var valuesStr = formCollection[item.SystemName].ToString();
-                        int enteredTextLength = String.IsNullOrEmpty(valuesStr) ? 0 : valuesStr.Length;
-                        if (item.ValidationMinLength.Value > enteredTextLength)
-                        {
-                            ModelState.AddModelError("", string.Format(_localizationService.GetResource("PopupInteractiveForm.Fields.TextboxMinimumLength"), item.GetLocalized(a => a.Name), item.ValidationMinLength.Value));
-                        }
-                    }
-                }
-                if (item.ValidationMaxLength.HasValue)
-                {
-                    if (item.AttributeControlType == FormControlType.TextBox ||
-                        item.AttributeControlType == FormControlType.MultilineTextbox)
-                    {
-                        var valuesStr = formCollection[item.SystemName].ToString();
-                        int enteredTextLength = String.IsNullOrEmpty(valuesStr) ? 0 : valuesStr.Length;
-                        if (item.ValidationMaxLength.Value < enteredTextLength)
-                        {
-                            ModelState.AddModelError("", string.Format(_localizationService.GetResource("PopupInteractiveForm.Fields.TextboxMaximumLength"), item.GetLocalized(a => a.Name), item.ValidationMaxLength.Value));
-                        }
-                    }
-                }
-
-            }
-
-            if (ModelState.Keys.Count() == 0)
-            {
-                var emailAccount = emailAccountService.GetEmailAccountById(form.EmailAccountId);
-                if (emailAccount == null)
-                    emailAccount = emailAccountService.GetAllEmailAccounts().FirstOrDefault();
-                if (emailAccount == null)
-                    throw new Exception("No email account could be loaded");
-
-                string from;
-                string fromName;
-                string subject = string.Format(_localizationService.GetResource("PopupInteractiveForm.EmailForm"), form.Name);
-                from = emailAccount.Email;
-                fromName = emailAccount.DisplayName;
-
-                queuedEmailService.InsertQueuedEmail(new QueuedEmail
-                {
-                    From = from,
-                    FromName = fromName,
-                    To = emailAccount.Email,
-                    ToName = emailAccount.DisplayName,
-                    Priority = QueuedEmailPriority.High,
-                    Subject = subject,
-                    Body = enquiry,
-                    CreatedOnUtc = DateTime.UtcNow,
-                    EmailAccountId = emailAccount.Id
-                });
-
-                //activity log
-                _customerActivityService.InsertActivity("PublicStore.InteractiveForm", form.Id, string.Format(_localizationService.GetResource("ActivityLog.PublicStore.InteractiveForm"), form.Name));
-            }
-
+            var result = await _mediator.Send(new PopupInteractiveCommand() { Form = formCollection });
             return Json(new
             {
-                success = ModelState.Keys.Count() == 0,
-                errors = ModelState.Keys.SelectMany(k => ModelState[k].Errors)
-                                .Select(m => m.ErrorMessage).ToArray()
+                success = result.Any(),
+                errors = result
             });
-
         }
 
         #endregion

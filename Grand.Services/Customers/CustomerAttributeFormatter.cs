@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Customers
 {
@@ -14,7 +15,6 @@ namespace Grand.Services.Customers
         #region Fields
 
         private readonly ICustomerAttributeParser _customerAttributeParser;
-        private readonly ICustomerAttributeService _customerAttributeService;
         private readonly IWorkContext _workContext;
 
         #endregion
@@ -22,12 +22,10 @@ namespace Grand.Services.Customers
         #region Ctor
 
         public CustomerAttributeFormatter(ICustomerAttributeParser customerAttributeParser,
-            ICustomerAttributeService customerAttributeService,
             IWorkContext workContext)
         {
-            this._customerAttributeParser = customerAttributeParser;
-            this._customerAttributeService = customerAttributeService;
-            this._workContext = workContext;
+            _customerAttributeParser = customerAttributeParser;
+            _workContext = workContext;
         }
 
         #endregion
@@ -41,11 +39,11 @@ namespace Grand.Services.Customers
         /// <param name="serapator">Serapator</param>
         /// <param name="htmlEncode">A value indicating whether to encode (HTML) values</param>
         /// <returns>Attributes</returns>
-        public virtual string FormatAttributes(string attributesXml, string serapator = "<br />", bool htmlEncode = true)
+        public virtual async Task<string> FormatAttributes(string attributesXml, string serapator = "<br />", bool htmlEncode = true)
         {
             var result = new StringBuilder();
 
-            var attributes = _customerAttributeParser.ParseCustomerAttributes(attributesXml);
+            var attributes = await _customerAttributeParser.ParseCustomerAttributes(attributesXml);
             for (int i = 0; i < attributes.Count; i++)
             {
                 var attribute = attributes[i];

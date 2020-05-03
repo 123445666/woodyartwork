@@ -9,12 +9,11 @@ namespace Grand.Web.Models.Catalog
     {
         public SearchModel()
         {
-            this.PagingFilteringContext = new CatalogPagingFilteringModel();
-            this.Products = new List<ProductOverviewModel>();
-
-            this.AvailableCategories = new List<SelectListItem>();
-            this.AvailableManufacturers = new List<SelectListItem>();
-            this.AvailableVendors = new List<SelectListItem>();
+            PagingFilteringContext = new CatalogPagingFilteringModel();
+            Products = new List<ProductOverviewModel>();
+            AvailableCategories = new List<SelectListItem>();
+            AvailableManufacturers = new List<SelectListItem>();
+            AvailableVendors = new List<SelectListItem>();
         }
 
         public string Warning { get; set; }
@@ -67,6 +66,7 @@ namespace Grand.Web.Models.Catalog
         /// A value indicating whether "allow search by vendor" is enabled
         /// </summary>
         public bool asv { get; set; }
+        public bool Box { get; set; }
 
         public IList<SelectListItem> AvailableCategories { get; set; }
         public IList<SelectListItem> AvailableManufacturers { get; set; }

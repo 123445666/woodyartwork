@@ -8,24 +8,26 @@
 <form asp-controller="Order" asp-action="PartiallyRefundOrderPopup" method="post"
       asp-route-OrderId="@Context.Request.Query["OrderId"]"
       asp-route-btnId="@Context.Request.Query["btnId"]"
+      asp-route-online="@Context.Request.Query["online"]"
       asp-route-formId="@Context.Request.Query["formId"]"
       >
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-tag"></i>
                         @T("Admin.Orders.Fields.PartialRefund")
                     </div>
                 </div>
+                <vc:admin-widget widget-zone="order_partially_refund_buttons" additional-data="Model" />
                 <div class="note note-info">
                     <strong>
                         @string.Format(T("Admin.Orders.Fields.PartialRefund.OrderInfo").Text, Model.Id)
                     </strong>
                 </div>
-                <div class="portlet-body form">
+                <div class="x_content form">
                     <div class="form-horizontal">
                         <div class="form-body">
                             <div class="form-group">

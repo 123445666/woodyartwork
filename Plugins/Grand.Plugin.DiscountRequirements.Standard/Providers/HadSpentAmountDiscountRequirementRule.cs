@@ -1,14 +1,13 @@
-using System;
-using System.Linq;
-using Grand.Core;
 using Grand.Core.Domain.Customers;
 using Grand.Core.Domain.Orders;
-using Grand.Core.Plugins;
 using Grand.Services.Configuration;
 using Grand.Services.Discounts;
 using Grand.Services.Localization;
 using Grand.Services.Orders;
-using Grand.Core.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Plugin.DiscountRequirements.Standard.HadSpentAmount
 {
@@ -17,15 +16,12 @@ namespace Grand.Plugin.DiscountRequirements.Standard.HadSpentAmount
         private readonly ISettingService _settingService;
         private readonly IOrderService _orderService;
         private readonly ILocalizationService _localizationService;
-        private readonly IWebHelper _webHelper;
 
-        public HadSpentAmountDiscountRequirementRule(ISettingService settingService,
-            IOrderService orderService, ILocalizationService localizationService, IWebHelper webHelper)
+        public HadSpentAmountDiscountRequirementRule(IServiceProvider serviceProvider)
         {
-            this._settingService = settingService;
-            this._orderService = orderService;
-            this._localizationService = localizationService;
-            this._webHelper = webHelper;
+            _settingService = serviceProvider.GetRequiredService<ISettingService>();
+            _orderService = serviceProvider.GetRequiredService<IOrderService>();
+            _localizationService = serviceProvider.GetRequiredService<ILocalizationService>();
         }
 
         /// <summary>
@@ -33,7 +29,7 @@ namespace Grand.Plugin.DiscountRequirements.Standard.HadSpentAmount
         /// </summary>
         /// <param name="request">Object that contains all information required to check the requirement (Current customer, discount, etc)</param>
         /// <returns>true - requirement is met; otherwise, false</returns>
-        public DiscountRequirementValidationResult CheckRequirement(DiscountRequirementValidationRequest request)
+        public async Task<DiscountRequirementValidationResult> CheckRequirement(DiscountRequirementValidationRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException("request");
@@ -53,7 +49,7 @@ namespace Grand.Plugin.DiscountRequirements.Standard.HadSpentAmount
             if (request.Customer == null || request.Customer.IsGuest())
                 return result;
 
-            var orders = _orderService.SearchOrders(storeId: request.Store.Id,
+            var orders = await _orderService.SearchOrders(storeId: request.Store.Id,
                 customerId: request.Customer.Id,
                 os: OrderStatus.Complete);
             decimal spentAmount = orders.Sum(o => o.OrderTotal);

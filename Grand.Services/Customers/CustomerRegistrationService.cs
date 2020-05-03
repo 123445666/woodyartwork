@@ -1,14 +1,16 @@
 using Grand.Core;
 using Grand.Core.Domain.Customers;
-using Grand.Services.Events;
+using Grand.Services.Common;
 using Grand.Services.Events.Web;
 using Grand.Services.Localization;
 using Grand.Services.Messages;
 using Grand.Services.Orders;
 using Grand.Services.Security;
 using Grand.Services.Stores;
+using MediatR;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Customers
 {
@@ -24,7 +26,7 @@ namespace Grand.Services.Customers
         private readonly INewsLetterSubscriptionService _newsLetterSubscriptionService;
         private readonly ILocalizationService _localizationService;
         private readonly IStoreService _storeService;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
         private readonly RewardPointsSettings _rewardPointsSettings;
         private readonly CustomerSettings _customerSettings;
         private readonly IRewardPointsService _rewardPointsService;
@@ -41,7 +43,7 @@ namespace Grand.Services.Customers
         /// <param name="newsLetterSubscriptionService">Newsletter subscription service</param>
         /// <param name="localizationService">Localization service</param>
         /// <param name="storeService">Store service</param>
-        /// <param name="eventPublisher">Event publisher</param>
+        /// <param name="mediator">Mediator</param>
         /// <param name="rewardPointsSettings">Reward points settings</param>
         /// <param name="customerSettings">Customer settings</param>
         /// <param name="rewardPointsService">Reward points service</param>
@@ -50,20 +52,20 @@ namespace Grand.Services.Customers
             INewsLetterSubscriptionService newsLetterSubscriptionService,
             ILocalizationService localizationService,
             IStoreService storeService,
-            IEventPublisher eventPublisher,
+            IMediator mediator,
             RewardPointsSettings rewardPointsSettings,
             CustomerSettings customerSettings,
             IRewardPointsService rewardPointsService)
         {
-            this._customerService = customerService;
-            this._encryptionService = encryptionService;
-            this._newsLetterSubscriptionService = newsLetterSubscriptionService;
-            this._localizationService = localizationService;
-            this._storeService = storeService;
-            this._eventPublisher = eventPublisher;
-            this._rewardPointsSettings = rewardPointsSettings;
-            this._customerSettings = customerSettings;
-            this._rewardPointsService = rewardPointsService;
+            _customerService = customerService;
+            _encryptionService = encryptionService;
+            _newsLetterSubscriptionService = newsLetterSubscriptionService;
+            _localizationService = localizationService;
+            _storeService = storeService;
+            _mediator = mediator;
+            _rewardPointsSettings = rewardPointsSettings;
+            _customerSettings = customerSettings;
+            _rewardPointsService = rewardPointsService;
         }
 
         #endregion
@@ -96,11 +98,11 @@ namespace Grand.Services.Customers
         /// <param name="usernameOrEmail">Username or email</param>
         /// <param name="password">Password</param>
         /// <returns>Result</returns>
-        public virtual CustomerLoginResults ValidateCustomer(string usernameOrEmail, string password)
+        public virtual async Task<CustomerLoginResults> ValidateCustomer(string usernameOrEmail, string password)
         {
             var customer = _customerSettings.UsernamesEnabled ?
-                _customerService.GetCustomerByUsername(usernameOrEmail) :
-                _customerService.GetCustomerByEmail(usernameOrEmail);
+                await _customerService.GetCustomerByUsername(usernameOrEmail) :
+                await _customerService.GetCustomerByEmail(usernameOrEmail);
 
             if (customer == null)
                 return CustomerLoginResults.CustomerNotExist;
@@ -142,15 +144,19 @@ namespace Grand.Services.Customers
                     //reset the counter
                     customer.FailedLoginAttempts = 0;
                 }
-                _customerService.UpdateCustomerLastLoginDate(customer);
+                await _customerService.UpdateCustomerLastLoginDate(customer);
                 return CustomerLoginResults.WrongPassword;
             }
 
+            //2fa required
+            if (customer.GetAttributeFromEntity<bool>(SystemCustomerAttributeNames.TwoFactorEnabled) && _customerSettings.TwoFactorAuthenticationEnabled)
+                return CustomerLoginResults.RequiresTwoFactor;
+            
             //save last login date
             customer.FailedLoginAttempts = 0;
             customer.CannotLoginUntilDateUtc = null;
             customer.LastLoginDateUtc = DateTime.UtcNow;
-            _customerService.UpdateCustomerLastLoginDate(customer);
+            await _customerService.UpdateCustomerLastLoginDate(customer);
             return CustomerLoginResults.Successful;
         }
 
@@ -159,7 +165,7 @@ namespace Grand.Services.Customers
         /// </summary>
         /// <param name="request">Request</param>
         /// <returns>Result</returns>
-        public virtual CustomerRegistrationResult RegisterCustomer(CustomerRegistrationRequest request)
+        public virtual async Task<CustomerRegistrationResult> RegisterCustomer(CustomerRegistrationRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException("request");
@@ -208,14 +214,14 @@ namespace Grand.Services.Customers
             }
 
             //validate unique user
-            if (_customerService.GetCustomerByEmail(request.Email) != null)
+            if (await _customerService.GetCustomerByEmail(request.Email) != null)
             {
                 result.AddError(_localizationService.GetResource("Account.Register.Errors.EmailAlreadyExists"));
                 return result;
             }
             if (_customerSettings.UsernamesEnabled)
             {
-                if (_customerService.GetCustomerByUsername(request.Username) != null)
+                if (await _customerService.GetCustomerByUsername(request.Username) != null)
                 {
                     result.AddError(_localizationService.GetResource("Account.Register.Errors.UsernameAlreadyExists"));
                     return result;
@@ -223,7 +229,7 @@ namespace Grand.Services.Customers
             }
 
             //event notification
-            _eventPublisher.CustomerRegistrationEvent(result, request);
+            await _mediator.CustomerRegistrationEvent(result, request);
 
             //return if exist errors
             if (result.Errors.Any())
@@ -233,6 +239,7 @@ namespace Grand.Services.Customers
             request.Customer.Username = request.Username;
             request.Customer.Email = request.Email;
             request.Customer.PasswordFormat = request.PasswordFormat;
+            request.Customer.StoreId = request.StoreId;
 
             switch (request.PasswordFormat)
             {
@@ -257,35 +264,35 @@ namespace Grand.Services.Customers
                     break;
             }
 
-            _customerService.InsertCustomerPassword(request.Customer);
+            await _customerService.InsertCustomerPassword(request.Customer);
 
             request.Customer.Active = request.IsApproved;
-            _customerService.UpdateActive(request.Customer);
+            await _customerService.UpdateActive(request.Customer);
             //add to 'Registered' role
-            var registeredRole = _customerService.GetCustomerRoleBySystemName(SystemCustomerRoleNames.Registered);
+            var registeredRole = await _customerService.GetCustomerRoleBySystemName(SystemCustomerRoleNames.Registered);
             if (registeredRole == null)
                 throw new GrandException("'Registered' role could not be loaded");
             request.Customer.CustomerRoles.Add(registeredRole);
             registeredRole.CustomerId = request.Customer.Id;
-            _customerService.InsertCustomerRoleInCustomer(registeredRole);
+            await _customerService.InsertCustomerRoleInCustomer(registeredRole);
             //remove from 'Guests' role
             var guestRole = request.Customer.CustomerRoles.FirstOrDefault(cr => cr.SystemName == SystemCustomerRoleNames.Guests);
             if (guestRole != null)
             {
                 request.Customer.CustomerRoles.Remove(guestRole);
                 guestRole.CustomerId = request.Customer.Id;
-                _customerService.DeleteCustomerRoleInCustomer(guestRole);
+                await _customerService.DeleteCustomerRoleInCustomer(guestRole);
             }
             //Add reward points for customer registration (if enabled)
             if (_rewardPointsSettings.Enabled &&
                 _rewardPointsSettings.PointsForRegistration > 0)
             {
-                _rewardPointsService.AddRewardPointsHistory(request.Customer.Id, _rewardPointsSettings.PointsForRegistration,
+                await _rewardPointsService.AddRewardPointsHistory(request.Customer.Id, _rewardPointsSettings.PointsForRegistration,
                     request.StoreId,
                     _localizationService.GetResource("RewardPoints.Message.EarnedForRegistration"), "", 0);
             }
             request.Customer.PasswordChangeDateUtc = DateTime.UtcNow;
-            _customerService.UpdateCustomer(request.Customer);
+            await _customerService.UpdateCustomer(request.Customer);
 
             return result;
         }
@@ -295,7 +302,7 @@ namespace Grand.Services.Customers
         /// </summary>
         /// <param name="request">Request</param>
         /// <returns>Result</returns>
-        public virtual ChangePasswordResult ChangePassword(ChangePasswordRequest request)
+        public virtual async Task<ChangePasswordResult> ChangePassword(ChangePasswordRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException("request");
@@ -312,7 +319,7 @@ namespace Grand.Services.Customers
                 return result;
             }
 
-            var customer = _customerService.GetCustomerByEmail(request.Email);
+            var customer = await _customerService.GetCustomerByEmail(request.Email);
             if (customer == null)
             {
                 result.AddError(_localizationService.GetResource("Account.ChangePassword.Errors.EmailNotFound"));
@@ -346,7 +353,7 @@ namespace Grand.Services.Customers
             if (_customerSettings.UnduplicatedPasswordsNumber > 0)
             {
                 //get some of previous passwords
-                var previousPasswords = _customerService.GetPasswords(customer.Id, passwordsToReturn: _customerSettings.UnduplicatedPasswordsNumber);
+                var previousPasswords = await _customerService.GetPasswords(customer.Id, passwordsToReturn: _customerSettings.UnduplicatedPasswordsNumber);
 
                 var newPasswordMatchesWithPrevious = previousPasswords.Any(password => PasswordMatch(password, request));
                 if (newPasswordMatchesWithPrevious)
@@ -380,8 +387,8 @@ namespace Grand.Services.Customers
             }
             customer.PasswordChangeDateUtc = DateTime.UtcNow;
             customer.PasswordFormat = request.NewPasswordFormat;
-            _customerService.UpdateCustomer(customer);
-            _customerService.InsertCustomerPassword(customer);
+            await _customerService.UpdateCustomer(customer);
+            await _customerService.InsertCustomerPassword(customer);
 
             return result;
         }
@@ -391,7 +398,7 @@ namespace Grand.Services.Customers
         /// </summary>
         /// <param name="customer">Customer</param>
         /// <param name="newEmail">New email</param>
-        public virtual void SetEmail(Customer customer, string newEmail)
+        public virtual async Task SetEmail(Customer customer, string newEmail)
         {
             if (customer == null)
                 throw new ArgumentNullException("customer");
@@ -408,23 +415,23 @@ namespace Grand.Services.Customers
             if (newEmail.Length > 100)
                 throw new GrandException(_localizationService.GetResource("Account.EmailUsernameErrors.EmailTooLong"));
 
-            var customer2 = _customerService.GetCustomerByEmail(newEmail);
+            var customer2 = await _customerService.GetCustomerByEmail(newEmail);
             if (customer2 != null && customer.Id != customer2.Id)
                 throw new GrandException(_localizationService.GetResource("Account.EmailUsernameErrors.EmailAlreadyExists"));
 
             customer.Email = newEmail;
-            _customerService.UpdateCustomer(customer);
+            await _customerService.UpdateCustomer(customer);
 
             //update newsletter subscription (if required)
             if (!String.IsNullOrEmpty(oldEmail) && !oldEmail.Equals(newEmail, StringComparison.OrdinalIgnoreCase))
             {
-                foreach (var store in _storeService.GetAllStores())
+                foreach (var store in await _storeService.GetAllStores())
                 {
-                    var subscriptionOld = _newsLetterSubscriptionService.GetNewsLetterSubscriptionByEmailAndStoreId(oldEmail, store.Id);
+                    var subscriptionOld = await _newsLetterSubscriptionService.GetNewsLetterSubscriptionByEmailAndStoreId(oldEmail, store.Id);
                     if (subscriptionOld != null)
                     {
                         subscriptionOld.Email = newEmail;
-                        _newsLetterSubscriptionService.UpdateNewsLetterSubscription(subscriptionOld);
+                        await _newsLetterSubscriptionService.UpdateNewsLetterSubscription(subscriptionOld);
                     }
                 }
             }
@@ -435,7 +442,7 @@ namespace Grand.Services.Customers
         /// </summary>
         /// <param name="customer">Customer</param>
         /// <param name="newUsername">New Username</param>
-        public virtual void SetUsername(Customer customer, string newUsername)
+        public virtual async Task SetUsername(Customer customer, string newUsername)
         {
             if (customer == null)
                 throw new ArgumentNullException("customer");
@@ -451,12 +458,12 @@ namespace Grand.Services.Customers
             if (newUsername.Length > 100)
                 throw new GrandException(_localizationService.GetResource("Account.EmailUsernameErrors.UsernameTooLong"));
 
-            var user2 = _customerService.GetCustomerByUsername(newUsername);
+            var user2 = await _customerService.GetCustomerByUsername(newUsername);
             if (user2 != null && customer.Id != user2.Id)
                 throw new GrandException(_localizationService.GetResource("Account.EmailUsernameErrors.UsernameAlreadyExists"));
 
             customer.Username = newUsername;
-            _customerService.UpdateCustomer(customer);
+            await _customerService.UpdateCustomer(customer);
         }
 
         #endregion

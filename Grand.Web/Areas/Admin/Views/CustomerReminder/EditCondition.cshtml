@@ -8,11 +8,11 @@
       asp-route-CustomerReminderId="@Context.Request.Query["CustomerReminderId"]"
       asp-route-cid="@Context.Request.Query["cid"]"
       method="post" id="customer-reminder-condition-form">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-code-fork"></i>
                         @T("Admin.Customers.CustomerReminder.EditCondition") - @Model.Name
@@ -25,8 +25,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="portlet-body form">
-                    @Html.Partial("_CreateOrUpdateCondition", Model)
+                <div class="x_content form">
+                   <partial name="_CreateOrUpdateCondition" model="Model" />
                 </div>
             </div>
         </div>

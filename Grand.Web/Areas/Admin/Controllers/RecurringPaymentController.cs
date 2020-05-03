@@ -1,10 +1,10 @@
 ﻿using Grand.Core;
 using Grand.Core.Domain.Customers;
 using Grand.Core.Domain.Orders;
-using Grand.Core.Infrastructure;
 using Grand.Framework.Controllers;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Customers;
 using Grand.Services.Helpers;
 using Grand.Services.Localization;
@@ -14,10 +14,13 @@ using Grand.Services.Security;
 using Grand.Web.Areas.Admin.Models.Orders;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.RecurringPayments)]
     public partial class RecurringPaymentController : BaseAdminController
     {
         #region Fields
@@ -28,8 +31,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly IWorkContext _workContext;
         private readonly IDateTimeHelper _dateTimeHelper;
         private readonly IPaymentService _paymentService;
-        private readonly IPermissionService _permissionService;
-
+        private readonly ICustomerService _customerService;
         #endregion Fields
 
         #region Constructors
@@ -37,7 +39,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         public RecurringPaymentController(IOrderService orderService,
             IOrderProcessingService orderProcessingService, ILocalizationService localizationService,
             IWorkContext workContext, IDateTimeHelper dateTimeHelper, IPaymentService paymentService,
-            IPermissionService permissionService)
+            ICustomerService customerService)
         {
             this._orderService = orderService;
             this._orderProcessingService = orderProcessingService;
@@ -45,7 +47,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             this._workContext = workContext;
             this._dateTimeHelper = dateTimeHelper;
             this._paymentService = paymentService;
-            this._permissionService = permissionService;
+            this._customerService = customerService;
         }
 
         #endregion
@@ -53,7 +55,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Utilities
 
         [NonAction]
-        protected virtual void PrepareRecurringPaymentModel(RecurringPaymentModel model, 
+        protected virtual async Task PrepareRecurringPaymentModel(RecurringPaymentModel model, 
             RecurringPayment recurringPayment)
         {
             if (model == null)
@@ -72,15 +74,15 @@ namespace Grand.Web.Areas.Admin.Controllers
             model.NextPaymentDate = recurringPayment.NextPaymentDate.HasValue ? _dateTimeHelper.ConvertToUserTime(recurringPayment.NextPaymentDate.Value, DateTimeKind.Utc).ToString() : "";
             model.CyclesRemaining = recurringPayment.CyclesRemaining;
             model.InitialOrderId = recurringPayment.InitialOrder.Id;
-            var customer = EngineContext.Current.Resolve<ICustomerService>().GetCustomerById(recurringPayment.InitialOrder.CustomerId);
+            var customer = await _customerService.GetCustomerById(recurringPayment.InitialOrder.CustomerId);
             model.CustomerId = customer.Id;
             model.CustomerEmail = customer.IsRegistered() ? customer.Email : _localizationService.GetResource("Admin.Customers.Guest");
             model.PaymentType = _paymentService.GetRecurringPaymentType(recurringPayment.InitialOrder.PaymentMethodSystemName).GetLocalizedEnum(_localizationService, _workContext);
-            model.CanCancelRecurringPayment = _orderProcessingService.CanCancelRecurringPayment(_workContext.CurrentCustomer, recurringPayment);
+            model.CanCancelRecurringPayment = await _orderProcessingService.CanCancelRecurringPayment(_workContext.CurrentCustomer, recurringPayment);
         }
 
         [NonAction]
-        protected virtual void PrepareRecurringPaymentHistoryModel(RecurringPaymentModel.RecurringPaymentHistoryModel model,
+        protected virtual async Task PrepareRecurringPaymentHistoryModel(RecurringPaymentModel.RecurringPaymentHistoryModel model,
             RecurringPaymentHistory history)
         {
             if (model == null)
@@ -89,7 +91,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             if (history == null)
                 throw new ArgumentNullException("history");
 
-            var order = _orderService.GetOrderById(history.OrderId);
+            var order = await _orderService.GetOrderById(history.OrderId);
 
             model.Id = history.Id;
             model.OrderId = history.OrderId;
@@ -106,64 +108,47 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Recurring payment
 
         //list
-        public IActionResult Index()
-        {
-            return RedirectToAction("List");
-        }
+        public IActionResult Index() => RedirectToAction("List");
 
-        public IActionResult List()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageRecurringPayments))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult List() => View();
 
         [HttpPost]
-        public IActionResult List(DataSourceRequest command)
+        public async Task<IActionResult> List(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageRecurringPayments))
-                return AccessDeniedView();
-
-            var payments = _orderService.SearchRecurringPayments("", "", "", null, command.Page - 1, command.PageSize, true);
+            var payments = await _orderService.SearchRecurringPayments("", "", "", null, command.Page - 1, command.PageSize, true);
+            var items = new List<RecurringPaymentModel>();
+            foreach (var x in payments)
+            {
+                var m = new RecurringPaymentModel();
+                await PrepareRecurringPaymentModel(m, x);
+                items.Add(m);
+            }
             var gridModel = new DataSourceResult
             {
-                Data = payments.Select(x =>
-                {
-                    var m = new RecurringPaymentModel();
-                    PrepareRecurringPaymentModel(m, x);
-                    return m;
-                }),
+                Data = items,
                 Total = payments.TotalCount,
             };
-
             return Json(gridModel);
         }
 
         //edit
-        public IActionResult Edit(string id)
+        public async Task<IActionResult> Edit(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageRecurringPayments))
-                return AccessDeniedView();
-
-            var payment = _orderService.GetRecurringPaymentById(id);
+            var payment = await _orderService.GetRecurringPaymentById(id);
             if (payment == null || payment.Deleted)
                 //No recurring payment found with the specified id
                 return RedirectToAction("List");
 
             var model = new RecurringPaymentModel();
-            PrepareRecurringPaymentModel(model, payment);
+            await PrepareRecurringPaymentModel(model, payment);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
         [FormValueRequired("save", "save-continue")]
-        public IActionResult Edit(RecurringPaymentModel model, bool continueEditing)
+        public async Task<IActionResult> Edit(RecurringPaymentModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageRecurringPayments))
-                return AccessDeniedView();
-
-            var payment = _orderService.GetRecurringPaymentById(model.Id);
+            var payment = await _orderService.GetRecurringPaymentById(model.Id);
             if (payment == null || payment.Deleted)
                 //No recurring payment found with the specified id
                 return RedirectToAction("List");
@@ -172,14 +157,14 @@ namespace Grand.Web.Areas.Admin.Controllers
             payment.CyclePeriodId = model.CyclePeriodId;
             payment.TotalCycles = model.TotalCycles;
             payment.IsActive = model.IsActive;
-            _orderService.UpdateRecurringPayment(payment);
+            await _orderService.UpdateRecurringPayment(payment);
 
             SuccessNotification(_localizationService.GetResource("Admin.RecurringPayments.Updated"));
 
             if (continueEditing)
             {
                 //selected tab
-                SaveSelectedTabIndex();
+                await SaveSelectedTabIndex();
 
                 return RedirectToAction("Edit",  new {id = payment.Id});
             }
@@ -188,17 +173,14 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         //delete
         [HttpPost]
-        public IActionResult Delete(string id)
+        public async Task<IActionResult> Delete(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageRecurringPayments))
-                return AccessDeniedView();
-
-            var payment = _orderService.GetRecurringPaymentById(id);
+            var payment = await _orderService.GetRecurringPaymentById(id);
             if (payment == null)
                 //No recurring payment found with the specified id
                 return RedirectToAction("List");
 
-            _orderService.DeleteRecurringPayment(payment);
+            await _orderService.DeleteRecurringPayment(payment);
 
             SuccessNotification(_localizationService.GetResource("Admin.RecurringPayments.Deleted"));
             return RedirectToAction("List");
@@ -209,23 +191,18 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region History
 
         [HttpPost]
-        public IActionResult HistoryList(string recurringPaymentId, DataSourceRequest command)
+        public async Task<IActionResult> HistoryList(string recurringPaymentId, DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageRecurringPayments))
-                return AccessDeniedView();
-
-            var payment = _orderService.GetRecurringPaymentById(recurringPaymentId);
+            var payment = await _orderService.GetRecurringPaymentById(recurringPaymentId);
             if (payment == null)
                 throw new ArgumentException("No recurring payment found with the specified id");
-
-            var historyModel = payment.RecurringPaymentHistory.OrderBy(x => x.CreatedOnUtc)
-                .Select(x =>
-                {
-                    var m = new RecurringPaymentModel.RecurringPaymentHistoryModel();
-                    PrepareRecurringPaymentHistoryModel(m, x);
-                    return m;
-                })
-                .ToList();
+            var historyModel = new List<RecurringPaymentModel.RecurringPaymentHistoryModel>();
+            foreach (var x in payment.RecurringPaymentHistory.OrderBy(x => x.CreatedOnUtc))
+            {
+                var m = new RecurringPaymentModel.RecurringPaymentHistoryModel();
+                await PrepareRecurringPaymentHistoryModel(m, x);
+                historyModel.Add(m);
+            }
             var gridModel = new DataSourceResult
             {
                 Data = historyModel,
@@ -237,26 +214,23 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         [HttpPost, ActionName("Edit")]
         [FormValueRequired("processnextpayment")]
-        public IActionResult ProcessNextPayment(string id)
+        public async Task<IActionResult> ProcessNextPayment(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageRecurringPayments))
-                return AccessDeniedView();
-
-            var payment = _orderService.GetRecurringPaymentById(id);
+            var payment = await _orderService.GetRecurringPaymentById(id);
             if (payment == null)
                 //No recurring payment found with the specified id
                 return RedirectToAction("List");
             
             try
             {
-                _orderProcessingService.ProcessNextRecurringPayment(payment);
+                await _orderProcessingService.ProcessNextRecurringPayment(payment);
                 var model = new RecurringPaymentModel();
-                PrepareRecurringPaymentModel(model, payment);
+                await PrepareRecurringPaymentModel(model, payment);
 
                 SuccessNotification(_localizationService.GetResource("Admin.RecurringPayments.NextPaymentProcessed"), false);
 
                 //selected tab
-                SaveSelectedTabIndex(persistForTheNextRequest: false);
+                await SaveSelectedTabIndex(persistForTheNextRequest: false);
 
                 return View(model);
             }
@@ -264,11 +238,11 @@ namespace Grand.Web.Areas.Admin.Controllers
             {
                 //error
                 var model = new RecurringPaymentModel();
-                PrepareRecurringPaymentModel(model, payment);
+                await PrepareRecurringPaymentModel(model, payment);
                 ErrorNotification(exc, false);
 
                 //selected tab
-                SaveSelectedTabIndex(persistForTheNextRequest: false);
+                await SaveSelectedTabIndex(persistForTheNextRequest: false);
 
                 return View(model);
             }
@@ -276,21 +250,18 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         [HttpPost, ActionName("Edit")]
         [FormValueRequired("cancelpayment")]
-        public IActionResult CancelRecurringPayment(string id)
+        public async Task<IActionResult> CancelRecurringPayment(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageRecurringPayments))
-                return AccessDeniedView();
-
-            var payment = _orderService.GetRecurringPaymentById(id);
+            var payment = await _orderService.GetRecurringPaymentById(id);
             if (payment == null)
                 //No recurring payment found with the specified id
                 return RedirectToAction("List");
 
             try
             {
-                var errors = _orderProcessingService.CancelRecurringPayment(payment);
+                var errors = await _orderProcessingService.CancelRecurringPayment(payment);
                 var model = new RecurringPaymentModel();
-                PrepareRecurringPaymentModel(model, payment);
+                await PrepareRecurringPaymentModel(model, payment);
                 if (errors.Count > 0)
                 {
                     foreach (var error in errors)
@@ -300,7 +271,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                     SuccessNotification(_localizationService.GetResource("Admin.RecurringPayments.Cancelled"), false);
 
                 //selected tab
-                SaveSelectedTabIndex(persistForTheNextRequest: false);
+                await SaveSelectedTabIndex(persistForTheNextRequest: false);
 
                 return View(model);
             }
@@ -308,11 +279,11 @@ namespace Grand.Web.Areas.Admin.Controllers
             {
                 //error
                 var model = new RecurringPaymentModel();
-                PrepareRecurringPaymentModel(model, payment);
+                await PrepareRecurringPaymentModel(model, payment);
                 ErrorNotification(exc, false);
 
                 //selected tab
-                SaveSelectedTabIndex(persistForTheNextRequest: false);
+                await SaveSelectedTabIndex(persistForTheNextRequest: false);
 
                 return View(model);
             }

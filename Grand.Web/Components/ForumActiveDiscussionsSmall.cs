@@ -1,21 +1,23 @@
 ﻿using Grand.Framework.Components;
-using Grand.Web.Services;
+using Grand.Web.Features.Models.Boards;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
 
 namespace Grand.Web.ViewComponents
 {
     public class ForumActiveDiscussionsSmallViewComponent : BaseViewComponent
     {
-        private readonly IBoardsViewModelService _boardsViewModelService;
+        private readonly IMediator _mediator;
 
-        public ForumActiveDiscussionsSmallViewComponent(IBoardsViewModelService boardsViewModelService)
+        public ForumActiveDiscussionsSmallViewComponent(IMediator mediator)
         {
-            this._boardsViewModelService = boardsViewModelService;
+            _mediator = mediator;
         }
 
-        public IViewComponentResult Invoke()
+        public async Task<IViewComponentResult> InvokeAsync()
         {
-            var model = _boardsViewModelService.PrepareActiveDiscussions();
+            var model = await _mediator.Send(new GetActiveDiscussions());
             if (model == null)
                 return Content("");
 

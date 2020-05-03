@@ -1,476 +1,185 @@
 ﻿using Grand.Core;
 using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Discounts;
-using Grand.Core.Domain.Localization;
+using Grand.Core.Domain.Customers;
 using Grand.Framework.Controllers;
-using Grand.Framework.Extensions;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Catalog;
 using Grand.Services.Customers;
-using Grand.Services.Discounts;
 using Grand.Services.ExportImport;
-using Grand.Services.Helpers;
 using Grand.Services.Localization;
-using Grand.Services.Logging;
-using Grand.Services.Media;
 using Grand.Services.Security;
 using Grand.Services.Seo;
 using Grand.Services.Stores;
-using Grand.Services.Vendors;
 using Grand.Web.Areas.Admin.Extensions;
+using Grand.Web.Areas.Admin.Interfaces;
 using Grand.Web.Areas.Admin.Models.Catalog;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.Categories)]
     public partial class CategoryController : BaseAdminController
     {
         #region Fields
 
         private readonly ICategoryService _categoryService;
-        private readonly ICategoryTemplateService _categoryTemplateService;
-        private readonly IManufacturerService _manufacturerService;
-        private readonly IProductService _productService;
+        private readonly ICategoryViewModelService _categoryViewModelService;
         private readonly ICustomerService _customerService;
-        private readonly IUrlRecordService _urlRecordService;
-        private readonly IPictureService _pictureService;
         private readonly ILanguageService _languageService;
         private readonly ILocalizationService _localizationService;
-        private readonly IDiscountService _discountService;
-        private readonly IPermissionService _permissionService;
-        private readonly IAclService _aclService;
         private readonly IStoreService _storeService;
-        private readonly IStoreMappingService _storeMappingService;
         private readonly IExportManager _exportManager;
-        private readonly ICustomerActivityService _customerActivityService;
-        private readonly IVendorService _vendorService;
-        private readonly IDateTimeHelper _dateTimeHelper;
         private readonly IWorkContext _workContext;
         private readonly IImportManager _importManager;
-        private readonly CatalogSettings _catalogSettings;
 
         #endregion
 
         #region Constructors
 
-        public CategoryController(ICategoryService categoryService, ICategoryTemplateService categoryTemplateService,
-            IManufacturerService manufacturerService, IProductService productService,
+        public CategoryController(
+            ICategoryService categoryService,
+            ICategoryViewModelService categoryViewModelService,
             ICustomerService customerService,
-            IUrlRecordService urlRecordService,
-            IPictureService pictureService,
             ILanguageService languageService,
             ILocalizationService localizationService,
-            IDiscountService discountService,
-            IPermissionService permissionService,
-            IAclService aclService,
             IStoreService storeService,
-            IStoreMappingService storeMappingService,
             IExportManager exportManager,
-            IVendorService vendorService,
-            ICustomerActivityService customerActivityService,
-            IDateTimeHelper dateTimeHelper,
             IWorkContext workContext,
-            IImportManager importManager,
-            CatalogSettings catalogSettings)
+            IImportManager importManager)
         {
             this._categoryService = categoryService;
-            this._categoryTemplateService = categoryTemplateService;
-            this._manufacturerService = manufacturerService;
-            this._productService = productService;
+            this._categoryViewModelService = categoryViewModelService;
             this._customerService = customerService;
-            this._urlRecordService = urlRecordService;
-            this._pictureService = pictureService;
             this._languageService = languageService;
             this._localizationService = localizationService;
-            this._discountService = discountService;
-            this._permissionService = permissionService;
-            this._vendorService = vendorService;
-            this._aclService = aclService;
             this._storeService = storeService;
-            this._storeMappingService = storeMappingService;
             this._exportManager = exportManager;
-            this._customerActivityService = customerActivityService;
-            this._dateTimeHelper = dateTimeHelper;
             this._workContext = workContext;
             this._importManager = importManager;
-            this._catalogSettings = catalogSettings;
         }
 
         #endregion
 
         #region Utilities
 
-        [NonAction]
-        protected virtual List<LocalizedProperty> UpdateLocales(Category category, CategoryModel model)
+        protected (bool allow, string message) CheckAccessToCategory(Category category)
         {
-            List<LocalizedProperty> localized = new List<LocalizedProperty>();
-
-            foreach (var local in model.Locales)
+            if (category == null)
             {
-                var seName = category.ValidateSeName(local.SeName, local.Name, false);
-                _urlRecordService.SaveSlug(category, seName, local.LanguageId);
-
-                if (!(String.IsNullOrEmpty(seName)))
-                    localized.Add(new LocalizedProperty()
-                    {
-                        LanguageId = local.LanguageId,
-                        LocaleKey = "SeName",
-                        LocaleValue = seName,
-                    });
-
-                if (!(String.IsNullOrEmpty(local.Description)))
-                    localized.Add(new LocalizedProperty()
-                    {
-                        LanguageId = local.LanguageId,
-                        LocaleKey = "Description",
-                        LocaleValue = local.Description,
-                    });
-
-                if (!(String.IsNullOrEmpty(local.MetaDescription)))
-                    localized.Add(new LocalizedProperty()
-                    {
-                        LanguageId = local.LanguageId,
-                        LocaleKey = "MetaDescription",
-                        LocaleValue = local.MetaDescription,
-                    });
-
-                if (!(String.IsNullOrEmpty(local.MetaKeywords)))
-                    localized.Add(new LocalizedProperty()
-                    {
-                        LanguageId = local.LanguageId,
-                        LocaleKey = "MetaKeywords",
-                        LocaleValue = local.MetaKeywords,
-                    });
-
-                if (!(String.IsNullOrEmpty(local.MetaTitle)))
-                    localized.Add(new LocalizedProperty()
-                    {
-                        LanguageId = local.LanguageId,
-                        LocaleKey = "MetaTitle",
-                        LocaleValue = local.MetaTitle,
-                    });
-
-                if (!(String.IsNullOrEmpty(local.Name)))
-                    localized.Add(new LocalizedProperty()
-                    {
-                        LanguageId = local.LanguageId,
-                        LocaleKey = "Name",
-                        LocaleValue = local.Name,
-                    });
-
+                return (false, "Category not exists");
             }
-            return localized;
-        }
-
-        [NonAction]
-        protected virtual void UpdatePictureSeoNames(Category category)
-        {
-            var picture = _pictureService.GetPictureById(category.PictureId);
-            if (picture != null)
-                _pictureService.SetSeoFilename(picture.Id, _pictureService.GetPictureSeName(category.Name));
-        }
-
-        [NonAction]
-        protected virtual void PrepareAllCategoriesModel(CategoryModel model)
-        {
-            if (model == null)
-                throw new ArgumentNullException("model");
-
-            model.AvailableCategories.Add(new SelectListItem
+            if (_workContext.CurrentCustomer.IsStaff())
             {
-                Text = "[None]",
-                Value = ""
-            });
-            var categories = _categoryService.GetAllCategories(showHidden: true);
-            foreach (var c in categories)
-            {
-                model.AvailableCategories.Add(new SelectListItem
-                {
-                    Text = c.GetFormattedBreadCrumb(categories),
-                    Value = c.Id.ToString()
-                });
+                if (!(!category.LimitedToStores || (category.Stores.Contains(_workContext.CurrentCustomer.StaffStoreId) && category.LimitedToStores)))
+                    return (false, "This is not your category");
             }
-        }
-
-        [NonAction]
-        protected virtual void PrepareTemplatesModel(CategoryModel model)
-        {
-            if (model == null)
-                throw new ArgumentNullException("model");
-
-            var templates = _categoryTemplateService.GetAllCategoryTemplates();
-            foreach (var template in templates)
-            {
-                model.AvailableCategoryTemplates.Add(new SelectListItem
-                {
-                    Text = template.Name,
-                    Value = template.Id.ToString()
-                });
-            }
-        }
-
-        [NonAction]
-        protected virtual void PrepareDiscountModel(CategoryModel model, Category category, bool excludeProperties)
-        {
-            if (model == null)
-                throw new ArgumentNullException("model");
-
-            model.AvailableDiscounts = _discountService
-                .GetAllDiscounts(DiscountType.AssignedToCategories, showHidden: true)
-                .Select(d => d.ToModel())
-                .ToList();
-
-            if (!excludeProperties && category != null)
-            {
-                model.SelectedDiscountIds = category.AppliedDiscounts.ToArray();
-            }
-        }
-
-        [NonAction]
-        protected virtual void PrepareAclModel(CategoryModel model, Category category, bool excludeProperties)
-        {
-            if (model == null)
-                throw new ArgumentNullException("model");
-
-            model.AvailableCustomerRoles = _customerService
-                .GetAllCustomerRoles(true)
-                .Select(cr => cr.ToModel())
-                .ToList();
-            if (!excludeProperties)
-            {
-                if (category != null)
-                {
-                    model.SelectedCustomerRoleIds = category.CustomerRoles.ToArray();
-                }
-            }
-        }
-
-
-        [NonAction]
-        protected virtual void PrepareStoresMappingModel(CategoryModel model, Category category, bool excludeProperties)
-        {
-            if (model == null)
-                throw new ArgumentNullException("model");
-
-            model.AvailableStores = _storeService
-                .GetAllStores()
-                .Select(s => s.ToModel())
-                .ToList();
-            if (!excludeProperties)
-            {
-                if (category != null)
-                {
-                    model.SelectedStoreIds = category.Stores.ToArray();
-                }
-            }
+            return (true, null);
         }
 
         #endregion
 
         #region List / tree
 
-        public IActionResult Index()
+        public IActionResult Index() => RedirectToAction("List");
+
+        public async Task<IActionResult> List()
         {
-            return RedirectToAction("List");
-        }
-
-        public IActionResult List()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var model = new CategoryListModel();
-            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
-            foreach (var s in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString() });
-
+            var model = await _categoryViewModelService.PrepareCategoryListModel(_workContext.CurrentCustomer.StaffStoreId);
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult List(DataSourceRequest command, CategoryListModel model)
+        public async Task<IActionResult> List(DataSourceRequest command, CategoryListModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var categories = _categoryService.GetAllCategories(model.SearchCategoryName, model.SearchStoreId,
-                command.Page - 1, command.PageSize, true);
-            var gridModel = new DataSourceResult
+            if (_workContext.CurrentCustomer.IsStaff())
             {
-                Data = categories.Select(x =>
-                {
-                    var categoryModel = x.ToModel();
-                    categoryModel.Breadcrumb = x.GetFormattedBreadCrumb(_categoryService);
-                    return categoryModel;
-                }),
-                Total = categories.TotalCount
+                model.SearchStoreId = _workContext.CurrentCustomer.StaffStoreId;
+            }
+
+            var categories = await _categoryViewModelService.PrepareCategoryListModel(model, command.Page, command.PageSize);
+            var gridModel = new DataSourceResult {
+                Data = categories.categoryListModel,
+                Total = categories.totalCount
             };
             return Json(gridModel);
         }
 
-        public IActionResult Tree()
+        public IActionResult Tree() => View();
+
+        public async Task<IActionResult> NodeList()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            return View();
-        }
-
-        public IActionResult NodeList()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var categories = _categoryService.GetAllCategories();
-            List<TreeNode> nodeList = new List<TreeNode>();
-            List<ITreeNode> list = new List<ITreeNode>();
-            list.AddRange(categories);
-
-            foreach (var node in list)
-            {
-                if (string.IsNullOrEmpty(node.ParentCategoryId))
-                {
-                    var newNode = new TreeNode
-                    {
-                        id = node.Id,
-                        text = node.Name,
-                        nodes = new List<TreeNode>()
-                    };
-
-                    FillChildNodes(newNode, list);
-
-                    nodeList.Add(newNode);
-                }
-            }
-
-            return Json(nodeList);
-        }
-
-        public void FillChildNodes(TreeNode parentNode, List<ITreeNode> nodes)
-        {
-            var children = nodes.Where(x => x.ParentCategoryId == parentNode.id);
-            foreach (var child in children)
-            {
-                var newNode = new TreeNode
-                {
-                    id = child.Id,
-                    text = child.Name,
-                    nodes = new List<TreeNode>()
-                };
-
-                FillChildNodes(newNode, nodes);
-
-                parentNode.nodes.Add(newNode);
-            }
+            var model = await _categoryViewModelService.PrepareCategoryNodeListModel(_workContext.CurrentCustomer.StaffStoreId);
+            return Json(model);
         }
 
         #endregion
 
         #region Create / Edit / Delete
 
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var model = new CategoryModel();
+            var model = await _categoryViewModelService.PrepareCategoryModel(_workContext.CurrentCustomer.StaffStoreId);
             //locales
-            AddLocales(_languageService, model.Locales);
-            //templates
-            PrepareTemplatesModel(model);
-            //categories
-            PrepareAllCategoriesModel(model);
-            //discounts
-            PrepareDiscountModel(model, null, true);
-            //ACL
-            PrepareAclModel(model, null, false);
-            //Stores
-            PrepareStoresMappingModel(model, null, false);
-            //default values
-            model.PageSize = _catalogSettings.DefaultCategoryPageSize;
-            model.PageSizeOptions = _catalogSettings.DefaultCategoryPageSizeOptions;
-            model.Published = true;
-            model.IncludeInTopMenu = true;
-            model.AllowCustomersToSelectPageSize = true;
+            await AddLocales(_languageService, model.Locales);
 
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Create(CategoryModel model, bool continueEditing)
+        public async Task<IActionResult> Create(CategoryModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
-                var category = model.ToEntity();
-                category.CreatedOnUtc = DateTime.UtcNow;
-                category.UpdatedOnUtc = DateTime.UtcNow;
-
-                category.CustomerRoles = model.SelectedCustomerRoleIds != null ? model.SelectedCustomerRoleIds.ToList() : new List<string>();
-                category.Stores = model.SelectedStoreIds != null ? model.SelectedStoreIds.ToList() : new List<string>();
-                var allDiscounts = _discountService.GetAllDiscounts(DiscountType.AssignedToCategories, showHidden: true);
-                foreach (var discount in allDiscounts)
+                if (_workContext.CurrentCustomer.IsStaff())
                 {
-                    if (model.SelectedDiscountIds != null && model.SelectedDiscountIds.Contains(discount.Id))
-                        category.AppliedDiscounts.Add(discount.Id);
+                    model.LimitedToStores = true;
+                    model.SelectedStoreIds = new string[] { _workContext.CurrentCustomer.StaffStoreId };
                 }
-                _categoryService.InsertCategory(category);
 
-                //locales
-                category.Locales = UpdateLocales(category, model);
-                model.SeName = category.ValidateSeName(model.SeName, category.Name, true);
-                category.SeName = model.SeName;
-                _categoryService.UpdateCategory(category);
-
-                _urlRecordService.SaveSlug(category, model.SeName, "");
-
-                //update picture seo file name
-                UpdatePictureSeoNames(category);
-
-                //activity log
-                _customerActivityService.InsertActivity("AddNewCategory", category.Id, _localizationService.GetResource("ActivityLog.AddNewCategory"), category.Name);
-
+                var category = await _categoryViewModelService.InsertCategoryModel(model);
                 SuccessNotification(_localizationService.GetResource("Admin.Catalog.Categories.Added"));
                 return continueEditing ? RedirectToAction("Edit", new { id = category.Id }) : RedirectToAction("List");
             }
 
             //If we got this far, something failed, redisplay form
-            //templates
-            PrepareTemplatesModel(model);
-            //categories
-            PrepareAllCategoriesModel(model);
-            //discounts
-            PrepareDiscountModel(model, null, true);
+            model = await _categoryViewModelService.PrepareCategoryModel(model, null, _workContext.CurrentCustomer.StaffStoreId);
             //ACL
-            PrepareAclModel(model, null, true);
+            await model.PrepareACLModel(null, true, _customerService);
             //Stores
-            PrepareStoresMappingModel(model, null, true);
+            await model.PrepareStoresMappingModel(null, _storeService, true, _workContext.CurrentCustomer.StaffStoreId);
+
             return View(model);
         }
 
-        public IActionResult Edit(string id)
+        public async Task<IActionResult> Edit(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var category = _categoryService.GetCategoryById(id);
+            var category = await _categoryService.GetCategoryById(id);
             if (category == null)
                 //No category found with the specified id
                 return RedirectToAction("List");
 
+            if (_workContext.CurrentCustomer.IsStaff())
+            {
+                if (!category.LimitedToStores || (category.LimitedToStores && category.Stores.Contains(_workContext.CurrentCustomer.StaffStoreId) && category.Stores.Count > 1))
+                    WarningNotification(_localizationService.GetResource("Admin.Catalog.Categories.Permisions"));
+                else
+                {
+                    if (!category.AccessToEntityByStore(_workContext.CurrentCustomer.StaffStoreId))
+                        return RedirectToAction("List");
+                }
+            }
+
             var model = category.ToModel();
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
                 locale.Name = category.GetLocalized(x => x.Name, languageId, false, false);
                 locale.Description = category.GetLocalized(x => x.Description, languageId, false, false);
@@ -478,123 +187,81 @@ namespace Grand.Web.Areas.Admin.Controllers
                 locale.MetaDescription = category.GetLocalized(x => x.MetaDescription, languageId, false, false);
                 locale.MetaTitle = category.GetLocalized(x => x.MetaTitle, languageId, false, false);
                 locale.SeName = category.GetSeName(languageId, false, false);
+                locale.Flag = category.GetLocalized(x => x.Flag, languageId, false, false);
             });
-            //templates
-            PrepareTemplatesModel(model);
-            //categories
-            PrepareAllCategoriesModel(model);
-            //discounts
-            PrepareDiscountModel(model, category, false);
+            model = await _categoryViewModelService.PrepareCategoryModel(model, category, _workContext.CurrentCustomer.StaffStoreId);
             //ACL
-            PrepareAclModel(model, category, false);
+            await model.PrepareACLModel(category, false, _customerService);
             //Stores
-            PrepareStoresMappingModel(model, category, false);
+            await model.PrepareStoresMappingModel(category, _storeService, false, _workContext.CurrentCustomer.StaffStoreId);
 
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Edit(CategoryModel model, bool continueEditing)
+        public async Task<IActionResult> Edit(CategoryModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var category = _categoryService.GetCategoryById(model.Id);
+            var category = await _categoryService.GetCategoryById(model.Id);
             if (category == null)
                 //No category found with the specified id
                 return RedirectToAction("List");
 
+            if (_workContext.CurrentCustomer.IsStaff())
+            {
+                if (!category.AccessToEntityByStore(_workContext.CurrentCustomer.StaffStoreId))
+                    return RedirectToAction("Edit", new { id = category.Id });
+            }
+
             if (ModelState.IsValid)
             {
-                string prevPictureId = category.PictureId;
-                category = model.ToEntity(category);
-                category.UpdatedOnUtc = DateTime.UtcNow;
-                model.SeName = category.ValidateSeName(model.SeName, category.Name, true);
-                category.SeName = model.SeName;
-                //locales
-                category.Locales = UpdateLocales(category, model);
-                _categoryService.UpdateCategory(category);
-                //search engine name
-                _urlRecordService.SaveSlug(category, model.SeName, "");
-
-                //discounts
-                var allDiscounts = _discountService.GetAllDiscounts(DiscountType.AssignedToCategories, showHidden: true);
-                foreach (var discount in allDiscounts)
+                if (_workContext.CurrentCustomer.IsStaff())
                 {
-                    if (model.SelectedDiscountIds != null && model.SelectedDiscountIds.Contains(discount.Id))
-                    {
-                        //new discount
-                        if (category.AppliedDiscounts.Count(d => d == discount.Id) == 0)
-                            category.AppliedDiscounts.Add(discount.Id);
-                    }
-                    else
-                    {
-                        //remove discount
-                        if (category.AppliedDiscounts.Count(d => d == discount.Id) > 0)
-                            category.AppliedDiscounts.Remove(discount.Id);
-                    }
+                    model.LimitedToStores = true;
+                    model.SelectedStoreIds = new string[] { _workContext.CurrentCustomer.StaffStoreId };
                 }
-                category.CustomerRoles = model.SelectedCustomerRoleIds != null ? model.SelectedCustomerRoleIds.ToList() : new List<string>();
-                category.Stores = model.SelectedStoreIds != null ? model.SelectedStoreIds.ToList() : new List<string>();
 
-                _categoryService.UpdateCategory(category);
-                //delete an old picture (if deleted or updated)
-                if (!String.IsNullOrEmpty(prevPictureId) && prevPictureId != category.PictureId)
-                {
-                    var prevPicture = _pictureService.GetPictureById(prevPictureId);
-                    if (prevPicture != null)
-                        _pictureService.DeletePicture(prevPicture);
-                }
-                //update picture seo file name
-                UpdatePictureSeoNames(category);
-
-                //activity log
-                _customerActivityService.InsertActivity("EditCategory", category.Id, _localizationService.GetResource("ActivityLog.EditCategory"), category.Name);
+                category = await _categoryViewModelService.UpdateCategoryModel(category, model);
 
                 SuccessNotification(_localizationService.GetResource("Admin.Catalog.Categories.Updated"));
                 if (continueEditing)
                 {
                     //selected tab
-                    SaveSelectedTabIndex();
+                    await SaveSelectedTabIndex();
 
                     return RedirectToAction("Edit", new { id = category.Id });
                 }
                 return RedirectToAction("List");
             }
 
-
             //If we got this far, something failed, redisplay form
-            //templates
-            PrepareTemplatesModel(model);
-            //categories
-            PrepareAllCategoriesModel(model);
-            //discounts
-            PrepareDiscountModel(model, category, true);
+            model = await _categoryViewModelService.PrepareCategoryModel(model, category, _workContext.CurrentCustomer.StaffStoreId);
             //ACL
-            PrepareAclModel(model, category, true);
+            await model.PrepareACLModel(category, true, _customerService);
             //Stores
-            PrepareStoresMappingModel(model, category, true);
+            await model.PrepareStoresMappingModel(category, _storeService, true, _workContext.CurrentCustomer.StaffStoreId);
 
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult Delete(string id)
+        public async Task<IActionResult> Delete(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var category = _categoryService.GetCategoryById(id);
+            var category = await _categoryService.GetCategoryById(id);
             if (category == null)
                 //No category found with the specified id
                 return RedirectToAction("List");
 
-            _categoryService.DeleteCategory(category);
+            if (_workContext.CurrentCustomer.IsStaff())
+            {
+                if (!category.AccessToEntityByStore(_workContext.CurrentCustomer.StaffStoreId))
+                    return RedirectToAction("Edit", new { id = category.Id });
+            }
 
-            //activity log
-            _customerActivityService.InsertActivity("DeleteCategory", category.Id, _localizationService.GetResource("ActivityLog.DeleteCategory"), category.Name);
-
-            SuccessNotification(_localizationService.GetResource("Admin.Catalog.Categories.Deleted"));
+            if (ModelState.IsValid)
+            {
+                await _categoryViewModelService.DeleteCategory(category);
+                SuccessNotification(_localizationService.GetResource("Admin.Catalog.Categories.Deleted"));
+            }
             return RedirectToAction("List");
         }
 
@@ -603,14 +270,11 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Export / Import
 
-        public IActionResult ExportXml()
+        public async Task<IActionResult> ExportXml()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
             try
             {
-                var xml = _exportManager.ExportCategoriesToXml();
+                var xml = await _exportManager.ExportCategoriesToXml(await _categoryService.GetAllCategories(showHidden: true, storeId: _workContext.CurrentCustomer.StaffStoreId));
                 return File(Encoding.UTF8.GetBytes(xml), "application/xml", "categories.xml");
             }
             catch (Exception exc)
@@ -620,15 +284,11 @@ namespace Grand.Web.Areas.Admin.Controllers
             }
         }
 
-        public IActionResult ExportXlsx()
+        public async Task<IActionResult> ExportXlsx()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
             try
             {
-                var bytes = _exportManager.ExportCategoriesToXlsx(_categoryService.GetAllCategories(showHidden: true));
-
+                var bytes = _exportManager.ExportCategoriesToXlsx(await _categoryService.GetAllCategories(showHidden: true, storeId: _workContext.CurrentCustomer.StaffStoreId));
                 return File(bytes, "text/xls", "categories.xlsx");
             }
             catch (Exception exc)
@@ -639,20 +299,17 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ImportFromXlsx(IFormFile importexcelfile)
+        public async Task<IActionResult> ImportFromXlsx(IFormFile importexcelfile)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            //a vendor cannot import categories
-            if (_workContext.CurrentVendor != null)
+            //a vendor and staff cannot import categories
+            if (_workContext.CurrentVendor != null || _workContext.CurrentCustomer.IsStaff())
                 return AccessDeniedView();
 
             try
             {
                 if (importexcelfile != null && importexcelfile.Length > 0)
                 {
-                    _importManager.ImportCategoryFromXlsx(importexcelfile.OpenReadStream());
+                    await _importManager.ImportCategoryFromXlsx(importexcelfile.OpenReadStream());
                 }
                 else
                 {
@@ -673,156 +330,79 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Products
 
         [HttpPost]
-        public IActionResult ProductList(DataSourceRequest command, string categoryId)
+        public async Task<IActionResult> ProductList(DataSourceRequest command, string categoryId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
+            var category = await _categoryService.GetCategoryById(categoryId);
+            var permission = CheckAccessToCategory(category);
+            if (!permission.allow)
+                return ErrorForKendoGridJson(permission.message);
 
-            var productCategories = _categoryService.GetProductCategoriesByCategoryId(categoryId,
-                command.Page - 1, command.PageSize, true);
-            var gridModel = new DataSourceResult
-            {
-                Data = productCategories.Select(x => new CategoryModel.CategoryProductModel
-                {
-                    Id = x.Id,
-                    CategoryId = x.CategoryId,
-                    ProductId = x.ProductId,
-                    ProductName = _productService.GetProductById(x.ProductId).Name,
-                    IsFeaturedProduct = x.IsFeaturedProduct,
-                    DisplayOrder = x.DisplayOrder
-                }),
-                Total = productCategories.TotalCount
+            var productCategories = await _categoryViewModelService.PrepareCategoryProductModel(categoryId, command.Page, command.PageSize);
+            var gridModel = new DataSourceResult {
+                Data = productCategories.categoryProductModels,
+                Total = productCategories.totalCount
             };
 
             return Json(gridModel);
         }
 
-        public IActionResult ProductUpdate(CategoryModel.CategoryProductModel model)
+        public async Task<IActionResult> ProductUpdate(CategoryModel.CategoryProductModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-            var product = _productService.GetProductById(model.ProductId);
-            var productCategory = product.ProductCategories.FirstOrDefault(x => x.Id == model.Id);
-            if (productCategory == null)
-                throw new ArgumentException("No product category mapping found with the specified id");
-
-            productCategory.IsFeaturedProduct = model.IsFeaturedProduct;
-            productCategory.DisplayOrder = model.DisplayOrder;
-            productCategory.ProductId = model.ProductId;
-            _categoryService.UpdateProductCategory(productCategory);
-
-            return new NullJsonResult();
+            if (ModelState.IsValid)
+            {
+                await _categoryViewModelService.UpdateProductCategoryModel(model);
+                return new NullJsonResult();
+            }
+            return ErrorForKendoGridJson(ModelState);
         }
 
-        public IActionResult ProductDelete(string id, string productId)
+        public async Task<IActionResult> ProductDelete(CategoryModel.CategoryProductModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var product = _productService.GetProductById(productId);
-            if (product == null)
-                throw new ArgumentException("No product found with the specified id");
-
-            var productCategory = product.ProductCategories.Where(x => x.Id == id).FirstOrDefault();
-            if (productCategory == null)
-                throw new ArgumentException("No product category mapping found with the specified id");
-            productCategory.ProductId = productId;
-
-            _categoryService.DeleteProductCategory(productCategory);
-
-            return new NullJsonResult();
+            if (ModelState.IsValid)
+            {
+                await _categoryViewModelService.DeleteProductCategoryModel(model.Id, model.ProductId);
+                return new NullJsonResult();
+            }
+            return ErrorForKendoGridJson(ModelState);
         }
 
-        public IActionResult ProductAddPopup(string categoryId)
+        public async Task<IActionResult> ProductAddPopup(string categoryId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            var model = new CategoryModel.AddCategoryProductModel();
-            //categories
-            model.AvailableCategories.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            var categories = _categoryService.GetAllCategories(showHidden: true);
-            foreach (var c in categories)
-                model.AvailableCategories.Add(new SelectListItem { Text = c.GetFormattedBreadCrumb(categories), Value = c.Id.ToString() });
-
-            //manufacturers
-            model.AvailableManufacturers.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            foreach (var m in _manufacturerService.GetAllManufacturers(showHidden: true))
-                model.AvailableManufacturers.Add(new SelectListItem { Text = m.Name, Value = m.Id.ToString() });
-
-            //stores
-            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            foreach (var s in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString() });
-
-            //vendors
-            model.AvailableVendors.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            foreach (var v in _vendorService.GetAllVendors(showHidden: true))
-                model.AvailableVendors.Add(new SelectListItem { Text = v.Name, Value = v.Id.ToString() });
-
-            //product types
-            model.AvailableProductTypes = ProductType.SimpleProduct.ToSelectList(false).ToList();
-            model.AvailableProductTypes.Insert(0, new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-
+            var model = await _categoryViewModelService.PrepareAddCategoryProductModel(_workContext.CurrentCustomer.StaffStoreId);
+            model.CategoryId = categoryId;
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult ProductAddPopupList(DataSourceRequest command, CategoryModel.AddCategoryProductModel model)
+        public async Task<IActionResult> ProductAddPopupList(DataSourceRequest command, CategoryModel.AddCategoryProductModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-            var searchCategoryIds = new List<string>();
-            if (!String.IsNullOrEmpty(model.SearchCategoryId))
-                searchCategoryIds.Add(model.SearchCategoryId);
-
             var gridModel = new DataSourceResult();
-            var products = _productService.SearchProducts(
-                categoryIds: searchCategoryIds,
-                manufacturerId: model.SearchManufacturerId,
-                storeId: model.SearchStoreId,
-                vendorId: model.SearchVendorId,
-                productType: model.SearchProductTypeId > 0 ? (ProductType?)model.SearchProductTypeId : null,
-                keywords: model.SearchProductName,
-                pageIndex: command.Page - 1,
-                pageSize: command.PageSize,
-                showHidden: true
-                );
-            gridModel.Data = products.Select(x => x.ToModel());
-            gridModel.Total = products.TotalCount;
+            if (_workContext.CurrentCustomer.IsStaff())
+            {
+                model.SearchStoreId = _workContext.CurrentCustomer.StaffStoreId;
+            }
+            var products = await _categoryViewModelService.PrepareProductModel(model, command.Page, command.PageSize);
+            gridModel.Data = products.products.ToList();
+            gridModel.Total = products.totalCount;
 
             return Json(gridModel);
         }
 
         [HttpPost]
         [FormValueRequired("save")]
-        public IActionResult ProductAddPopup(CategoryModel.AddCategoryProductModel model)
+        public async Task<IActionResult> ProductAddPopup(CategoryModel.AddCategoryProductModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return AccessDeniedView();
-
-            if (model.SelectedProductIds != null)
+            if (ModelState.IsValid)
             {
-                foreach (string id in model.SelectedProductIds)
+                if (model.SelectedProductIds != null)
                 {
-                    var product = _productService.GetProductById(id);
-                    if (product != null)
-                    {
-                        if (product.ProductCategories.Where(x => x.CategoryId == model.CategoryId).Count() == 0)
-                        {
-                            _categoryService.InsertProductCategory(
-                                new ProductCategory
-                                {
-                                    CategoryId = model.CategoryId,
-                                    ProductId = id,
-                                    IsFeaturedProduct = false,
-                                    DisplayOrder = 1,
-                                });
-                        }
-                    }
+                    await _categoryViewModelService.InsertCategoryProductModel(model);
                 }
+                ViewBag.RefreshPage = true;
             }
-            ViewBag.RefreshPage = true;
+            else
+                ErrorNotification(ModelState);
+
             return View(model);
         }
 
@@ -831,36 +411,23 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Activity log
 
         [HttpPost]
-        public IActionResult ListActivityLog(DataSourceRequest command, string categoryId)
+        public async Task<IActionResult> ListActivityLog(DataSourceRequest command, string categoryId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
-                return Content("");
+            var category = await _categoryService.GetCategoryById(categoryId);
 
-            var activityLog = _customerActivityService.GetCategoryActivities(null, null, categoryId, command.Page - 1, command.PageSize);
-            var gridModel = new DataSourceResult
-            {
-                Data = activityLog.Select(x =>
-                {
-                    var customer = _customerService.GetCustomerById(x.CustomerId);
-                    var m = new CategoryModel.ActivityLogModel
-                    {
-                        Id = x.Id,
-                        ActivityLogTypeName = _customerActivityService.GetActivityTypeById(x.ActivityLogTypeId)?.Name,
-                        Comment = x.Comment,
-                        CreatedOn = _dateTimeHelper.ConvertToUserTime(x.CreatedOnUtc, DateTimeKind.Utc),
-                        CustomerId = x.CustomerId,
-                        CustomerEmail = customer != null ? customer.Email : "null"
-                    };
-                    return m;
+            var permission = CheckAccessToCategory(category);
+            if (!permission.allow)
+                return ErrorForKendoGridJson(permission.message);
 
-                }),
-                Total = activityLog.TotalCount
+            var activityLog = await _categoryViewModelService.PrepareActivityLogModel(categoryId, command.Page, command.PageSize);
+            var gridModel = new DataSourceResult {
+                Data = activityLog.activityLogModel,
+                Total = activityLog.totalCount
             };
 
             return Json(gridModel);
         }
 
         #endregion
-
     }
 }

@@ -8,17 +8,21 @@ namespace Grand.Core.Domain.Stores
     /// </summary>
     public partial class Store : BaseEntity, ILocalizedEntity
     {
-        private ICollection<string> _appliedDiscounts;
-
         public Store()
         {
             Locales = new List<LocalizedProperty>();
         }
+
         /// <summary>
         /// Gets or sets the store name
         /// </summary>
         public string Name { get; set; }
 
+        /// <summary>
+        /// Gets or sets the store shortcut
+        /// </summary>
+        public string Shortcut { get; set; }
+        
         /// <summary>
         /// Gets or sets the store URL
         /// </summary>
@@ -45,9 +49,14 @@ namespace Grand.Core.Domain.Stores
         public string DefaultLanguageId { get; set; }
 
         /// <summary>
-        /// ets or sets the identifier of the default waregouse for this store
+        /// Gets or sets the identifier of the default waregouse for this store
         /// </summary>
         public string DefaultWarehouseId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the identifier of the default country for this store
+        /// </summary>
+        public string DefaultCountryId { get; set; }
 
         /// <summary>
         /// Gets or sets the display order
@@ -75,16 +84,19 @@ namespace Grand.Core.Domain.Stores
         public string CompanyVat { get; set; }
 
         /// <summary>
+        /// Gets or sets the company email
+        /// </summary>
+        public string CompanyEmail { get; set; }
+
+        /// <summary>
+        /// Gets or sets the company opening hours
+        /// </summary>
+        public string CompanyHours { get; set; }
+
+        /// <summary>
         /// Gets or sets the collection of locales
         /// </summary>
         public IList<LocalizedProperty> Locales { get; set; }
-        /// <summary>
-        /// Gets or sets the collection of applied discounts
-        /// </summary>
-        public virtual ICollection<string> AppliedDiscounts
-        {
-            get { return _appliedDiscounts ?? (_appliedDiscounts = new List<string>()); }
-            protected set { _appliedDiscounts = value; }
-        }
+
     }
 }

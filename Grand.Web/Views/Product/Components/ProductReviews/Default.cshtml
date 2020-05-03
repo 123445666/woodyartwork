@@ -1,7 +1,7 @@
 ﻿@model ProductReviewsModel
 
 <div class="mb-4">
-    <a class="btn btn-sm btn-secondary" href="@Url.RouteUrl("ProductReviews", new { productId = Model.ProductId })">@T("Reviews.Overview.AddNew")</a>
+    <a class="btn btn-sm btn-outline-secondary" href="@Url.RouteUrl("ProductReviews", new { productId = Model.ProductId })">@T("Reviews.Overview.AddNew")</a>
 </div>
 
 @if (Model.Items.Any())
@@ -12,14 +12,13 @@
         {
             int ratingPercent = review.Rating * 20;
             <div class="card comment product-review-item pb-3">
-                <div class="card-header review-item-head">
-                    <div class="rating rating_@review.Id float-right">
+                <div class="card-header review-item-head pt-0">
+                    <div class="ratings justify-content-start">
+                        <div class="rating-box">
+                            <div class="rating" style="width: @(ratingPercent)%">
+                            </div>
+                        </div>
                     </div>
-                    <script asp-location="Footer">
-                        $(document).ready(function () {
-                            productStarProgress5('@(ratingPercent)', 'rating_@review.Id');
-                        });
-                    </script>
                     <div class="review-info">
                         <span class="user">
                             <span>@T("Reviews.From"):</span>
@@ -51,7 +50,8 @@
                     @if (!string.IsNullOrEmpty(review.ReplyText))
                     {
                         <div class="reply-content">
-                            <blockquote class="blockquote-footer">
+                            <blockquote class="administration-response">
+                                <h5 class="administration-response-header">@T("Reviews.AdministrationResponse")</h5>
                                 @Html.Raw(Grand.Core.Html.HtmlHelper.FormatText(review.ReplyText, false, true, false, false, false, false))
                                 <p>@review.Signature</p>
                             </blockquote>

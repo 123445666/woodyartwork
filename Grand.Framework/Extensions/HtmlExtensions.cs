@@ -1,21 +1,19 @@
-﻿using Grand.Core.Infrastructure;
-using Grand.Framework.Localization;
-using Grand.Framework.Mvc.Models;
+﻿using Grand.Framework.Localization;
 using Grand.Services.Localization;
 using Grand.Services.Stores;
 using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.Routing;
-using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Text.Encodings.Web;
+using System.Threading.Tasks;
 
 namespace Grand.Framework
 {
@@ -23,7 +21,7 @@ namespace Grand.Framework
     {
         #region Admin area extensions
 
-        public static IHtmlContent LocalizedEditor<T, TLocalizedModelLocal>(this IHtmlHelper<T> helper,
+        public static async Task<IHtmlContent> LocalizedEditor<T, TLocalizedModelLocal>(this IHtmlHelper<T> helper,
             string name,
             Func<int, HelperResult> localizedTemplate,
             Func<T, HelperResult> standardTemplate,
@@ -31,12 +29,12 @@ namespace Grand.Framework
             where T : ILocalizedModel<TLocalizedModelLocal>
             where TLocalizedModelLocal : ILocalizedModelLocal
         {
-            
+
             var localizationSupported = helper.ViewData.Model.Locales.Count > 1;
             if (ignoreIfSeveralStores)
             {
-                var storeService = EngineContext.Current.Resolve<IStoreService>();
-                if (storeService.GetAllStores().Count >= 2)
+                var storeService = helper.ViewContext.HttpContext.RequestServices.GetRequiredService<IStoreService>();
+                if ((await storeService.GetAllStores()).Count >= 2)
                 {
                     localizationSupported = false;
                 }
@@ -52,10 +50,11 @@ namespace Grand.Framework
                 tabStrip.AppendLine("Standard");
                 tabStrip.AppendLine("</li>");
 
+                var languageService = helper.ViewContext.HttpContext.RequestServices.GetRequiredService<ILanguageService>();
                 foreach (var locale in helper.ViewData.Model.Locales)
                 {
                     //languages
-                    var language = EngineContext.Current.Resolve<ILanguageService>().GetLanguageById(locale.LanguageId);
+                    var language = await languageService.GetLanguageById(locale.LanguageId);
 
                     tabStrip.AppendLine("<li>");
                     var urlHelper = new UrlHelper(helper.ViewContext);
@@ -65,8 +64,6 @@ namespace Grand.Framework
                     tabStrip.AppendLine("</li>");
                 }
                 tabStrip.AppendLine("</ul>");
-
-
 
                 //default tab
                 tabStrip.AppendLine("<div>");
@@ -101,54 +98,6 @@ namespace Grand.Framework
             }
         }
 
-        public static IHtmlContent DeleteConfirmation<T>(this IHtmlHelper<T> helper, string buttonsSelector) where T : BaseGrandEntityModel
-        {
-            return DeleteConfirmation(helper, "", buttonsSelector);
-        }
-
-        public static IHtmlContent DeleteConfirmation<T>(this IHtmlHelper<T> helper, string actionName,
-                    string buttonsSelector) where T : BaseGrandEntityModel
-        {
-            if (String.IsNullOrEmpty(actionName))
-                actionName = "Delete";
-
-            var modalId = new HtmlString(helper.ViewData.ModelMetadata.ModelType.Name.ToLower() + "-delete-confirmation").ToHtmlString();
-
-
-            var deleteConfirmationModel = new DeleteConfirmationModel
-            {
-                Id = helper.ViewData.Model.Id.ToString(),
-                ControllerName = helper.ViewContext.RouteData.Values["controller"].ToString(),
-                ActionName = actionName,
-                WindowId = modalId
-            };
-
-            var window = new StringBuilder();
-            window.AppendLine(string.Format("<div id='{0}' style='display:none;'>", modalId));
-            window.AppendLine(helper.Partial("Delete", deleteConfirmationModel).ToHtmlString());
-            window.AppendLine("</div>");
-            window.AppendLine("<script>");
-            window.AppendLine("$(document).ready(function() {");
-            window.AppendLine(string.Format("$('#{0}').click(function (e) ", buttonsSelector));
-            window.AppendLine("{");
-            window.AppendLine("e.preventDefault();");
-            window.AppendLine(string.Format("var window = $('#{0}');", modalId));
-            window.AppendLine("if (!window.data('kendoWindow')) {");
-            window.AppendLine("window.kendoWindow({");
-            window.AppendLine("modal: true,");
-            window.AppendLine(string.Format("title: '{0}',", EngineContext.Current.Resolve<ILocalizationService>().GetResource("Admin.Common.AreYouSure")));
-            window.AppendLine("actions: ['Close']");
-            window.AppendLine("});");
-            window.AppendLine("}");
-            window.AppendLine("window.data('kendoWindow').center().open();");
-            window.AppendLine("});");
-            window.AppendLine("});");
-            window.AppendLine("</script>");
-
-            return new HtmlString(window.ToString());
-        }
-
-        
         public static IHtmlContent OverrideStoreCheckboxFor<TModel, TValue>(this IHtmlHelper<TModel> helper,
             Expression<Func<TModel, bool>> expression,
             Expression<Func<TModel, TValue>> forInputExpression,
@@ -213,7 +162,7 @@ namespace Grand.Framework
                     dataInputSelector = "#" + String.Join(", #", datainputIds);
                 }
                 var onClick = string.Format("checkOverriddenStoreValue(this, '{0}')", dataInputSelector);
-                result.Append("<label class=\"mt-checkbox\">");
+                result.Append("<label class=\"mt-checkbox control control-checkbox\">");
                 var check = helper.CheckBoxFor(expression, new Dictionary<string, object>
                 {
                     { "class", cssClass },
@@ -221,7 +170,7 @@ namespace Grand.Framework
                     { "data-for-input-selector", dataInputSelector },
                 });
                 result.Append(check.ToHtmlString());
-                result.Append("<span></span>");
+                result.Append("<div class='control__indicator'></div>");
                 result.Append("</label>");
             }
             return new HtmlString(result.ToString());
@@ -242,31 +191,6 @@ namespace Grand.Framework
                 return htmlOutput;
             }
         }
-        /// <summary>
-        /// Render CSS styles of selected index 
-        /// </summary>
-        /// <param name="helper">HTML helper</param>
-        /// <param name="currentIndex">Current tab index (where appropriate CSS style should be rendred)</param>
-        /// <param name="indexToSelect">Tab index to select</param>
-        /// <returns>MvcHtmlString</returns>
-        public static IHtmlContent RenderSelectedTabIndex(this IHtmlHelper helper, int currentIndex, int indexToSelect)
-        {
-            if (helper == null)
-                throw new ArgumentNullException("helper");
-
-            //ensure it's not negative
-            if (indexToSelect < 0)
-                indexToSelect = 0;
-
-            //required validation
-            if (indexToSelect == currentIndex)
-            {
-                return new HtmlString(" class='k-state-active'");
-            }
-
-            return new HtmlString("");
-        }
-
         #endregion
 
         #region Common extensions
@@ -280,114 +204,6 @@ namespace Grand.Framework
             }
         }
 
-        /// <summary>
-        /// Creates a days, months, years drop down list using an HTML select control. 
-        /// The parameters represent the value of the "name" attribute on the select control.
-        /// </summary>
-        /// <param name="html">HTML helper</param>
-        /// <param name="dayName">"Name" attribute of the day drop down list.</param>
-        /// <param name="monthName">"Name" attribute of the month drop down list.</param>
-        /// <param name="yearName">"Name" attribute of the year drop down list.</param>
-        /// <param name="beginYear">Begin year</param>
-        /// <param name="endYear">End year</param>
-        /// <param name="selectedDay">Selected day</param>
-        /// <param name="selectedMonth">Selected month</param>
-        /// <param name="selectedYear">Selected year</param>
-        /// <param name="localizeLabels">Localize labels</param>
-        /// <param name="htmlAttributes">HTML attributes</param>
-        /// <returns></returns>
-        public static IHtmlContent DatePickerDropDowns(this IHtmlHelper html,
-            string dayName, string monthName, string yearName,
-            int? beginYear = null, int? endYear = null,
-            int? selectedDay = null, int? selectedMonth = null, int? selectedYear = null,
-            bool localizeLabels = true, object htmlAttributes = null, bool wrapTags = false)
-        {
-            var daysList = new TagBuilder("select");
-            var monthsList = new TagBuilder("select");
-            var yearsList = new TagBuilder("select");
-
-            daysList.Attributes.Add("name", dayName);
-            monthsList.Attributes.Add("name", monthName);
-            yearsList.Attributes.Add("name", yearName);
-
-            var htmlAttributesDictionary = HtmlHelper.AnonymousObjectToHtmlAttributes(htmlAttributes);
-            daysList.MergeAttributes(htmlAttributesDictionary, true);
-            monthsList.MergeAttributes(htmlAttributesDictionary, true);
-            yearsList.MergeAttributes(htmlAttributesDictionary, true);
-
-            var days = new StringBuilder();
-            var months = new StringBuilder();
-            var years = new StringBuilder();
-
-            string dayLocale, monthLocale, yearLocale;
-            if (localizeLabels)
-            {
-                var locService = EngineContext.Current.Resolve<ILocalizationService>();
-                dayLocale = locService.GetResource("Common.Day");
-                monthLocale = locService.GetResource("Common.Month");
-                yearLocale = locService.GetResource("Common.Year");
-            }
-            else
-            {
-                dayLocale = "Day";
-                monthLocale = "Month";
-                yearLocale = "Year";
-            }
-
-            days.AppendFormat("<option value='{0}'>{1}</option>", "0", dayLocale);
-            for (int i = 1; i <= 31; i++)
-                days.AppendFormat("<option value='{0}'{1}>{0}</option>", i,
-                    (selectedDay.HasValue && selectedDay.Value == i) ? " selected=\"selected\"" : null);
-
-
-            months.AppendFormat("<option value='{0}'>{1}</option>", "0", monthLocale);
-            for (int i = 1; i <= 12; i++)
-            {
-                months.AppendFormat("<option value='{0}'{1}>{2}</option>",
-                                    i,
-                                    (selectedMonth.HasValue && selectedMonth.Value == i) ? " selected=\"selected\"" : null,
-                                    CultureInfo.CurrentUICulture.DateTimeFormat.GetMonthName(i));
-            }
-
-
-            years.AppendFormat("<option value='{0}'>{1}</option>", "0", yearLocale);
-
-            if (beginYear == null)
-                beginYear = DateTime.UtcNow.Year - 100;
-            if (endYear == null)
-                endYear = DateTime.UtcNow.Year;
-
-            if (endYear > beginYear)
-            {
-                for (int i = beginYear.Value; i <= endYear.Value; i++)
-                    years.AppendFormat("<option value='{0}'{1}>{0}</option>", i,
-                        (selectedYear.HasValue && selectedYear.Value == i) ? " selected=\"selected\"" : null);
-            }
-            else
-            {
-                for (int i = beginYear.Value; i >= endYear.Value; i--)
-                    years.AppendFormat("<option value='{0}'{1}>{0}</option>", i,
-                        (selectedYear.HasValue && selectedYear.Value == i) ? " selected=\"selected\"" : null);
-            }
-
-            daysList.InnerHtml.AppendHtml(days.ToString());
-            monthsList.InnerHtml.AppendHtml(months.ToString());
-            yearsList.InnerHtml.AppendHtml(years.ToString());
-
-            if (wrapTags)
-            {
-                string wrapDaysList = "<span class=\"days-list select-wrapper\">" + daysList.RenderHtmlContent() + "</span>";
-                string wrapMonthsList = "<span class=\"months-list select-wrapper\">" + monthsList.RenderHtmlContent() + "</span>";
-                string wrapYearsList = "<span class=\"years-list select-wrapper\">" + yearsList.RenderHtmlContent() + "</span>";
-
-                return new HtmlString(string.Concat(wrapDaysList, wrapMonthsList, wrapYearsList));
-            }
-            else
-            {
-                return new HtmlString(string.Concat(daysList.RenderHtmlContent(), monthsList.RenderHtmlContent(), yearsList.RenderHtmlContent()));
-            }
-
-        }       
         #endregion
     }
 }

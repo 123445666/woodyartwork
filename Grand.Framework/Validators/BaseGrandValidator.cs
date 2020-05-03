@@ -1,25 +1,26 @@
 using FluentValidation;
-using Grand.Core.Infrastructure;
-using Grand.Services.Events;
+using System.Collections.Generic;
 
 namespace Grand.Framework.Validators
 {
     public abstract class BaseGrandValidator<T> : AbstractValidator<T> where T : class
     {
-        protected BaseGrandValidator()
+
+        protected BaseGrandValidator(IEnumerable<IValidatorConsumer<T>> validators)
         {
-            PostInitialize();
+            PostInitialize(validators);
         }
 
-        /// <summary>
-        /// Developers can override this method in custom partial classes
-        /// in order to add some custom initialization code to constructors
-        /// </summary>
-        protected virtual void PostInitialize()
+        protected virtual void PostInitialize(IEnumerable<IValidatorConsumer<T>> validators)
         {
-            EngineContext.Current.Resolve<IEventPublisher>().Publish(this);
-        }
+            foreach (var item in validators)
+            {
+                item.AddRules(this);
+            }
 
+        }
 
     }
+
+
 }

@@ -2,6 +2,7 @@
 using Grand.Core.Domain.PushNotifications;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Configuration;
 using Grand.Services.Customers;
 using Grand.Services.Helpers;
@@ -15,34 +16,34 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.PushNotifications)]
     public class PushNotificationsController : BaseAdminController
     {
         private readonly PushNotificationsSettings _pushNotificationsSettings;
         private readonly ILocalizationService _localizationService;
         private readonly ISettingService _settingService;
-        private readonly IStoreService _storeService;
         private readonly IPushNotificationsService _pushNotificationsService;
-        private readonly IPermissionService _permissionService;
-        private readonly IWorkContext _workContext;
         private readonly ICustomerService _customerService;
         private readonly IPictureService _pictureService;
         private readonly IDateTimeHelper _dateTimeHelper;
 
-        public PushNotificationsController(PushNotificationsSettings pushNotificationsSettings,
-            ILocalizationService localizationService, ISettingService settingService, IStoreService storeService,
-            IPushNotificationsService pushNotificationsService, IPermissionService permissionService, IWorkContext workContext,
-            ICustomerService customerService, IPictureService pictureService, IDateTimeHelper dateTimeHelper)
+        public PushNotificationsController(
+            PushNotificationsSettings pushNotificationsSettings,
+            ILocalizationService localizationService, 
+            ISettingService settingService, 
+            IPushNotificationsService pushNotificationsService, 
+            ICustomerService customerService, 
+            IPictureService pictureService, 
+            IDateTimeHelper dateTimeHelper)
         {
             this._pushNotificationsSettings = pushNotificationsSettings;
             this._localizationService = localizationService;
             this._settingService = settingService;
-            this._storeService = storeService;
             this._pushNotificationsService = pushNotificationsService;
-            this._permissionService = permissionService;
-            this._workContext = workContext;
             this._customerService = customerService;
             this._pictureService = pictureService;
             this._dateTimeHelper = dateTimeHelper;
@@ -50,27 +51,27 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         public IActionResult Send()
         {
-            var model = new PushModel();
-            model.MessageText = _localizationService.GetResource("PushNotifications.MessageTextPlaceholder");
-            model.Title = _localizationService.GetResource("PushNotifications.MessageTitlePlaceholder");
-            model.PictureId = _pushNotificationsSettings.PicutreId;
-            model.ClickUrl = _pushNotificationsSettings.ClickUrl;
+            var model = new PushModel
+            {
+                MessageText = _localizationService.GetResource("Admin.PushNotifications.MessageTextPlaceholder"),
+                Title = _localizationService.GetResource("Admin.PushNotifications.MessageTitlePlaceholder"),
+                PictureId = _pushNotificationsSettings.PictureId,
+                ClickUrl = _pushNotificationsSettings.ClickUrl
+            };
 
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult Send(PushModel model)
+        public async Task<IActionResult> Send(PushModel model)
         {
             if (!string.IsNullOrEmpty(_pushNotificationsSettings.PrivateApiKey) && !string.IsNullOrEmpty(model.MessageText))
             {
-                _pushNotificationsSettings.PicutreId = model.PictureId;
+                _pushNotificationsSettings.PictureId = model.PictureId;
                 _pushNotificationsSettings.ClickUrl = model.ClickUrl;
-                _settingService.SaveSetting(_pushNotificationsSettings);
-
-                Tuple<bool, string> result = _pushNotificationsService.SendPushNotification(model.Title, model.MessageText,
-                    _pictureService.GetPictureUrl(model.PictureId), model.ClickUrl);
-
+                await _settingService.SaveSetting(_pushNotificationsSettings);
+                var pictureUrl = await _pictureService.GetPictureUrl(model.PictureId);
+                var result = (await _pushNotificationsService.SendPushNotification(model.Title, model.MessageText, pictureUrl, model.ClickUrl));
                 if (result.Item1)
                 {
                     SuccessNotification(result.Item2);
@@ -88,56 +89,62 @@ namespace Grand.Web.Areas.Admin.Controllers
             return RedirectToAction("Send");
         }
 
-        public IActionResult Messages()
+        public async Task<IActionResult> Messages()
         {
-            var model = new MessagesModel();
-            model.Allowed = _pushNotificationsService.GetAllowedReceivers();
-            model.Denied = _pushNotificationsService.GetDeniedReceivers();
-
-            return View(model);
-        }
-
-        public IActionResult Receivers()
-        {
-            var model = new ReceiversModel();
-            model.Allowed = _pushNotificationsService.GetAllowedReceivers();
-            model.Denied = _pushNotificationsService.GetDeniedReceivers();
-
-            return View(model);
-        }
-               
-        [HttpPost]
-        public IActionResult PushMessagesList(DataSourceRequest command)
-        {
-            var messages = _pushNotificationsService.GetPushMessages(command.Page - 1, command.PageSize);
-            var gridModel = new DataSourceResult();
-            gridModel.Data = messages.Select(x => new PushMessageGridModel
+            var model = new MessagesModel
             {
-                Id = x.Id,
-                Text = x.Text,
-                Title = x.Title,
-                SentOn = _dateTimeHelper.ConvertToUserTime(x.SentOn, DateTimeKind.Utc),
-                NumberOfReceivers = x.NumberOfReceivers
-            });
-            gridModel.Total = messages.TotalCount;
+                Allowed = await _pushNotificationsService.GetAllowedReceivers(),
+                Denied = await _pushNotificationsService.GetDeniedReceivers()
+            };
+
+            return View(model);
+        }
+
+        public async Task<IActionResult> Receivers()
+        {
+            var model = new ReceiversModel
+            {
+                Allowed = await _pushNotificationsService.GetAllowedReceivers(),
+                Denied = await _pushNotificationsService.GetDeniedReceivers()
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> PushMessagesList(DataSourceRequest command)
+        {
+            var messages = await _pushNotificationsService.GetPushMessages(command.Page - 1, command.PageSize);
+            var gridModel = new DataSourceResult
+            {
+                Data = messages.Select(x => new PushMessageGridModel
+                {
+                    Id = x.Id,
+                    Text = x.Text,
+                    Title = x.Title,
+                    SentOn = _dateTimeHelper.ConvertToUserTime(x.SentOn, DateTimeKind.Utc),
+                    NumberOfReceivers = x.NumberOfReceivers
+                }),
+                Total = messages.TotalCount
+            };
 
             return Json(gridModel);
         }
 
         [HttpPost]
-        public IActionResult PushReceiversList(DataSourceRequest command)
+        public async Task<IActionResult> PushReceiversList(DataSourceRequest command)
         {
-            var receivers = _pushNotificationsService.GetPushReceivers(command.Page - 1, command.PageSize);
+            var receivers = await _pushNotificationsService.GetPushReceivers(command.Page - 1, command.PageSize);
             var gridModel = new DataSourceResult();
             var list = new List<PushRegistrationGridModel>();
             foreach (var receiver in receivers)
             {
                 var gridReceiver = new PushRegistrationGridModel();
 
-                var customer = _customerService.GetCustomerById(receiver.CustomerId);
+                var customer = await _customerService.GetCustomerById(receiver.CustomerId);
                 if (customer == null)
                 {
-                    _pushNotificationsService.DeletePushReceiver(receiver);
+                    await _pushNotificationsService.DeletePushReceiver(receiver);
                     continue;
                 }
 
@@ -166,11 +173,10 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult DeleteReceiver(string id)
+        public async Task<IActionResult> DeleteReceiver(string id)
         {
-            var receiver = _pushNotificationsService.GetPushReceiver(id);
-            _pushNotificationsService.DeletePushReceiver(receiver);
-
+            var receiver = await _pushNotificationsService.GetPushReceiver(id);
+            await _pushNotificationsService.DeletePushReceiver(receiver);
             return new NullJsonResult();
         }
     }

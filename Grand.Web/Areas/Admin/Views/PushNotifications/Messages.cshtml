@@ -7,21 +7,21 @@
 }
 @using Grand.Core.Domain.Common
 
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
-                <div class="caption">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
+                <div class="caption level-caption">
                     <i class="fa fa-cubes"></i>
-                    @T("PushNotifications.PushNotications.Messages")
+                    @T("Admin.PushNotifications.Messages")
                 </div>
             </div>
 
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div class="form-horizontal">
                     <div class="form-body">
-                        <div class="portlet-body">
+                        <div class="x_content">
                             @if (!(Model.Allowed == 0 && Model.Denied == 0))
                             {
                                 <div style="width:50%;margin-bottom:40px">
@@ -45,7 +45,7 @@ $(document).ready(function () {
             type: "json",
             transport: {
                 read: {
-                    url: "@Html.Raw(Url.RouteUrl("PushNotifications.PushMessagesList"))",
+                    url: "@Html.Raw(Url.Action("PushMessagesList", "PushNotifications"))",
                     type: "POST",
                     dataType: "json",
                     data: addAntiForgeryToken
@@ -78,11 +78,11 @@ $(document).ready(function () {
         columns: [
         {
             field: "Id",
-            title: "@T("PushNotifications.Message.Fields.Id")",
+            title: "@T("Admin.PushNotifications.Message.Fields.Id")",
             width: 100
         }, {
             field: "Title",
-            title: "@T("PushNotifications.Message.Fields.Title")",
+            title: "@T("Admin.PushNotifications.Message.Fields.Title")",
             width: 200
         }, {
             field: "Text",
@@ -90,11 +90,11 @@ $(document).ready(function () {
             width: 400
         }, {
             field: "NumberOfReceivers",
-            title: "@T("PushNotifications.Message.Fields.NumberOfReceivers")",
+            title: "@T("Admin.PushNotifications.Message.Fields.NumberOfReceivers")",
             width: 100
         }, {
             field: "SentOn",
-            title: "@T("PushNotifications.Message.Fields.SentOn")",
+            title: "@T("Admin.PushNotifications.Message.Fields.SentOn")",
             width: 200,
             type: "date",
             format: "{0:G}"
@@ -106,8 +106,8 @@ $(document).ready(function () {
 
 @if (!(Model.Allowed == 0 && Model.Denied == 0))
 {
-    <script src="~/scripts/" type="text/javascript"></script>
-    <script>
+    
+    <script asp-location="Footer">
     $(document).ready(function () {
         var config = {
             type: 'pie',

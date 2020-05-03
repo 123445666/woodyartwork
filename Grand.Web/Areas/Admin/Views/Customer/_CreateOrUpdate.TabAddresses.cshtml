@@ -1,12 +1,14 @@
 ﻿@model CustomerModel
-
+@inject AdminAreaSettings adminAreaSettings
 <div class="panel panel-default">
+    <vc:admin-widget widget-zone="customer_details_addresses_top" additional-data="Model" />
     <div class="panel-body">
         <div id="customer-addresses-grid"></div>
     </div>
     <div class="panel-footer">
-        <input type="button" class="btn default" onclick="location.href='@Url.Action("AddressCreate", new { customerId = Model.Id })'" value='@T("Admin.Customers.Customers.Addresses.AddButton")' />
+        <button type="button" class="k-button" onclick="location.href='@Url.Action("AddressCreate", new { customerId = Model.Id })'"><i class="fa fa-plus"></i>&nbsp;@T("Admin.Customers.Customers.Addresses.AddButton")</button>
     </div>
+    <vc:admin-widget widget-zone="customer_details_addresses_bottom" additional-data="Model" />
 </div>
 
 <script>
@@ -40,15 +42,11 @@ $(document).ready(function () {
                 // Cancel the changes
                 this.cancelChanges();
             },
-            serverPaging: true,
-            serverFiltering: true,
-            serverSorting: true
+            pageSize: @(adminAreaSettings.DefaultGridPageSize),
         },
         pageable: {
             refresh: true,
-            numeric: false,
-            previousNext: false,
-            info: false
+            pageSizes: [@(adminAreaSettings.GridPageSizes)]
         },
         editable: {
             confirmation: true,
@@ -80,7 +78,7 @@ $(document).ready(function () {
             field: "Id",
             title: "@T("Admin.Common.Edit")",
             width: 100,
-            template: '<a class="k-link" href="@Url.Content("~/Admin/Customer/AddressEdit?customerId=")@Model.Id&addressid=#=Id#">@T("Admin.Common.Edit")</a>'
+                template: '<a class="k-button" href="@Url.Content("~/Admin/Customer/AddressEdit?customerId=")@Model.Id&addressid=#=Id#"><span class="k-icon k-i-edit"></span>&nbsp;&nbsp;@T("Admin.Common.Edit")</a>'
         }, {
             command: { name: "destroy", text: "@T("Admin.Common.Delete")" },
             title: "@T("Admin.Common.Delete")",

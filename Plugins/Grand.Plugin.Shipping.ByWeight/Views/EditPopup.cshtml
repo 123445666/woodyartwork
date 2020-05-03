@@ -7,11 +7,11 @@
       asp-route-ShippingByWeightId="@Context.Request.Query["ShippingByWeightId"]"
       asp-route-btnId="@Context.Request.Query["btnId"]"
       asp-route-formId="@Context.Request.Query["formId"]">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-list-alt"></i>
                         @T("Admin.Common.Edit")
@@ -22,8 +22,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="portlet-body form">
-                    @Html.Partial("~/Plugins/Shipping.ByWeight/Views/_CreateOrUpdate.cshtml", Model)
+                <div class="x_content form">
+                    <partial name="~/Plugins/Shipping.ByWeight/Views/_CreateOrUpdate.cshtml" model="Model" />
                 </div>
             </div>
         </div>

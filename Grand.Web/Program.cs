@@ -1,20 +1,22 @@
-﻿using Microsoft.AspNetCore;
+﻿using Autofac.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
+using System.Threading.Tasks;
 
 namespace Grand.Web
 {
     public class Program
     {
-        public static void Main(string[] args)
-        {
-            var host = WebHost.CreateDefaultBuilder(args)
-                .UseKestrel(options => options.AddServerHeader = false)
-                .CaptureStartupErrors(true)
-                .UseSetting(WebHostDefaults.PreventHostingStartupKey, "true")
-                .UseStartup<Startup>()
-                .Build();
+        public static Task Main(string[] args) => CreateHostBuilder(args).Build().RunAsync();
 
-            host.Run();
-        }
+        public static IHostBuilder CreateHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+                .UseServiceProviderFactory(new AutofacServiceProviderFactory())
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.CaptureStartupErrors(true);
+                    webBuilder.UseSetting(WebHostDefaults.PreventHostingStartupKey, "true");
+                    webBuilder.UseStartup<Startup>();
+                });
     }
 }

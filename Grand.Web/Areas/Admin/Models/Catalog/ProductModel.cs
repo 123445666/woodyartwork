@@ -1,10 +1,9 @@
 ﻿using FluentValidation.Attributes;
 using Grand.Framework.Localization;
+using Grand.Framework.Mapping;
 using Grand.Framework.Mvc.ModelBinding;
 using Grand.Framework.Mvc.Models;
-using Grand.Web.Areas.Admin.Models.Customers;
 using Grand.Web.Areas.Admin.Models.Discounts;
-using Grand.Web.Areas.Admin.Models.Stores;
 using Grand.Web.Areas.Admin.Validators.Catalog;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
@@ -14,7 +13,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Grand.Web.Areas.Admin.Models.Catalog
 {
     [Validator(typeof(ProductValidator))]
-    public partial class ProductModel : BaseGrandEntityModel, ILocalizedModel<ProductLocalizedModel>
+    public partial class ProductModel : BaseGrandEntityModel, ILocalizedModel<ProductLocalizedModel>, IAclMappingModel, IStoreMappingModel
     {
         public ProductModel()
         {
@@ -33,6 +32,8 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             AvailableProductAttributes = new List<SelectListItem>();
             AvailableUnits = new List<SelectListItem>();
             AddPictureModel = new ProductPictureModel();
+            AvailableStores = new List<StoreModel>();
+            AvailableCustomerRoles = new List<CustomerRoleModel>();
             AddSpecificationAttributeModel = new AddProductSpecificationAttributeModel();
             ProductWarehouseInventoryModels = new List<ProductWarehouseInventoryModel>();
             CalendarModel = new GenerateCalendarModel();
@@ -211,7 +212,7 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
         public IList<SelectListItem> AvailableTaxCategories { get; set; }
 
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.IsTelecommunicationsOrBroadcastingOrElectronicServices")]
-        public bool IsTelecommunicationsOrBroadcastingOrElectronicServices { get; set; }
+        public bool IsTele { get; set; }
 
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.ManageInventoryMethod")]
         public int ManageInventoryMethodId { get; set; }
@@ -273,9 +274,9 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.AvailableForPreOrder")]
         public bool AvailableForPreOrder { get; set; }
 
-        [GrandResourceDisplayName("Admin.Catalog.Products.Fields.PreOrderAvailabilityStartDateTimeUtc")]
+        [GrandResourceDisplayName("Admin.Catalog.Products.Fields.PreOrderAvailabilityStartDateTime")]
         [UIHint("DateTimeNullable")]
-        public DateTime? PreOrderAvailabilityStartDateTimeUtc { get; set; }
+        public DateTime? PreOrderAvailabilityStartDateTime { get; set; }
 
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.CallForPrice")]
         public bool CallForPrice { get; set; }
@@ -319,12 +320,12 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
 
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.MarkAsNew")]
         public bool MarkAsNew { get; set; }
-        [GrandResourceDisplayName("Admin.Catalog.Products.Fields.MarkAsNewStartDateTimeUtc")]
+        [GrandResourceDisplayName("Admin.Catalog.Products.Fields.MarkAsNewStartDateTime")]
         [UIHint("DateTimeNullable")]
-        public DateTime? MarkAsNewStartDateTimeUtc { get; set; }
-        [GrandResourceDisplayName("Admin.Catalog.Products.Fields.MarkAsNewEndDateTimeUtc")]
+        public DateTime? MarkAsNewStartDateTime { get; set; }
+        [GrandResourceDisplayName("Admin.Catalog.Products.Fields.MarkAsNewEndDateTime")]
         [UIHint("DateTimeNullable")]
-        public DateTime? MarkAsNewEndDateTimeUtc { get; set; }
+        public DateTime? MarkAsNewEndDateTime { get; set; }
 
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Unit")]
         public string UnitId { get; set; }
@@ -344,11 +345,11 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
 
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.AvailableStartDateTime")]
         [UIHint("DateTimeNullable")]
-        public DateTime? AvailableStartDateTimeUtc { get; set; }
+        public DateTime? AvailableStartDateTime { get; set; }
 
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.AvailableEndDateTime")]
         [UIHint("DateTimeNullable")]
-        public DateTime? AvailableEndDateTimeUtc { get; set; }
+        public DateTime? AvailableEndDateTime { get; set; }
 
         [GrandResourceDisplayName("Admin.Catalog.Products.Fields.DisplayOrder")]
         public int DisplayOrder { get; set; }
@@ -414,14 +415,8 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
         //discounts
         public List<DiscountModel> AvailableDiscounts { get; set; }
         public string[] SelectedDiscountIds { get; set; }
-
-
-
-
         //add specification attribute model
         public AddProductSpecificationAttributeModel AddSpecificationAttributeModel { get; set; }
-
-
         //multiple warehouses
         [GrandResourceDisplayName("Admin.Catalog.Products.ProductWarehouseInventory")]
         public IList<ProductWarehouseInventoryModel> ProductWarehouseInventoryModels { get; set; }
@@ -466,6 +461,7 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public bool IsLoggedInAsVendor { get; set; }
         }
 
+        [Validator(typeof(AddProductSpecificationAttributeModelValidator))]
         public partial class AddProductSpecificationAttributeModel : BaseGrandModel
         {
             public AddProductSpecificationAttributeModel()
@@ -482,7 +478,6 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
 
             [GrandResourceDisplayName("Admin.Catalog.Products.SpecificationAttributes.Fields.SpecificationAttributeOption")]
             public string SpecificationAttributeOptionId { get; set; }
-
             
             [GrandResourceDisplayName("Admin.Catalog.Products.SpecificationAttributes.Fields.CustomValue")]
             public string CustomValue { get; set; }
@@ -496,10 +491,12 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             [GrandResourceDisplayName("Admin.Catalog.Products.SpecificationAttributes.Fields.DisplayOrder")]
             public int DisplayOrder { get; set; }
 
+            public string ProductId { get; set; }
             public IList<SelectListItem> AvailableAttributes { get; set; }
             public IList<SelectListItem> AvailableOptions { get; set; }
         }
-        
+
+        [Validator(typeof(ProductPictureModelValidator))]
         public partial class ProductPictureModel : BaseGrandEntityModel
         {
             public string ProductId { get; set; }
@@ -522,7 +519,8 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             
             public string OverrideTitleAttribute { get; set; }
         }
-        
+
+        [Validator(typeof(ProductCategoryModelValidator))]
         public partial class ProductCategoryModel : BaseGrandEntityModel
         {
             [GrandResourceDisplayName("Admin.Catalog.Products.Categories.Fields.Category")]
@@ -539,6 +537,7 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public int DisplayOrder { get; set; }
         }
 
+        [Validator(typeof(ProductManufacturerModelValidator))]
         public partial class ProductManufacturerModel : BaseGrandEntityModel
         {
             [GrandResourceDisplayName("Admin.Catalog.Products.Manufacturers.Fields.Manufacturer")]
@@ -555,6 +554,7 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public int DisplayOrder { get; set; }
         }
 
+        [Validator(typeof(RelatedProductModelValidator))]
         public partial class RelatedProductModel : BaseGrandEntityModel
         {
             public string ProductId1 { get; set; }
@@ -566,6 +566,7 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             [GrandResourceDisplayName("Admin.Catalog.Products.RelatedProducts.Fields.DisplayOrder")]
             public int DisplayOrder { get; set; }
         }
+        [Validator(typeof(AddRelatedProductModelValidator))]
         public partial class AddRelatedProductModel : BaseGrandModel
         {
             public AddRelatedProductModel()
@@ -605,6 +606,60 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public bool IsLoggedInAsVendor { get; set; }
         }
 
+        [Validator(typeof(SimilarProductModelValidator))]
+        public partial class SimilarProductModel : BaseGrandEntityModel
+        {
+            public string ProductId1 { get; set; }
+            public string ProductId2 { get; set; }
+
+            [GrandResourceDisplayName("Admin.Catalog.Products.SimilarProducts.Fields.Product")]
+            public string Product2Name { get; set; }
+
+            [GrandResourceDisplayName("Admin.Catalog.Products.SimilarProducts.Fields.DisplayOrder")]
+            public int DisplayOrder { get; set; }
+        }
+
+        [Validator(typeof(AddSimilarProductModelValidator))]
+        public partial class AddSimilarProductModel : BaseGrandModel
+        {
+            public AddSimilarProductModel()
+            {
+                AvailableCategories = new List<SelectListItem>();
+                AvailableManufacturers = new List<SelectListItem>();
+                AvailableStores = new List<SelectListItem>();
+                AvailableVendors = new List<SelectListItem>();
+                AvailableProductTypes = new List<SelectListItem>();
+            }
+
+            [GrandResourceDisplayName("Admin.Catalog.Products.List.SearchProductName")]
+
+            public string SearchProductName { get; set; }
+            [GrandResourceDisplayName("Admin.Catalog.Products.List.SearchCategory")]
+            public string SearchCategoryId { get; set; }
+            [GrandResourceDisplayName("Admin.Catalog.Products.List.SearchManufacturer")]
+            public string SearchManufacturerId { get; set; }
+            [GrandResourceDisplayName("Admin.Catalog.Products.List.SearchStore")]
+            public string SearchStoreId { get; set; }
+            [GrandResourceDisplayName("Admin.Catalog.Products.List.SearchVendor")]
+            public string SearchVendorId { get; set; }
+            [GrandResourceDisplayName("Admin.Catalog.Products.List.SearchProductType")]
+            public int SearchProductTypeId { get; set; }
+
+            public IList<SelectListItem> AvailableCategories { get; set; }
+            public IList<SelectListItem> AvailableManufacturers { get; set; }
+            public IList<SelectListItem> AvailableStores { get; set; }
+            public IList<SelectListItem> AvailableVendors { get; set; }
+            public IList<SelectListItem> AvailableProductTypes { get; set; }
+
+            public string ProductId { get; set; }
+
+            public string[] SelectedProductIds { get; set; }
+
+            //vendor
+            public bool IsLoggedInAsVendor { get; set; }
+        }
+
+        [Validator(typeof(BundleProductModelValidator))]
         public partial class BundleProductModel : BaseGrandEntityModel
         {
             public string ProductBundleId { get; set; }
@@ -619,6 +674,8 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             [GrandResourceDisplayName("Admin.Catalog.Products.BundleProducts.Fields.DisplayOrder")]
             public int DisplayOrder { get; set; }
         }
+
+        [Validator(typeof(AddBundleProductModelValidator))]
         public partial class AddBundleProductModel : BaseGrandModel
         {
             public AddBundleProductModel()
@@ -652,15 +709,16 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             //vendor
             public bool IsLoggedInAsVendor { get; set; }
         }
-
-
+        [Validator(typeof(AssociatedProductModelValidator))]
         public partial class AssociatedProductModel : BaseGrandEntityModel
         {
+            public string ProductId { get; set; }
             [GrandResourceDisplayName("Admin.Catalog.Products.AssociatedProducts.Fields.Product")]
             public string ProductName { get; set; }
             [GrandResourceDisplayName("Admin.Catalog.Products.AssociatedProducts.Fields.DisplayOrder")]
             public int DisplayOrder { get; set; }
         }
+        [Validator(typeof(AddAssociatedProductModelValidator))]
         public partial class AddAssociatedProductModel : BaseGrandModel
         {
             public AddAssociatedProductModel()
@@ -700,13 +758,16 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public bool IsLoggedInAsVendor { get; set; }
         }
 
+        [Validator(typeof(CrossSellProductModelValidator))]
         public partial class CrossSellProductModel : BaseGrandEntityModel
         {
+            public string ProductId { get; set; }
             public string ProductId2 { get; set; }
 
             [GrandResourceDisplayName("Admin.Catalog.Products.CrossSells.Fields.Product")]
             public string Product2Name { get; set; }
         }
+        [Validator(typeof(AddCrossSellProductModelValidator))]
         public partial class AddCrossSellProductModel : BaseGrandModel
         {
             public AddCrossSellProductModel()
@@ -746,6 +807,7 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public bool IsLoggedInAsVendor { get; set; }
         }
 
+        [Validator(typeof(TierPriceModelValidator))]
         public partial class TierPriceModel : BaseGrandEntityModel
         {
 
@@ -772,13 +834,13 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             [GrandResourceDisplayName("Admin.Catalog.Products.TierPrices.Fields.Price")]
             public decimal Price { get; set; }
 
-            [GrandResourceDisplayName("Admin.Catalog.Products.TierPrices.Fields.StartDateTimeUtc")]
+            [GrandResourceDisplayName("Admin.Catalog.Products.TierPrices.Fields.StartDateTime")]
             [UIHint("DateTimeNullable")]
-            public DateTime? StartDateTimeUtc { get; set; }
+            public DateTime? StartDateTime { get; set; }
 
-            [GrandResourceDisplayName("Admin.Catalog.Products.TierPrices.Fields.EndDateTimeUtc")]
+            [GrandResourceDisplayName("Admin.Catalog.Products.TierPrices.Fields.EndDateTime")]
             [UIHint("DateTimeNullable")]
-            public DateTime? EndDateTimeUtc { get; set; }
+            public DateTime? EndDateTime { get; set; }
 
         }
 
@@ -808,11 +870,13 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public string Resource { get; set; }
             public string Parameter { get; set; }
             public string OrderId { get; set; }
+            public string ProductId { get; set; }
             public string Duration { get; set; }
         }
 
         public partial class BidModel : BaseGrandEntityModel
         {
+            public string ProductId { get; set; }
             public string BidId { get; set; }
             public DateTime Date { get; set; }
             public string CustomerId { get; set; }
@@ -821,7 +885,6 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public string OrderId { get; set; }
         }
 
-        [Validator(typeof(GenerateCalendarValidator))]
         public partial class GenerateCalendarModel : BaseGrandModel
         {
 
@@ -830,25 +893,26 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
                 Interval = 1;
                 Quantity = 1;
             }
+            public string ProductId { get; set; }
 
-            [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Calendar.StartDateUtc")]
-            [UIHint("Date")]
-            public DateTime StartDateUtc { get; set; }
+            [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Calendar.StartDate")]
+            [UIHint("DateNullable")]
+            public DateTime? StartDate { get; set; }
 
             [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Calendar.StartTime")]
             [UIHint("Time")]
             public DateTime StartTime { get; set; }
 
-            [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Calendar.EndDateUtc")]
-            [UIHint("Date")]
-            public DateTime EndDateUtc { get; set; }
+            [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Calendar.EndDate")]
+            [UIHint("DateNullable")]
+            public DateTime? EndDate { get; set; }
             [UIHint("Time")]
 
             [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Calendar.EndTime")]
             public DateTime EndTime { get; set; }
 
             [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Calendar.Interval")]
-            public int Interval { get; set; }
+            public int Interval { get; set; } = 1;
             public int IntervalUnit { get; set; }
 
             [GrandResourceDisplayName("Admin.Catalog.Products.Fields.Calendar.IncBothDate")]
@@ -885,21 +949,28 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
             public bool Sunday { get; set; }
 
         }
+
+        [Validator(typeof(ProductAttributeMappingModelValidator))]
         public partial class ProductAttributeMappingModel : BaseGrandEntityModel
         {
+            public ProductAttributeMappingModel()
+            {
+                AvailableProductAttribute = new List<SelectListItem>();
+            }
             public string ProductId { get; set; }
 
             public string ProductAttributeId { get; set; }
             [GrandResourceDisplayName("Admin.Catalog.Products.ProductAttributes.Attributes.Fields.Attribute")]
             public string ProductAttribute { get; set; }
+            public IList<SelectListItem> AvailableProductAttribute { get; set; }
 
             [GrandResourceDisplayName("Admin.Catalog.Products.ProductAttributes.Attributes.Fields.TextPrompt")]
-            
             public string TextPrompt { get; set; }
 
             [GrandResourceDisplayName("Admin.Catalog.Products.ProductAttributes.Attributes.Fields.IsRequired")]
             public bool IsRequired { get; set; }
-
+            [GrandResourceDisplayName("Admin.Catalog.Products.ProductAttributes.Attributes.Fields.ShowOnCatalogPage")]
+            public bool ShowOnCatalogPage { get; set; }
             public int AttributeControlTypeId { get; set; }
             [GrandResourceDisplayName("Admin.Catalog.Products.ProductAttributes.Attributes.Fields.AttributeControlType")]
             public string AttributeControlType { get; set; }
@@ -1140,7 +1211,7 @@ namespace Grand.Web.Areas.Admin.Models.Catalog
         #endregion
     }
 
-    public partial class ProductLocalizedModel : ILocalizedModelLocal
+    public partial class ProductLocalizedModel : ILocalizedModelLocal, ISlugModelLocal
     {
         public string LanguageId { get; set; }
 

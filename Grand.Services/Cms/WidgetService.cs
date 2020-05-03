@@ -1,4 +1,3 @@
-using Grand.Core.Caching;
 using Grand.Core.Domain.Cms;
 using Grand.Core.Plugins;
 using System;
@@ -15,7 +14,6 @@ namespace Grand.Services.Cms
         #region Fields
 
         private readonly IPluginFinder _pluginFinder;
-        private readonly ICacheManager _cacheManager;
         private readonly WidgetSettings _widgetSettings;
 
         #endregion
@@ -26,14 +24,12 @@ namespace Grand.Services.Cms
         /// Ctor
         /// </summary>
         /// <param name="pluginFinder">Plugin finder</param>
-        /// <param name="cacheManager">Cache manager</param>
         /// <param name="widgetSettings">Widget settings</param>
-        public WidgetService(IPluginFinder pluginFinder, ICacheManager cacheManager,
+        public WidgetService(IPluginFinder pluginFinder,
             WidgetSettings widgetSettings)
         {
-            this._pluginFinder = pluginFinder;
-            this._cacheManager = cacheManager;
-            this._widgetSettings = widgetSettings;
+            _pluginFinder = pluginFinder;
+            _widgetSettings = widgetSettings;
         }
 
         #endregion
@@ -58,7 +54,7 @@ namespace Grand.Services.Cms
         /// <param name="widgetZone">Widget zone</param>
         /// <param name="storeId">Load records allowed only in a specified store; pass "" to load all records</param>
         /// <returns>Widgets</returns>
-        public virtual IList<IWidgetPlugin> LoadActiveWidgetsByWidgetZone(string  widgetZone, string storeId = "")
+        public virtual IList<IWidgetPlugin> LoadActiveWidgetsByWidgetZone(string widgetZone, string storeId = "")
         {
             if (String.IsNullOrWhiteSpace(widgetZone))
                 return new List<IWidgetPlugin>();
@@ -77,7 +73,7 @@ namespace Grand.Services.Cms
         {
             var descriptor = _pluginFinder.GetPluginDescriptorBySystemName<IWidgetPlugin>(systemName);
             if (descriptor != null)
-                return descriptor.Instance<IWidgetPlugin>();
+                return descriptor.Instance<IWidgetPlugin>(_pluginFinder.ServiceProvider);
 
             return null;
         }
@@ -89,13 +85,9 @@ namespace Grand.Services.Cms
         /// <returns>Widgets</returns>
         public virtual IList<IWidgetPlugin> LoadAllWidgets(string storeId = "")
         {
-            var cacheKey = string.Format("Grand.pres.widget-store-{0}", storeId);
-            return _cacheManager.Get(cacheKey, () =>
-            {
-                return _pluginFinder.GetPlugins<IWidgetPlugin>(storeId: storeId).ToList();
-            });
+            return _pluginFinder.GetPlugins<IWidgetPlugin>(storeId: storeId).ToList();
         }
-        
+
         #endregion
     }
 }

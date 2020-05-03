@@ -1,12 +1,13 @@
-﻿@{
+﻿@model CountriesListModel
+@{
     //page title
     ViewBag.Title = T("Admin.Configuration.Countries").Text;
 }
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
                 <div class="caption">
                     <i class="fa fa-globe"></i>
                     @T("Admin.Configuration.Countries")
@@ -17,14 +18,30 @@
                     <input type="button" id="unpublish-selected" class="btn default" value="@T("Admin.Configuration.Countries.UnpublishSelected")" />
                     <a href="@Url.Action("ExportCsv")" class="btn blue">@T("Admin.Configuration.Countries.ExportToCsv")</a>
                     <input type="submit" id="importcsv" name="importcsv" class="btn yellow" value="@T("Admin.Configuration.Countries.ImportFromCsv")" />
+                    <vc:admin-widget widget-zone="country_list_buttons" additional-data="null" />
                 </div>
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div class="form-horizontal">
                     <div class="form-body">
-                        <div class="portlet-body">
-                            <div id="countries-grid"></div>
+                        <div class="form-group">
+                            <admin-label asp-for="CountryName" />
+                            <div class="col-md-9 col-sm-6">
+                                <admin-input asp-for="CountryName" />
+                            </div>
                         </div>
+                    </div>
+                    <div class="form-actions">
+                        <div class="row">
+                            <div class="col-md-offset-3 col-sm-offset-3 col-md-9 col-sm-9">
+                                <button class="btn btn-success filter-submit" id="search-countries">
+                                    <i class="fa fa-search"></i> @T("Admin.Common.Search")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="x_content">
+                        <div id="countries-grid"></div>
                     </div>
                 </div>
             </div>
@@ -42,7 +59,7 @@
                         url: "@Html.Raw(Url.Action("CountryList", "Country"))",
                         type: "POST",
                         dataType: "json",
-                        data: addAntiForgeryToken
+                        data: additionalData
                     }
                 },
                 schema: {
@@ -69,16 +86,16 @@
             dataBound: onDataBound,
             columns: [{
                 field: "Id",
-                headerTemplate: "<label class='mt-checkbox mt-checkbox-outline'><input id='mastercheckbox' type='checkbox'/><span></span></label>",
+                headerTemplate: "<label class='mt-checkbox mt-checkbox-outline control control-checkbox'><input id='mastercheckbox' type='checkbox'/> <div class='control__indicator'></div></label>",
                 headerAttributes: { style: "text-align:center" },
                 attributes: { style: "text-align:center" },
-                template: "<label class='mt-checkbox mt-checkbox-outline'><input type='checkbox' value='#=Id#' class='checkboxGroups'/><span></span></label>",
+                template: "<label class='mt-checkbox mt-checkbox-outline control control-checkbox'><input type='checkbox' value='#=Id#' class='checkboxGroups'/> <div class='control__indicator'></div></label>",
                 width: 50
             }, {
                 field: "Name",
                 title: "@T("Admin.Configuration.Countries.Fields.Name")",
                 width: 300,
-                template: '<a class="k-link" href="Edit/#=Id#">#=Name#</a>',
+                template: '<a class="k-link" href="Edit/#=Id#">#=kendo.htmlEncode(Name)#</a>',
             }, {
                 field: "AllowsBilling",
                 title: "@T("Admin.Configuration.Countries.Fields.AllowsBilling")",
@@ -236,7 +253,7 @@
 @*import states form*@
 <div id="importcsv-window" style="display:none;">
     <form asp-controller="Country" asp-action="ImportCsv" method="post" enctype="multipart/form-data">
-        <antiforgery-token />
+        
         <table style="text-align:left;">
             <tr>
                 <td>
@@ -270,4 +287,32 @@
             window.data('kendoWindow').center().open();
         });
     });
+</script>
+
+<script type="text/javascript">
+
+    $(document).ready(function () {
+        //search button
+        $('#search-countries').click(function () {
+            //search
+            var grid = $('#countries-grid').data('kendoGrid');
+            grid.dataSource.read();
+        });
+
+        $("#@Html.FieldIdFor(model => model.CountryName)").keydown(function (event) {
+            if (event.keyCode == 13) {
+                $("#search-countries").click();
+                return false;
+            }
+        });
+
+    });
+
+    function additionalData() {
+        var data = {
+            CountryName: $('#@Html.FieldIdFor(model => model.CountryName)').val()
+        };
+        addAntiForgeryToken(data);
+        return data;
+    }
 </script>

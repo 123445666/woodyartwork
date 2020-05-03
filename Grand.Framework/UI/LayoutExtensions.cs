@@ -1,10 +1,8 @@
 ﻿using Grand.Core.Infrastructure;
-using Grand.Framework.TagHelpers;
 using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using System.Text;
-using System.Text.Encodings.Web;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Grand.Framework.UI
 {
@@ -20,7 +18,7 @@ namespace Grand.Framework.UI
         /// <param name="part">Title part</param>
         public static void AddTitleParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder  = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AddTitleParts(part);
         }
         /// <summary>
@@ -30,7 +28,7 @@ namespace Grand.Framework.UI
         /// <param name="part">Title part</param>
         public static void AppendTitleParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder  = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AppendTitleParts(part);
         }
         /// <summary>
@@ -42,7 +40,7 @@ namespace Grand.Framework.UI
         /// <returns>Generated string</returns>
         public static IHtmlContent GrandTitle(this IHtmlHelper html, bool addDefaultTitle = true, string part = "")
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             html.AppendTitleParts(part);
             return new HtmlString(html.Encode(pageHeadBuilder.GenerateTitle(addDefaultTitle)));
         }
@@ -55,7 +53,7 @@ namespace Grand.Framework.UI
         /// <param name="part">Meta description part</param>
         public static void AddMetaDescriptionParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AddMetaDescriptionParts(part);
         }
         /// <summary>
@@ -65,7 +63,7 @@ namespace Grand.Framework.UI
         /// <param name="part">Meta description part</param>
         public static void AppendMetaDescriptionParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AppendMetaDescriptionParts(part);
         }
         /// <summary>
@@ -76,7 +74,7 @@ namespace Grand.Framework.UI
         /// <returns>Generated string</returns>
         public static IHtmlContent GrandMetaDescription(this IHtmlHelper html, string part = "")
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             html.AppendMetaDescriptionParts(part);
             return new HtmlString(html.Encode(pageHeadBuilder.GenerateMetaDescription()));
         }
@@ -89,7 +87,7 @@ namespace Grand.Framework.UI
         /// <param name="part">Meta keyword part</param>
         public static void AddMetaKeywordParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AddMetaKeywordParts(part);
         }
         /// <summary>
@@ -99,7 +97,7 @@ namespace Grand.Framework.UI
         /// <param name="part">Meta keyword part</param>
         public static void AppendMetaKeywordParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AppendMetaKeywordParts(part);
         }
         /// <summary>
@@ -110,7 +108,7 @@ namespace Grand.Framework.UI
         /// <returns>Generated string</returns>
         public static IHtmlContent GrandMetaKeywords(this IHtmlHelper html, string part = "")
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             html.AppendMetaKeywordParts(part);
             return new HtmlString(html.Encode(pageHeadBuilder.GenerateMetaKeywords()));
         }
@@ -141,7 +139,7 @@ namespace Grand.Framework.UI
         public static void AddScriptParts(this IHtmlHelper html, ResourceLocation location,
             string src, string debugSrc = "", bool excludeFromBundle = false, bool isAsync = false)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AddScriptParts(location, src, debugSrc, excludeFromBundle, isAsync);
         }
         /// <summary>
@@ -169,7 +167,7 @@ namespace Grand.Framework.UI
         public static void AppendScriptParts(this IHtmlHelper html, ResourceLocation location,
             string src, string debugSrc = "", bool excludeFromBundle = false, bool isAsync = false)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AppendScriptParts(location, src, debugSrc, excludeFromBundle, isAsync);
         }
         /// <summary>
@@ -182,7 +180,7 @@ namespace Grand.Framework.UI
         /// <returns>Generated string</returns>
         public static IHtmlContent GrandScripts(this IHtmlHelper html, IUrlHelper urlHelper, ResourceLocation location, bool? bundleFiles = null)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             return new HtmlString(pageHeadBuilder.GenerateScripts(urlHelper, location, bundleFiles));
         }
 
@@ -209,7 +207,7 @@ namespace Grand.Framework.UI
         public static void AddCssFileParts(this IHtmlHelper html, ResourceLocation location, 
             string src, string debugSrc = "", bool excludeFromBundle = false)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AddCssFileParts(location, src, debugSrc, excludeFromBundle);
         }
         /// <summary>
@@ -234,7 +232,7 @@ namespace Grand.Framework.UI
         public static void AppendCssFileParts(this IHtmlHelper html, ResourceLocation location, 
             string src, string debugSrc = "", bool excludeFromBundle = false)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AppendCssFileParts(location, src, debugSrc, excludeFromBundle);
         }
         /// <summary>
@@ -247,7 +245,7 @@ namespace Grand.Framework.UI
         /// <returns>Generated string</returns>
         public static IHtmlContent GrandCssFiles(this IHtmlHelper html, IUrlHelper urlHelper, ResourceLocation location, bool? bundleFiles = null)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             return new HtmlString(pageHeadBuilder.GenerateCssFiles(urlHelper, location, bundleFiles));
         }
 
@@ -258,7 +256,7 @@ namespace Grand.Framework.UI
         /// <param name="part">Canonical URL part</param>
         public static void AddCanonicalUrlParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AddCanonicalUrlParts(part);
         }
         /// <summary>
@@ -268,7 +266,7 @@ namespace Grand.Framework.UI
         /// <param name="part">Canonical URL part</param>
         public static void AppendCanonicalUrlParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AppendCanonicalUrlParts(part);
         }
         /// <summary>
@@ -279,7 +277,7 @@ namespace Grand.Framework.UI
         /// <returns>Generated string</returns>
         public static IHtmlContent GrandCanonicalUrls(this IHtmlHelper html, string part = "")
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             html.AppendCanonicalUrlParts(part);
             return new HtmlString(pageHeadBuilder.GenerateCanonicalUrls());
         }
@@ -292,7 +290,7 @@ namespace Grand.Framework.UI
         /// <param name="part">The entire element. For example, <![CDATA[<meta name="msvalidate.01" content="123121231231313123123" />]]></param>
         public static void AddHeadCustomParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AddHeadCustomParts(part);
         }
         /// <summary>
@@ -302,7 +300,7 @@ namespace Grand.Framework.UI
         /// <param name="part">The entire element. For example, <![CDATA[<meta name="msvalidate.01" content="123121231231313123123" />]]></param>
         public static void AppendHeadCustomParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AppendHeadCustomParts(part);
         }
         /// <summary>
@@ -312,7 +310,7 @@ namespace Grand.Framework.UI
         /// <returns>Generated string</returns>
         public static IHtmlContent GrandHeadCustom(this IHtmlHelper html)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             return new HtmlString(pageHeadBuilder.GenerateHeadCustom());
         }
 
@@ -324,7 +322,7 @@ namespace Grand.Framework.UI
         /// <param name="part">CSS class</param>
         public static void AddPageCssClassParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AddPageCssClassParts(part);
         }
         /// <summary>
@@ -334,7 +332,7 @@ namespace Grand.Framework.UI
         /// <param name="part">CSS class</param>
         public static void AppendPageCssClassParts(this IHtmlHelper html, string part)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.AppendPageCssClassParts(part);
         }
         /// <summary>
@@ -346,7 +344,7 @@ namespace Grand.Framework.UI
         /// <returns>Generated string</returns>
         public static IHtmlContent GrandPageCssClasses(this IHtmlHelper html, string part = "", bool includeClassElement = true)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             html.AppendPageCssClassParts(part);
             var classes = pageHeadBuilder.GeneratePageCssClasses();
 
@@ -365,7 +363,7 @@ namespace Grand.Framework.UI
         /// <param name="systemName">System name</param>
         public static void SetActiveMenuItemSystemName(this IHtmlHelper html, string systemName)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             pageHeadBuilder.SetActiveMenuItemSystemName(systemName);
         }
         /// <summary>
@@ -375,7 +373,7 @@ namespace Grand.Framework.UI
         /// <returns>System name</returns>
         public static string GetActiveMenuItemSystemName(this IHtmlHelper html)
         {
-            var pageHeadBuilder = EngineContext.Current.Resolve<IPageHeadBuilder>();
+            var pageHeadBuilder = html.ViewContext.HttpContext.RequestServices.GetRequiredService<IPageHeadBuilder>();
             return pageHeadBuilder.GetActiveMenuItemSystemName();
         }
     }

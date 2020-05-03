@@ -1,19 +1,20 @@
-﻿using Grand.Core;
-using Grand.Core.Domain.Common;
-using Grand.Framework.Kendoui;
+﻿using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Common;
 using Grand.Services.Localization;
 using Grand.Services.Security;
-using Grand.Web.Areas.Admin.Extensions;
 using Grand.Web.Areas.Admin.Models.Common;
+using Grand.Web.Areas.Admin.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.Settings)]
     public partial class AddressAttributeController : BaseAdminController
     {
         #region Fields
@@ -21,9 +22,7 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly IAddressAttributeService _addressAttributeService;
         private readonly ILanguageService _languageService;
         private readonly ILocalizationService _localizationService;
-        private readonly IWorkContext _workContext;
-        private readonly IPermissionService _permissionService;
-
+        private readonly IAddressAttributeViewModelService _addressAttributeViewModelService;
         #endregion
 
         #region Constructors
@@ -31,14 +30,12 @@ namespace Grand.Web.Areas.Admin.Controllers
         public AddressAttributeController(IAddressAttributeService addressAttributeService,
             ILanguageService languageService, 
             ILocalizationService localizationService,
-            IWorkContext workContext,
-            IPermissionService permissionService)
+            IAddressAttributeViewModelService addressAttributeViewModelService)
         {
             this._addressAttributeService = addressAttributeService;
             this._languageService = languageService;
             this._localizationService = localizationService;
-            this._workContext = workContext;
-            this._permissionService = permissionService;
+            this._addressAttributeViewModelService = addressAttributeViewModelService;
         }
 
         #endregion
@@ -46,83 +43,45 @@ namespace Grand.Web.Areas.Admin.Controllers
         
         #region Address attributes
 
-        public IActionResult Index()
-        {
-            return RedirectToAction("List");
-        }
+        public IActionResult Index() => RedirectToAction("List");
 
-        public IActionResult ListBlock()
-        {
-            return PartialView("ListBlock");
-        }
+        public IActionResult ListBlock() => PartialView("ListBlock");
 
-        public IActionResult List()
+        public async Task<IActionResult> List()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            //we just redirect a user to the address settings page
-            
             //select third tab
             const int addressFormFieldIndex = 2;
-            SaveSelectedTabIndex(addressFormFieldIndex);
+            await SaveSelectedTabIndex(addressFormFieldIndex);
             return RedirectToAction("CustomerUser", "Setting");
         }
 
         [HttpPost]
-        public IActionResult List(DataSourceRequest command)
+        public async Task<IActionResult> List(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var addressAttributes = _addressAttributeService.GetAllAddressAttributes();
+            var model = await _addressAttributeViewModelService.PrepareAddressAttributes();
             var gridModel = new DataSourceResult
             {
-                Data = addressAttributes.Select(x =>
-                {
-                    var attributeModel = x.ToModel();
-                    attributeModel.AttributeControlTypeName = x.AttributeControlType.GetLocalizedEnum(_localizationService, _workContext);
-                    return attributeModel;
-                }),
-                Total = addressAttributes.Count()
+                Data = model.addressAttributes,
+                Total = model.totalCount
             };
             return Json(gridModel);
         }
         
         //create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var model = new AddressAttributeModel();
+            var model = _addressAttributeViewModelService.PrepareAddressAttributeModel();
             //locales
-            AddLocales(_languageService, model.Locales);
+            await AddLocales(_languageService, model.Locales);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Create(AddressAttributeModel model, bool continueEditing)
+        public async Task<IActionResult> Create(AddressAttributeModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
-                var addressAttribute = model.ToEntity();
-                addressAttribute.Locales.Clear();
-                foreach(var local in model.Locales)
-                {
-                    if(!(String.IsNullOrEmpty(local.Name)))
-                        addressAttribute.Locales.Add(new Core.Domain.Localization.LocalizedProperty()
-                        {
-                            LanguageId = local.LanguageId,
-                            LocaleKey = "Name",
-                            LocaleValue = local.Name
-                        });
-                }
-                _addressAttributeService.InsertAddressAttribute(addressAttribute);
-
+                var addressAttribute = await _addressAttributeViewModelService.InsertAddressAttributeModel(model);
                 SuccessNotification(_localizationService.GetResource("Admin.Address.AddressAttributes.Added"));
                 return continueEditing ? RedirectToAction("Edit", new { id = addressAttribute.Id }) : RedirectToAction("List");
             }
@@ -132,19 +91,16 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //edit
-        public IActionResult Edit(string id)
+        public async Task<IActionResult> Edit(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var addressAttribute = _addressAttributeService.GetAddressAttributeById(id);
+            var addressAttribute = await _addressAttributeService.GetAddressAttributeById(id);
             if (addressAttribute == null)
                 //No address attribute found with the specified id
                 return RedirectToAction("List");
 
-            var model = addressAttribute.ToModel();
+            var model = _addressAttributeViewModelService.PrepareAddressAttributeModel(addressAttribute);
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
                 locale.Name = addressAttribute.GetLocalized(x => x.Name, languageId, false, false);
             });
@@ -152,37 +108,21 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Edit(AddressAttributeModel model, bool continueEditing)
+        public async Task<IActionResult> Edit(AddressAttributeModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var addressAttribute = _addressAttributeService.GetAddressAttributeById(model.Id);
+            var addressAttribute = await _addressAttributeService.GetAddressAttributeById(model.Id);
             if (addressAttribute == null)
                 //No address attribute found with the specified id
                 return RedirectToAction("List");
 
             if (ModelState.IsValid)
             {
-                addressAttribute = model.ToEntity(addressAttribute);
-                addressAttribute.Locales.Clear();
-                foreach (var local in model.Locales)
-                {
-                    if (!(String.IsNullOrEmpty(local.Name)))
-                        addressAttribute.Locales.Add(new Core.Domain.Localization.LocalizedProperty()
-                        {
-                            LanguageId = local.LanguageId,
-                            LocaleKey = "Name",
-                            LocaleValue = local.Name
-                        });
-                }
-                _addressAttributeService.UpdateAddressAttribute(addressAttribute);
-
+                addressAttribute = await _addressAttributeViewModelService.UpdateAddressAttributeModel(model, addressAttribute);
                 SuccessNotification(_localizationService.GetResource("Admin.Address.AddressAttributes.Updated"));
                 if (continueEditing)
                 {
                     //selected tab
-                    SaveSelectedTabIndex();
+                    await SaveSelectedTabIndex();
 
                     return RedirectToAction("Edit", new {id = addressAttribute.Id});
                 }
@@ -195,13 +135,14 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         //delete
         [HttpPost]
-        public IActionResult Delete(string id)
+        public async Task<IActionResult> Delete(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
+            var addressAttribute = await _addressAttributeService.GetAddressAttributeById(id);
+            if (addressAttribute == null)
+                //No address attribute found with the specified id
+                return RedirectToAction("List");
 
-            var addressAttribute = _addressAttributeService.GetAddressAttributeById(id);
-            _addressAttributeService.DeleteAddressAttribute(addressAttribute);
+            await _addressAttributeService.DeleteAddressAttribute(addressAttribute);
 
             SuccessNotification(_localizationService.GetResource("Admin.Address.AddressAttributes.Deleted"));
             return RedirectToAction("List");
@@ -213,79 +154,42 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         //list
         [HttpPost]
-        public IActionResult ValueList(string addressAttributeId, DataSourceRequest command)
+        public async Task<IActionResult> ValueList(string addressAttributeId, DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var values = _addressAttributeService.GetAddressAttributeById(addressAttributeId).AddressAttributeValues;
+            var model = await _addressAttributeViewModelService.PrepareAddressAttributeValues(addressAttributeId);
             var gridModel = new DataSourceResult
             {
-                Data = values.Select(x => new AddressAttributeValueModel
-                {
-                    Id = x.Id,
-                    AddressAttributeId = x.AddressAttributeId,
-                    Name = x.Name,
-                    IsPreSelected = x.IsPreSelected,
-                    DisplayOrder = x.DisplayOrder,
-                }),
-                Total = values.Count()
+                Data = model.addressAttributeValues,
+                Total = model.totalCount
             };
             return Json(gridModel);
         }
 
         //create
-        public IActionResult ValueCreatePopup(string addressAttributeId)
+        public async Task<IActionResult> ValueCreatePopup(string addressAttributeId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var addressAttribute = _addressAttributeService.GetAddressAttributeById(addressAttributeId);
+            var addressAttribute = await _addressAttributeService.GetAddressAttributeById(addressAttributeId);
             if (addressAttribute == null)
                 //No address attribute found with the specified id
                 return RedirectToAction("List");
 
-            var model = new AddressAttributeValueModel();
-            model.AddressAttributeId = addressAttributeId;
+            var model = _addressAttributeViewModelService.PrepareAddressAttributeValueModel(addressAttributeId);
             //locales
-            AddLocales(_languageService, model.Locales);
+            await AddLocales(_languageService, model.Locales);
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult ValueCreatePopup(AddressAttributeValueModel model)
+        public async Task<IActionResult> ValueCreatePopup(AddressAttributeValueModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var addressAttribute = _addressAttributeService.GetAddressAttributeById(model.AddressAttributeId);
+            var addressAttribute = await _addressAttributeService.GetAddressAttributeById(model.AddressAttributeId);
             if (addressAttribute == null)
                 //No address attribute found with the specified id
                 return RedirectToAction("List");
             
             if (ModelState.IsValid)
             {
-                var cav = new AddressAttributeValue
-                {
-                    AddressAttributeId = model.AddressAttributeId,
-                    Name = model.Name,
-                    IsPreSelected = model.IsPreSelected,
-                    DisplayOrder = model.DisplayOrder
-                };
-
-                addressAttribute.Locales.Clear();
-                foreach (var local in model.Locales)
-                {
-                    if(!(String.IsNullOrEmpty(local.Name)))
-                        addressAttribute.Locales.Add(new Core.Domain.Localization.LocalizedProperty()
-                        {
-                            LanguageId = local.LanguageId,
-                            LocaleKey = "Name",
-                            LocaleValue = local.Name
-                        });
-                }
-
-                _addressAttributeService.InsertAddressAttributeValue(cav);
+                await _addressAttributeViewModelService.InsertAddressAttributeValueModel(model);
                 ViewBag.RefreshPage = true;
                 return View(model);
             }
@@ -294,27 +198,22 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //edit
-        public IActionResult ValueEditPopup(string id, string addressAttributeId)
+        public async Task<IActionResult> ValueEditPopup(string id, string addressAttributeId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
+            var av = await _addressAttributeService.GetAddressAttributeById(addressAttributeId);
+            if(av == null)
+                //No address attribute found with the specified id
+                return RedirectToAction("List");
 
-            var av = _addressAttributeService.GetAddressAttributeById(addressAttributeId);
             var cav = av.AddressAttributeValues.FirstOrDefault(x=>x.Id == id);
             if (cav == null)
                 //No address attribute value found with the specified id
                 return RedirectToAction("List");
 
-            var model = new AddressAttributeValueModel
-            {
-                AddressAttributeId = cav.AddressAttributeId,
-                Name = cav.Name,
-                IsPreSelected = cav.IsPreSelected,
-                DisplayOrder = cav.DisplayOrder
-            };
+            var model = _addressAttributeViewModelService.PrepareAddressAttributeValueModel(cav);
 
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
                 locale.Name = cav.GetLocalized(x => x.Name, languageId, false, false);
             });
@@ -323,12 +222,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ValueEditPopup(AddressAttributeValueModel model)
+        public async Task<IActionResult> ValueEditPopup(AddressAttributeValueModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var av = _addressAttributeService.GetAddressAttributeById(model.AddressAttributeId);
+            var av = await _addressAttributeService.GetAddressAttributeById(model.AddressAttributeId);
             var cav = av.AddressAttributeValues.FirstOrDefault(x => x.Id == model.Id);
             if (cav == null)
                 //No address attribute value found with the specified id
@@ -336,22 +232,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                cav.Name = model.Name;
-                cav.IsPreSelected = model.IsPreSelected;
-                cav.DisplayOrder = model.DisplayOrder;
-                cav.Locales.Clear();
-                foreach (var local in model.Locales)
-                {
-                    cav.Locales.Add(new Core.Domain.Localization.LocalizedProperty()
-                    {
-                        LanguageId = local.LanguageId,
-                        LocaleKey = "Name",
-                        LocaleValue = local.Name
-                    });
-                }
-
-                _addressAttributeService.UpdateAddressAttributeValue(cav);
-
+                await _addressAttributeViewModelService.UpdateAddressAttributeValueModel(model, cav);
                 ViewBag.RefreshPage = true;
                 return View(model);
             }
@@ -362,21 +243,16 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         //delete
         [HttpPost]
-        public IActionResult ValueDelete(AddressAttributeValueModel model)
+        public async Task<IActionResult> ValueDelete(AddressAttributeValueModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var av = _addressAttributeService.GetAddressAttributeById(model.AddressAttributeId);
+            var av = await _addressAttributeService.GetAddressAttributeById(model.AddressAttributeId);
             var cav = av.AddressAttributeValues.FirstOrDefault(x => x.Id == model.Id);
             if (cav == null)
                 throw new ArgumentException("No address attribute value found with the specified id");
-            _addressAttributeService.DeleteAddressAttributeValue(cav);
+            await _addressAttributeService.DeleteAddressAttributeValue(cav);
 
             return new NullJsonResult();
         }
-
-
         #endregion
     }
 }

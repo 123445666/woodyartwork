@@ -7,10 +7,11 @@ using Grand.Services.Localization;
 using Grand.Services.Logging;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Configuration
 {
-    public partial class GoogleAnalyticsService: IGoogleAnalyticsService
+    public partial class GoogleAnalyticsService : IGoogleAnalyticsService
     {
         #region Fields
 
@@ -19,28 +20,24 @@ namespace Grand.Services.Configuration
         private readonly ILogger _logger;
 
 
-        private AnalyticsReportingService _analyticsReportingService
+        private async Task<AnalyticsReportingService> _analyticsReportingService()
         {
-            get
+            try
             {
-                try
-                {
-                    var scopes = new[] { AnalyticsReportingService.Scope.Analytics };
-                    var temp = new ServiceAccountCredential.Initializer(_googleAnalyticsSettings.gaserviceAccountEmail) { Scopes = scopes };
-                    string privateKey = _googleAnalyticsSettings.gaprivateKey.Replace("\\n", "\n");
-                    var credential = new ServiceAccountCredential(temp.FromPrivateKey(privateKey));
+                var scopes = new[] { AnalyticsReportingService.Scope.Analytics };
+                var temp = new ServiceAccountCredential.Initializer(_googleAnalyticsSettings.gaserviceAccountEmail) { Scopes = scopes };
+                string privateKey = _googleAnalyticsSettings.gaprivateKey.Replace("\\n", "\n");
+                var credential = new ServiceAccountCredential(temp.FromPrivateKey(privateKey));
 
-                    return new AnalyticsReportingService(new BaseClientService.Initializer()
-                    {
-                        HttpClientInitializer = credential,
-                        ApplicationName = "GrandNode",
-                    });
-                }
-                catch(Exception ex)
-                {
-                    _logger.InsertLog(Core.Domain.Logging.LogLevel.Error,"GoogleAnalytics", ex.Message);
-                    return null;
-                }
+                return new AnalyticsReportingService(new BaseClientService.Initializer() {
+                    HttpClientInitializer = credential,
+                    ApplicationName = "GrandNode",
+                });
+            }
+            catch (Exception ex)
+            {
+                await _logger.InsertLog(Core.Domain.Logging.LogLevel.Error, "GoogleAnalytics", ex.Message);
+                return await Task.FromResult<AnalyticsReportingService>(null);
             }
         }
 
@@ -50,9 +47,9 @@ namespace Grand.Services.Configuration
         public GoogleAnalyticsService(GoogleAnalyticsSettings googleAnalyticsSettings,
             ILocalizationService localizationService, ILogger logger)
         {
-            this._googleAnalyticsSettings = googleAnalyticsSettings;
-            this._localizationService = localizationService;
-            this._logger = logger;
+            _googleAnalyticsSettings = googleAnalyticsSettings;
+            _localizationService = localizationService;
+            _logger = logger;
         }
         #endregion
 
@@ -110,9 +107,9 @@ namespace Grand.Services.Configuration
 
         #endregion
 
-        public GoogleAnalyticsResult GetDataByGeneral(DateTime startDate, DateTime endDate)
+        public virtual async Task<GoogleAnalyticsResult> GetDataByGeneral(DateTime startDate, DateTime endDate)
         {
-            if(_analyticsReportingService==null)
+            if (await _analyticsReportingService() == null)
             {
                 return ReturnEmpty();
             }
@@ -123,7 +120,7 @@ namespace Grand.Services.Configuration
             //it would be nice just to pass metrics and dimensions to this method, but it will surely incerase complexity 
             //and get rid of tidy and neat "fire-n-get" method that requires simple arguments
 
-            
+
             //DateRange
             IList<DateRange> dateRanges = new List<DateRange>();
             dateRanges.Add(new DateRange() { StartDate = startDate.ToString("yyyy-MM-dd"), EndDate = endDate.ToString("yyyy-MM-dd") });
@@ -143,8 +140,7 @@ namespace Grand.Services.Configuration
             orderBys.Add(new OrderBy() { FieldName = "ga:pageviews", SortOrder = "DESCENDING", OrderType = "VALUE" });
 
             //final assembling
-            ReportRequest request = new ReportRequest()
-            {
+            ReportRequest request = new ReportRequest() {
                 ViewId = _googleAnalyticsSettings.gaviewID,
                 DateRanges = dateRanges,
                 Metrics = metrics,
@@ -158,13 +154,13 @@ namespace Grand.Services.Configuration
             GetReportsRequest reportsRequest = new GetReportsRequest();
             reportsRequest.ReportRequests = requests;
 
-            var response = _analyticsReportingService.Reports.BatchGet(reportsRequest).Execute();
+            var response = await (await _analyticsReportingService()).Reports.BatchGet(reportsRequest).ExecuteAsync();
 
             return ParseResponse(response, startDate, endDate);
         }
-        public GoogleAnalyticsResult GetDataByLocalization(DateTime startDate, DateTime endDate)
+        public virtual async Task<GoogleAnalyticsResult> GetDataByLocalization(DateTime startDate, DateTime endDate)
         {
-            if (_analyticsReportingService == null)
+            if (await _analyticsReportingService() == null)
             {
                 return ReturnEmpty();
             }
@@ -188,8 +184,7 @@ namespace Grand.Services.Configuration
             orderBys.Add(new OrderBy() { FieldName = "ga:pageviews", SortOrder = "DESCENDING", OrderType = "VALUE" });
 
             //ReportRequest - final assembling
-            ReportRequest request = new ReportRequest()
-            {
+            ReportRequest request = new ReportRequest() {
                 ViewId = _googleAnalyticsSettings.gaviewID,
                 DateRanges = dateRanges,
                 Metrics = metrics,
@@ -203,14 +198,14 @@ namespace Grand.Services.Configuration
             GetReportsRequest reportsRequest = new GetReportsRequest();
             reportsRequest.ReportRequests = requests;
 
-            var response = _analyticsReportingService.Reports.BatchGet(reportsRequest).Execute();
+            var response = await (await _analyticsReportingService()).Reports.BatchGet(reportsRequest).ExecuteAsync();
 
             return ParseResponse(response, startDate, endDate);
 
         }
-        public GoogleAnalyticsResult GetDataBySource(DateTime startDate, DateTime endDate)
+        public virtual async Task<GoogleAnalyticsResult> GetDataBySource(DateTime startDate, DateTime endDate)
         {
-            if (_analyticsReportingService == null)
+            if (await _analyticsReportingService() == null)
             {
                 return ReturnEmpty();
             }
@@ -233,8 +228,7 @@ namespace Grand.Services.Configuration
             orderBys.Add(new OrderBy() { FieldName = "ga:pageviews", SortOrder = "DESCENDING", OrderType = "VALUE" });
 
             //final assembling
-            ReportRequest request = new ReportRequest()
-            {
+            ReportRequest request = new ReportRequest() {
                 ViewId = _googleAnalyticsSettings.gaviewID,
                 DateRanges = dateRanges,
                 Metrics = metrics,
@@ -248,14 +242,14 @@ namespace Grand.Services.Configuration
             GetReportsRequest reportsRequest = new GetReportsRequest();
             reportsRequest.ReportRequests = requests;
 
-            var response = _analyticsReportingService.Reports.BatchGet(reportsRequest).Execute();
+            var response = await (await _analyticsReportingService()).Reports.BatchGet(reportsRequest).ExecuteAsync();
 
             return ParseResponse(response, startDate, endDate);
 
         }
-        public GoogleAnalyticsResult GetDataByExit(DateTime startDate, DateTime endDate)
+        public virtual async Task<GoogleAnalyticsResult> GetDataByExit(DateTime startDate, DateTime endDate)
         {
-            if (_analyticsReportingService == null)
+            if (await _analyticsReportingService() == null)
             {
                 return ReturnEmpty();
             }
@@ -278,8 +272,7 @@ namespace Grand.Services.Configuration
             orderBys.Add(new OrderBy() { FieldName = "ga:pageviews", SortOrder = "DESCENDING", OrderType = "VALUE" });
 
             //final assembling
-            ReportRequest request = new ReportRequest()
-            {
+            ReportRequest request = new ReportRequest() {
                 ViewId = _googleAnalyticsSettings.gaviewID,
                 DateRanges = dateRanges,
                 Metrics = metrics,
@@ -293,14 +286,14 @@ namespace Grand.Services.Configuration
             GetReportsRequest reportsRequest = new GetReportsRequest();
             reportsRequest.ReportRequests = requests;
 
-            var response = _analyticsReportingService.Reports.BatchGet(reportsRequest).Execute();
+            var response = await (await _analyticsReportingService()).Reports.BatchGet(reportsRequest).ExecuteAsync();
 
             return ParseResponse(response, startDate, endDate);
 
         }
-        public GoogleAnalyticsResult GetDataByDevice(DateTime startDate, DateTime endDate)
+        public virtual async Task<GoogleAnalyticsResult> GetDataByDevice(DateTime startDate, DateTime endDate)
         {
-            if (_analyticsReportingService == null)
+            if (await _analyticsReportingService() == null)
             {
                 return ReturnEmpty();
             }
@@ -315,7 +308,7 @@ namespace Grand.Services.Configuration
 
             //Dimension
             IList<Dimension> dimensions = new List<Dimension>();
-            dimensions.Add(new Dimension() { Name = "ga:browser" });
+            //dimensions.Add(new Dimension() { Name = "ga:browser" });
             dimensions.Add(new Dimension() { Name = "ga:mobileDeviceInfo" });
 
             //OrderBy
@@ -323,8 +316,7 @@ namespace Grand.Services.Configuration
             orderBys.Add(new OrderBy() { FieldName = "ga:pageviews", SortOrder = "DESCENDING", OrderType = "VALUE" });
 
             //final assembling
-            ReportRequest request = new ReportRequest()
-            {
+            var request = new ReportRequest() {
                 ViewId = _googleAnalyticsSettings.gaviewID,
                 DateRanges = dateRanges,
                 Metrics = metrics,
@@ -332,17 +324,15 @@ namespace Grand.Services.Configuration
                 OrderBys = orderBys
             };
 
-            List<ReportRequest> requests = new List<ReportRequest>();
+            var requests = new List<ReportRequest>();
             requests.Add(request);
 
-            GetReportsRequest reportsRequest = new GetReportsRequest();
+            var reportsRequest = new GetReportsRequest();
             reportsRequest.ReportRequests = requests;
 
-            var response = _analyticsReportingService.Reports.BatchGet(reportsRequest).Execute();
+            var response = await (await _analyticsReportingService()).Reports.BatchGet(reportsRequest).ExecuteAsync();
 
             return ParseResponse(response, startDate, endDate);
-            
-
         }
     }
 }

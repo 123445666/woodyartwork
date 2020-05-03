@@ -5,20 +5,21 @@
     ViewBag.Title = T("Admin.System.ContactForm").Text;
 }
 <form asp-controller="ContactForm" asp-action="List">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-envelope-o"></i>
                         @T("Admin.System.ContactForm")
                     </div>
                     <div class="actions btn-group btn-group-devided">
                         <input type="submit" name="delete-all" class="btn red" value="@T("Admin.System.ContactForm.DeleteAll")" onclick="return confirm('@T("Admin.Common.AreYouSure")'); " />
+                        <vc:admin-widget widget-zone="contact_form_list_buttons" additional-data="null" />
                     </div>
                 </div>
-                <div class="portlet-body form">
+                <div class="x_content form">
                     <div class="form-horizontal">
                         <div class="form-body">
                             <div class="form-group">
@@ -57,7 +58,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="portlet-body">
+                <div class="x_content">
                     <div id="contactform-grid"></div>
                 </div>
             </div>
@@ -118,7 +119,7 @@ $(document).ready(function () {
             field: "Subject",
             title: "@T("Admin.System.ContactForm.Fields.Subject")",
             width: 300,
-            template: '<a class="k-link" href="Details/#=Id#">#=Subject#</a>',
+                template: '<a class="k-link" href="Details/#=Id#">#=kendo.htmlEncode(Subject)#</a>',
         }]
     });
 });

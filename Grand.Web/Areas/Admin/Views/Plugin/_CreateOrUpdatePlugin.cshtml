@@ -1,5 +1,5 @@
 ﻿@model PluginModel
-@inject IEventPublisher eventPublisher
+
 <div asp-validation-summary="All"></div>
 <input asp-for="SystemName" type="hidden" />
 @if (ViewBag.RefreshPage == true)
@@ -10,40 +10,26 @@
         window.close();
     </script>
 }
-<script>
-    $(document).ready(function () {
-        $("#plugin-edit").kendoTabStrip({
-            animation: {
-                open: {
-                    effects: "fadeIn"
-                }
-            },
-            select: tabstrip_on_tab_select
-        });
-    });
-</script>
-<div id="plugin-edit">
-    <ul>
-        <li @Html.RenderSelectedTabIndex(0, GetSelectedTabIndex())>
-            @T("Admin.Configuration.Plugins.Info")
-        </li>
-        <li @Html.RenderSelectedTabIndex(1, GetSelectedTabIndex())>
-            @T("Admin.Configuration.Plugins.Stores")
-        </li>
-    </ul>
-    <div>
-        @Html.Partial("_CreateOrUpdatePlugin.TabInfo.cshtml", @Model)
-    </div>
-    <div>
-        @Html.Partial("_CreateOrUpdatePlugin.TabStores.cshtml", Model)
-    </div>
-</div>
-@{
-    //custom tabs
-    var eventMessage = new AdminTabStripCreated(this.Html, "plugin-edit");
-    eventPublisher.Publish(eventMessage);
-    foreach (var eventBlock in eventMessage.BlocksToRender)
-    {
-        @eventBlock
-    }
-}
+<vc:admin-widget widget-zone="plugin_details_top" additional-data="Model" />
+
+<admin-tabstrip name="plugin-edit">
+    <items>
+        <tabstrip-item text="@T("Admin.Configuration.Plugins.Info")" tab-index="0">
+            <content>
+                <div>
+                    <partial name="_CreateOrUpdatePlugin.TabInfo" model="Model" />
+                </div>
+            </content>
+        </tabstrip-item>
+        <tabstrip-item text="@T("Admin.Configuration.Plugins.Stores")" tab-index="1">
+            <content>
+                <div>
+                    <partial name="_TabStores" model="Model" />
+                </div>
+            </content>
+        </tabstrip-item>
+        <vc:admin-widget widget-zone="plugin_details_tabs" additional-data="Model" />
+    </items>
+</admin-tabstrip>
+
+<vc:admin-widget widget-zone="plugin_details_bottom" additional-data="Model" />

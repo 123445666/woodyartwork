@@ -4,11 +4,11 @@
     //page title
     ViewBag.Title = T("Admin.Catalog.Manufacturers").Text;
 }
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
                 <div class="caption">
                     <i class="fa fa-building-o"></i>
                     @T("Admin.Catalog.Manufacturers")
@@ -25,9 +25,10 @@
                         <i class="fa fa-upload"></i>
                         @T("Admin.Common.ImportFromExcel")
                     </button>
+                    <vc:admin-widget widget-zone="manufacturer_list_buttons" additional-data="null" />
                 </div>
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div class="form-horizontal">
                     <div class="form-body">
                         <div class="form-group">
@@ -54,7 +55,7 @@
                     </div>
                 </div>
             </div>
-            <div class="portlet-body">
+            <div class="x_content">
                 <div id="manufacturers-grid"></div>
             </div>
         </div>
@@ -99,7 +100,7 @@
             columns: [{
                 field: "Name",
                 title: "@T("Admin.Catalog.Manufacturers.Fields.Name")",
-                template: '<a class="k-link" href="Edit/#=Id#">#=Name#</a>',
+                template: '<a class="k-link" href="Edit/#=Id#">#=kendo.htmlEncode(Name)#</a>',
             },
             {
                 field: "ShowOnHomePage",
@@ -169,7 +170,7 @@
 @*import manufacturers form*@
 <div class="modal-dialog" id="importexcel-window" style="display:none; padding: 0 10px;">
     <form asp-controller="Manufacturer" asp-action="ImportFromXlsx" method="post" enctype="multipart/form-data">
-        <antiforgery-token />
+        
         <em>@T("Admin.Catalog.Manufacturer.List.ImportFromExcelTip")</em>
         <div class="form-group">
             &nbsp;

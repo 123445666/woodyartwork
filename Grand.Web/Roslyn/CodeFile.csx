@@ -1,21 +1,27 @@
-﻿#! "netcoreapp2.1"
+﻿#! "netcoreapp3.1"
 #r "Grand.Core"
 #r "Grand.Services"
 
 using System;
 using Grand.Core.Domain.Messages;
 using Grand.Core.Domain.Orders;
-using Grand.Core.Domain.Stores;
 using Grand.Services.Events;
-using Grand.Services.Messages;
+using System.Threading;
+using System.Threading.Tasks;
+using MediatR;
 
 /* Sample code to add new token message (message email) to the order */
 
-public class EntityTokensAddedEventConsumer : IConsumer<EntityTokensAddedEvent<Order, Token>>
+public class OrderTokenTest : INotificationHandler<EntityTokensAddedEvent<Order>>
 {
-    public void HandleEvent(EntityTokensAddedEvent<Order, Token> eventMessage)
+    public Task Handle(EntityTokensAddedEvent<Order> eventMessage, CancellationToken cancellationToken)
     {
-        eventMessage.Tokens.Add(new Token("order", "my value"));
+        //in message templates you can put new token {{AdditionalTokens["NewOrderNumber"]}}
+        eventMessage.LiquidObject.AdditionalTokens.Add("NewOrderNumber", $"{eventMessage.Entity.CreatedOnUtc.Year}/{eventMessage.Entity.OrderNumber}");
+        return Task.CompletedTask;
     }
+
 }
+
+
 

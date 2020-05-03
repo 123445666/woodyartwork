@@ -1,11 +1,11 @@
 ﻿using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Media;
-using Grand.Core.Infrastructure;
 using Grand.Services.Catalog;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Media
 {
@@ -17,7 +17,7 @@ namespace Grand.Services.Media
         /// <summary>
         /// Gets the download binary array
         /// </summary>
-        /// <param name="postedFile">Posted file</param>
+        /// <param name="file">Posted file</param>
         /// <returns>Download binary array</returns>
         public static byte[] GetDownloadBits(this IFormFile file)
         {
@@ -48,8 +48,8 @@ namespace Grand.Services.Media
         /// <param name="pictureService">Picture service</param>
         /// <param name="productAttributeParser">Product attribute service</param>
         /// <returns>Picture</returns>
-        public static Picture GetProductPicture(this Product product, string attributesXml,
-            IPictureService pictureService,
+        public static async Task<Picture> GetProductPicture(this Product product, string attributesXml,
+            IProductService productService, IPictureService pictureService,
             IProductAttributeParser productAttributeParser)
         {
             if (product == null)
@@ -66,11 +66,11 @@ namespace Grand.Services.Media
             {
 
                 var comb = product.ProductAttributeCombinations.Where(x => x.AttributesXml == attributesXml).FirstOrDefault();
-                if(comb!=null)
+                if (comb != null)
                 {
-                    if(!string.IsNullOrEmpty(comb.PictureId))
+                    if (!string.IsNullOrEmpty(comb.PictureId))
                     {
-                        var combPicture = pictureService.GetPictureById(comb.PictureId);
+                        var combPicture = await pictureService.GetPictureById(comb.PictureId);
                         if (combPicture != null)
                         {
                             picture = combPicture;
@@ -82,7 +82,7 @@ namespace Grand.Services.Media
                     var attributeValues = productAttributeParser.ParseProductAttributeValues(product, attributesXml);
                     foreach (var attributeValue in attributeValues)
                     {
-                        var attributePicture = pictureService.GetPictureById(attributeValue.PictureId);
+                        var attributePicture = await pictureService.GetPictureById(attributeValue.PictureId);
                         if (attributePicture != null)
                         {
                             picture = attributePicture;
@@ -94,19 +94,19 @@ namespace Grand.Services.Media
             //now let's load the default product picture
             if (picture == null)
             {
-                var pp = product.ProductPictures.FirstOrDefault();
+                var pp = product.ProductPictures.OrderBy(x => x.DisplayOrder).FirstOrDefault();
                 if (pp != null)
-                    picture = pictureService.GetPictureById(pp.PictureId);
+                    picture = await pictureService.GetPictureById(pp.PictureId);
             }
 
             //let's check whether this product has some parent "grouped" product
-            if (picture == null && !product.VisibleIndividually && !String.IsNullOrEmpty(product.ParentGroupedProductId))
+            if (picture == null && !product.VisibleIndividually && !string.IsNullOrEmpty(product.ParentGroupedProductId))
             {
-                var parentProduct = EngineContext.Current.Resolve<IProductService>().GetProductById(product.ParentGroupedProductId);
-                if(parentProduct!=null)
-                    if(parentProduct.ProductPictures.Any())
+                var parentProduct = await productService.GetProductById(product.ParentGroupedProductId);
+                if (parentProduct != null)
+                    if (parentProduct.ProductPictures.Any())
                     {
-                        picture = pictureService.GetPictureById(parentProduct.ProductPictures.FirstOrDefault().PictureId);
+                        picture = await pictureService.GetPictureById(parentProduct.ProductPictures.FirstOrDefault().PictureId);
 
                     }
             }

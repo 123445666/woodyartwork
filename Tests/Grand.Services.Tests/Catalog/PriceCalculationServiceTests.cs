@@ -2,18 +2,20 @@
 using Grand.Core.Caching;
 using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Directory;
 using Grand.Core.Domain.Discounts;
 using Grand.Core.Domain.Orders;
 using Grand.Core.Domain.Stores;
+using Grand.Core.Tests.Caching;
 using Grand.Services.Customers;
 using Grand.Services.Directory;
 using Grand.Services.Discounts;
-using Grand.Services.Stores;
 using Grand.Services.Vendors;
+using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Catalog.Tests
 {
@@ -33,13 +35,13 @@ namespace Grand.Services.Catalog.Tests
         private IProductService _productService;
         private ShoppingCartSettings _shoppingCartSettings;
         private CatalogSettings _catalogSettings;
-        private CurrencySettings _currencySettings;
-        private ICacheManager _cacheManager;
         private IPriceCalculationService _priceCalcService;
         private IVendorService _vendorService;
-        private IStoreService _storeService;
         private ICustomerService _customerService;
+        private ICustomerProductService _customerProductService;
         private ICurrencyService _currencyService;
+        private IMediator _eventPublisher;
+
         [TestInitialize()]
         public void TestInitialize()
         {
@@ -61,7 +63,6 @@ namespace Grand.Services.Catalog.Tests
             _categoryService = new Mock<ICategoryService>().Object;
             _manufacturerService = new Mock<IManufacturerService>().Object;
             _vendorService = new Mock<IVendorService>().Object;
-            _storeService = new Mock<IStoreService>().Object;
             _customerService = new Mock<ICustomerService>().Object;
             _currencyService = new Mock<ICurrencyService>().Object;
             tempProductService = new Mock<IProductService>();
@@ -71,8 +72,10 @@ namespace Grand.Services.Catalog.Tests
             _productAttributeParser = new Mock<IProductAttributeParser>().Object;
             _shoppingCartSettings = new ShoppingCartSettings();
             _catalogSettings = new CatalogSettings();
-            _currencySettings = new CurrencySettings();
-            _cacheManager = new GrandNullCache();
+            _customerProductService = new Mock<ICustomerProductService>().Object;
+            var eventPublisher = new Mock<IMediator>();
+            _eventPublisher = eventPublisher.Object;
+
             _priceCalcService = new PriceCalculationService(
                 _workContext,
                 _storeContext,
@@ -81,18 +84,15 @@ namespace Grand.Services.Catalog.Tests
                 _manufacturerService,
                 _productAttributeParser,
                 _productService,
-                _customerService,
-                _cacheManager,
+                _customerProductService,
                 _vendorService,
-                _storeService,
                 _currencyService,
                 _shoppingCartSettings,
-                _catalogSettings,
-                _currencySettings);
+                _catalogSettings);
         }
 
         [TestMethod()]
-        public void Can_get_final_product_price()
+        public async Task Can_get_final_product_price()
         {
             var product = new Product
             {
@@ -105,13 +105,13 @@ namespace Grand.Services.Catalog.Tests
 
             var customer = new Customer();
 
-            Assert.AreEqual(49.99M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 1));
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 1)).finalPrice);
             //returned price FOR ONE UNIT should be the same, even if quantity is different than 1
-            Assert.AreEqual(49.99M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 10));
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 10)).finalPrice);
         }
 
         [TestMethod()]
-        public void Can_get_final_product_price_with_tier_prices()
+        public async Task Can_get_final_product_price_with_tier_prices()
         {
             var product = new Product
             {
@@ -120,7 +120,6 @@ namespace Grand.Services.Catalog.Tests
                 Price = 49.99M,
                 CustomerEntersPrice = false,
                 Published = true,
-                HasTierPrices = true //set to true - now Product has some TierPrices
             };
 
             //TierPrice is simply "the more you buy, the less you pay"
@@ -135,22 +134,22 @@ namespace Grand.Services.Catalog.Tests
             quantity: >=200         price: 2
             */
 
-            Assert.AreEqual(49.99M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 1));
-            Assert.AreEqual(49.99M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 5));
-            Assert.AreEqual(49.99M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 9));
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 1)).finalPrice);
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 5)).finalPrice);
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 9)).finalPrice);
 
-            Assert.AreEqual(10M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 10));
-            Assert.AreEqual(10M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 11));
-            Assert.AreEqual(10M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 151));
-            Assert.AreEqual(10M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 199));
+            Assert.AreEqual(10M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 10)).finalPrice);
+            Assert.AreEqual(10M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 11)).finalPrice);
+            Assert.AreEqual(10M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 151)).finalPrice);
+            Assert.AreEqual(10M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 199)).finalPrice);
 
-            Assert.AreEqual(2M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 200));
-            Assert.AreEqual(2M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 201));
-            Assert.AreEqual(2M, _priceCalcService.GetFinalPrice(product, customer, 0, false, 22201));
+            Assert.AreEqual(2M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 200)).finalPrice);
+            Assert.AreEqual(2M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 201)).finalPrice);
+            Assert.AreEqual(2M, (await _priceCalcService.GetFinalPrice(product, customer, 0, false, 22201)).finalPrice);
         }
 
         [TestMethod()]
-        public void Can_get_final_product_price_with_tier_prices_by_customerRole()
+        public async Task Can_get_final_product_price_with_tier_prices_by_customerRole()
         {
             /*
             this test shows how property "Price" of class "Product" can change in relation to:
@@ -165,7 +164,6 @@ namespace Grand.Services.Catalog.Tests
                 Price = 49.99M,
                 CustomerEntersPrice = false,
                 Published = true,
-                HasTierPrices = true
             };
 
             //this is normal user - normal prices
@@ -200,30 +198,30 @@ namespace Grand.Services.Catalog.Tests
             var normalCustomer = new Customer();
             normalCustomer.CustomerRoles.Add(customerRoleNormal);
             //49.99 - 40 - 2
-            Assert.AreEqual(49.99M, _priceCalcService.GetFinalPrice(product, normalCustomer, 0, false, 1));
-            Assert.AreEqual(40, _priceCalcService.GetFinalPrice(product, normalCustomer, 0, false, 5));
-            Assert.AreEqual(2, _priceCalcService.GetFinalPrice(product, normalCustomer, 0, false, 1000));
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetFinalPrice(product, normalCustomer, 0, false, 1)).finalPrice);
+            Assert.AreEqual(40, (await _priceCalcService.GetFinalPrice(product, normalCustomer, 0, false, 5)).finalPrice);
+            Assert.AreEqual(2, (await _priceCalcService.GetFinalPrice(product, normalCustomer, 0, false, 1000)).finalPrice);
 
             //lets try vip customer
             var vipCustomer = new Customer();
             vipCustomer.CustomerRoles.Add(customerRoleVip);
             //49.99 - 20 - 2
-            Assert.AreEqual(49.99M, _priceCalcService.GetFinalPrice(product, vipCustomer, 0, false, 1));
-            Assert.AreEqual(20, _priceCalcService.GetFinalPrice(product, vipCustomer, 0, false, 5));
-            Assert.AreEqual(2, _priceCalcService.GetFinalPrice(product, vipCustomer, 0, false, 1000));
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetFinalPrice(product, vipCustomer, 0, false, 1)).finalPrice);
+            Assert.AreEqual(20, (await _priceCalcService.GetFinalPrice(product, vipCustomer, 0, false, 5)).finalPrice);
+            Assert.AreEqual(2, (await _priceCalcService.GetFinalPrice(product, vipCustomer, 0, false, 1000)).finalPrice);
 
             //lets try king customer
             var kingCustomer = new Customer();
             kingCustomer.CustomerRoles.Add(customerRoleKingOfWorld);
             //49.99 - 10 - 2
-            Assert.AreEqual(49.99M, _priceCalcService.GetFinalPrice(product, kingCustomer, 0, false, 1));
-            Assert.AreEqual(10, _priceCalcService.GetFinalPrice(product, kingCustomer, 0, false, 5));
-            Assert.AreEqual(2, _priceCalcService.GetFinalPrice(product, kingCustomer, 0, false, 1000));
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetFinalPrice(product, kingCustomer, 0, false, 1)).finalPrice);
+            Assert.AreEqual(10, (await _priceCalcService.GetFinalPrice(product, kingCustomer, 0, false, 5)).finalPrice);
+            Assert.AreEqual(2, (await _priceCalcService.GetFinalPrice(product, kingCustomer, 0, false, 1000)).finalPrice);
             //I know it is intricate, but all works fine
         }
 
         [TestMethod()]
-        public void Can_get_final_product_price_with_additionalFee()
+        public async Task Can_get_final_product_price_with_additionalFee()
         {
             //tests if price is valid for additional charge (additional fee) 
             var product = new Product
@@ -239,11 +237,11 @@ namespace Grand.Services.Catalog.Tests
 
             //additional charge +1000
             //==1049.99
-            Assert.AreEqual(1049.99M, _priceCalcService.GetFinalPrice(product, customer, 1000, false, 1));
+            Assert.AreEqual(1049.99M, (await _priceCalcService.GetFinalPrice(product, customer, 1000, false, 1)).finalPrice);
         }
 
         [TestMethod()]
-        public void Can_get_final_product_price_with_discount()
+        public async Task Can_get_final_product_price_with_discount()
         {
             var product = new Product
             {
@@ -265,24 +263,28 @@ namespace Grand.Services.Catalog.Tests
                 DiscountLimitation = DiscountLimitationType.Unlimited
             };
 
-            tempDiscountServiceMock.Setup(x => x.GetDiscountById(discount001.Id)).Returns(discount001);
+            tempDiscountServiceMock.Setup(x => x.GetDiscountById(discount001.Id)).ReturnsAsync(discount001);
 
             product.AppliedDiscounts.Add(discount001.Id);
 
-            tempDiscountServiceMock.Setup(x => x.ValidateDiscount(discount001, customer)).Returns(new DiscountValidationResult() { IsValid = true });
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToCategories, "", "", false)).Returns(new List<Discount>());
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToManufacturers, "", "", false)).Returns(new List<Discount>());
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToAllProducts, "", "", false)).Returns(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.ValidateDiscount(discount001, customer)).ReturnsAsync(new DiscountValidationResult() { IsValid = true });
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToCategories, "1", "", "", false)).ReturnsAsync(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToManufacturers, "1", "", "", false)).ReturnsAsync(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToAllProducts, "1", "", "", false)).ReturnsAsync(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToSkus, "1", "", "", false)).ReturnsAsync(new List<Discount>() { discount001 });
 
             var discountAmount = discount001.DiscountAmount;
-            tempDiscountServiceMock.Setup(x => x.GetPreferredDiscount(It.IsAny<List<AppliedDiscount>>(), customer, product, 49.99M, out discountAmount)).Returns(new List<AppliedDiscount>());
+            tempDiscountServiceMock.Setup(x => x.GetPreferredDiscount(It.IsAny<List<AppliedDiscount>>(), customer, product, 49.99M)).ReturnsAsync((new List<AppliedDiscount>(), 10));
 
             //it should return 39.99 - price cheaper about 10 
-            Assert.AreEqual(39.99M, _priceCalcService.GetFinalPrice(product, customer, 0, true, 1));
+            var finalprice = await _priceCalcService.GetFinalPrice(product, customer, 0, true, 1);
+            var pp = finalprice.finalPrice;
+
+            Assert.AreEqual(39.99M, pp);
         }
 
         [TestMethod()]
-        public void Can_get_shopping_cart_item_unitPrice()
+        public async Task Can_get_shopping_cart_item_unitPrice()
         {
             var customer001 = new Customer { Id = "98767" };
             tempWorkContext.Setup(x => x.CurrentCustomer).Returns(customer001);
@@ -295,7 +297,7 @@ namespace Grand.Services.Catalog.Tests
                 CustomerEntersPrice = false,
                 Published = true,
             };
-            tempProductService.Setup(x => x.GetProductById("242422")).Returns(product001);
+            tempProductService.Setup(x => x.GetProductById("242422", false)).ReturnsAsync(product001);
 
             var shoppingCartItem = new ShoppingCartItem
             {
@@ -305,15 +307,15 @@ namespace Grand.Services.Catalog.Tests
 
             customer001.ShoppingCartItems.Add(shoppingCartItem);
 
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToCategories, "", "", false)).Returns(new List<Discount>());
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToManufacturers, "", "", false)).Returns(new List<Discount>());
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToAllProducts, "", "", false)).Returns(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToCategories, "1", "", "", false)).ReturnsAsync(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToManufacturers, "1", "", "", false)).ReturnsAsync(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToAllProducts, "1", "", "", false)).ReturnsAsync(new List<Discount>());
 
-            Assert.AreEqual(49.99M, _priceCalcService.GetUnitPrice(shoppingCartItem));
+            Assert.AreEqual(49.99M, (await _priceCalcService.GetUnitPrice(shoppingCartItem)).unitprice);
         }
 
         [TestMethod()]
-        public void Can_get_shopping_cart_item_subTotal()
+        public async Task Can_get_shopping_cart_item_subTotal()
         {
             var product001 = new Product
             {
@@ -323,7 +325,7 @@ namespace Grand.Services.Catalog.Tests
                 CustomerEntersPrice = false,
                 Published = true,
             };
-            tempProductService.Setup(x => x.GetProductById("242422")).Returns(product001);
+            tempProductService.Setup(x => x.GetProductById("242422", false)).ReturnsAsync(product001);
 
             var customer001 = new Customer { Id = "98767" };
             tempWorkContext.Setup(x => x.CurrentCustomer).Returns(customer001);
@@ -336,11 +338,11 @@ namespace Grand.Services.Catalog.Tests
 
             customer001.ShoppingCartItems.Add(shoppingCartItem);
 
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToCategories, "", "", false)).Returns(new List<Discount>());
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToManufacturers, "", "", false)).Returns(new List<Discount>());
-            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToAllProducts, "", "", false)).Returns(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToCategories, "1", "", "", false)).ReturnsAsync(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToManufacturers, "1", "", "", false)).ReturnsAsync(new List<Discount>());
+            tempDiscountServiceMock.Setup(x => x.GetAllDiscounts(DiscountType.AssignedToAllProducts, "1", "", "", false)).ReturnsAsync(new List<Discount>());
 
-            Assert.AreEqual(110.22M, _priceCalcService.GetSubTotal(shoppingCartItem));
+            Assert.AreEqual(110.22M,(await _priceCalcService.GetSubTotal(shoppingCartItem)).subTotal);
         }
     }
 }

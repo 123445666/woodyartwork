@@ -15,7 +15,7 @@
                 <div id="conditions-grid"></div>
             </div>
             <div class="panel-footer">
-                <input type="submit" id="btnAddNewCondition" name="btnAddNewCondition" value="@T("Admin.Customers.CustomerAction.Conditions.AddNew")" onclick="javascript:setLocation('@(Url.Action("AddCondition", "CustomerAction", new { customerActionId = Model.Id }))'); return false;" class="btn default" />
+                <button type="submit" id="btnAddNewCondition" name="btnAddNewCondition" onclick="javascript:setLocation('@(Url.Action("AddCondition", "CustomerAction", new { customerActionId = Model.Id }))'); return false;" class="k-button"><i class="fa fa-plus"></i>&nbsp;@T("Admin.Customers.CustomerAction.Conditions.AddNew")</button>
             </div>
         </div>
         <script>
@@ -69,7 +69,7 @@
                     field: "Name",
                     title: "@T("Admin.Customers.CustomerAction.Fields.Name")",
                     width: 300,
-                    template: '<a class="k-link" href="@Url.Content("~/Admin/CustomerAction/EditCondition")?customerActionId=@(Model.Id)&cid=#=Id#">#=Name#</a>',
+                    template: '<a class="k-link" href="@Url.Content("~/Admin/CustomerAction/EditCondition")?customerActionId=@(Model.Id)&cid=#=Id#">#=kendo.htmlEncode(Name)#</a>',
                 },
                 {
                     field: "Condition",

@@ -1,14 +1,15 @@
 ﻿@model CustomerModel
+@inject Grand.Core.Domain.Forums.ForumSettings forumsettings 
 @{
     //page title
     ViewBag.Title = T("Admin.Customers.Customers.EditCustomerDetails").Text;
 }
 <form asp-controller="Customer" asp-action="Edit" method="post" id = "customer-form">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-user"></i>
                         @T("Admin.Customers.Customers.EditCustomerDetails") - @Model.LastName @Model.FirstName
@@ -18,33 +19,37 @@
                         <div class="btn-group btn-group-devided util-btn-margin-bottom-5">
                             <button class="btn btn-success" type="submit" name="save"><i class="fa fa-check"></i> @T("Admin.Common.Save") </button>
                             <button class="btn btn-success" type="submit" name="save-continue"><i class="fa fa-check-circle"></i> @T("Admin.Common.SaveContinue") </button>
-                            <input type="button" id="sendemail" class="btn yellow" value="@T("Admin.Customers.Customers.SendEmail")" />
-                            <input type="button" id="sendprivatemessage" class="btn blue" value="@T("Admin.Customers.Customers.SendPM")" />
+                            <button class="btn btn-info" type="submit" id="sendemail"><i class="fa fa-paper-plane" aria-hidden="true"></i> &nbsp;@T("Admin.Customers.Customers.SendEmail") </button>
+                            @if (forumsettings.AllowPrivateMessages)
+                            {
+                                <button class="btn btn-warning" type="submit" id="sendprivatemessage"><i class="fa fa-paper-plane" aria-hidden="true"></i> &nbsp;@T("Admin.Customers.Customers.SendPM") </button>
+                            }
                             @if (Model.AllowSendingOfWelcomeMessage)
                             {
-                                <input type="submit" name="send-welcome-message" class="btn default" value="@T("Admin.Customers.Customers.SendWelcomeMessage")" onclick="return confirm('@T("Admin.Common.AreYouSure")');" />
+                                <button class="btn btn-primary" type="submit" name="send-welcome-message" onclick="return confirm('@T("Admin.Common.AreYouSure")');"><span class="k-icon k-i-rotate"></span> &nbsp;@T("Admin.Customers.Customers.SendWelcomeMessage") </button>
                             }
                             @if (Model.AllowReSendingOfActivationMessage)
                             {
-                                <input type="submit" name="resend-activation-message" class="btn default" value="@T("Admin.Customers.Customers.ReSendActivationMessage")" onclick="return confirm('@T("Admin.Common.AreYouSure")');" />
+                                <button class="btn btn-primary" type="submit" name="resend-activation-message" onclick="return confirm('@T("Admin.Common.AreYouSure")');"><span class="k-icon k-i-rotate"></span> &nbsp;@T("Admin.Customers.Customers.ReSendActivationMessage") </button>
                             }
-                            <span id="customer-delete" class="btn red"><i class="fa fa-trash-o"></i> @T("Admin.Common.Delete")</span>
+                            <span id="customer-delete" class="btn red"><i class="fa fa-trash-o"></i><span class="hidden-xs"> @T("Admin.Common.Delete")</span></span>
+                            <vc:admin-widget widget-zone="customer_details_buttons" additional-data="Model" />
                         </div>
                     </div>
                 </div>
-                <div class="portlet-body form">
-                    @Html.Partial("_CreateOrUpdate", Model)
+                <div class="x_content form">
+                   <partial name="_CreateOrUpdate" model="Model" />
                 </div>
             </div>
         </div>
     </div>
 </form>
-@Html.DeleteConfirmation("customer-delete")
+<admin-delete-confirmation button-id="customer-delete"/>
 
 @*send email form*@
 <div id="sendemail-window" style="display:none;">
     <form asp-controller="Customer" asp-action="SendEmail" method="post" asp-route-id="Id">
-        <antiforgery-token />
+        
         <input type="hidden" asp-for="Id" id="sendemail_customerId" />
         <div class="form-horizontal">
             <div class="form-body">
@@ -79,7 +84,7 @@
             </div>
             <div class="form-actions">
                 <div class="col-md-offset-3 col-sm-offset-3 col-md-6 col-sm-6">
-                    <input type="submit" class="btn default" value="@T("Admin.Customers.Customers.SendEmail")" />
+                    <button type="submit" class="k-button"><span class="k-icon k-i-email"></span>&nbsp;@T("Admin.Customers.Customers.SendEmail")</button>
                 </div>
             </div>
         </div>
@@ -107,20 +112,20 @@
 @*send PM form*@
 <div id="sendprivatemessage-window" style="display:none;">
     <form asp-controller="Customer" asp-action="SendPm" method="post" asp-route-id="Id" >
-        <antiforgery-token />
+        
         <input type="hidden" asp-for="Id" id="sendprivatemessage_customerId" />
         <div class="form-horizontal">
             <div class="form-body">
                 <div class="form-group">
-                    <admin-label asp-for="SendPm.Subject" class="control-label col-md-4 col-sm-4"/>
-                    <div class="col-md-8 col-sm-8">
+                    <admin-label asp-for="SendPm.Subject" class="control-label col-xs-8 col-md-4 col-sm-4"/>
+                    <div class="col-xs-4 col-md-8 col-sm-8">
                         <admin-input asp-for="SendPm.Subject" />
                         <span asp-validation-for="SendPm.Subject"></span>
                     </div>
                 </div>
                 <div class="form-group">
-                    <admin-label asp-for="SendPm.Message" class="control-label col-md-4 col-sm-4" />
-                    <div class="col-md-8 col-sm-8">
+                    <admin-label asp-for="SendPm.Message" class="control-label col-xs-8 col-md-4 col-sm-4" />
+                    <div class="col-xs-4 col-md-8 col-sm-8">
                         <admin-textarea asp-for="SendPm.Message"></admin-textarea>
                         <span asp-validation-for="SendPm.Message"></span>
                     </div>
@@ -128,7 +133,7 @@
             </div>
             <div class="form-actions">
                 <div class="col-md-offset-3 col-sm-offset-3 col-md-6 col-sm-6">
-                    <input type="submit" class="btn default" value="@T("Admin.Customers.Customers.SendPM")" />
+                    <button type="submit" class="k-button"><span class="k-icon k-i-email-box"></span>&nbsp;@T("Admin.Customers.Customers.SendPM")</button>
                 </div>
             </div>
         </div>

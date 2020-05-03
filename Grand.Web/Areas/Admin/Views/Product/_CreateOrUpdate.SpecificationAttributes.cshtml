@@ -6,11 +6,13 @@
     /*hide "add spec" table if no attributes are defined*/
     if (Model.AddSpecificationAttributeModel.AvailableAttributes.Count > 0)
     {
-        <div class="panel panel-default">
-            <div class="panel-body">
-                <div id="specificationattributes-grid"></div>
-            </div>
-        </div>
+<div class="panel panel-default">
+    <vc:admin-widget widget-zone="product_details_specification_attribute_details_top" additional-data="Model" />
+    <div class="panel-body">
+        <div id="specificationattributes-grid"></div>
+    </div>
+    <vc:admin-widget widget-zone="product_details_specification_attribute_details_bottom" additional-data="Model" />
+</div>
             <script>
                 $(document).ready(function() {
                     $("#specificationattributes-grid").kendoGrid({
@@ -96,7 +98,7 @@
                                                             .appendTo(container).kendoDropDownList().data("kendoDropDownList");
                                                         $.ajax({
                                                             type: "GET",
-                                                            url: "@(Url.Action("GetOptionsByAttributeId", "SpecificationAttribute"))",
+                                                            url: "@(Url.Action("GetOptionsByAttributeId", "Product"))",
                                                             data: { "attributeId": options.model.AttributeId },
                                                             success: function (data) {
                                                                 var availableOptions = [];
@@ -178,13 +180,13 @@
                 $.ajax({
                     cache: false,
                     type: "GET",
-                    url: "@(Url.Action("GetOptionsByAttributeId", "SpecificationAttribute"))",
+                    url: "@(Url.Action("GetOptionsByAttributeId", "Product"))",
                     data: { "attributeId": selectedAttributeId },
                     success: function(data) {
                         var ddlSpecOptions = $("#@Html.FieldIdFor(model => model.AddSpecificationAttributeModel.SpecificationAttributeOptionId)");
                         ddlSpecOptions.html('');
                         $.each(data, function(id, option) {
-                            ddlSpecOptions.append($('<option></option>').val(option.id).html(option.name));
+                            ddlSpecOptions.append($('<option></option>').val(option.id).html(kendo.htmlEncode(option.name)));
                         });
                     },
                     error: function(xhr, ajaxOptions, thrownError) {
@@ -281,7 +283,7 @@
             <div class="form-group">
                 <admin-label asp-for="AddSpecificationAttributeModel.AttributeTypeId" />
                 <div class="col-md-9 col-sm-9">
-                    <admin-select asp-for="AddSpecificationAttributeModel.AttributeTypeId" asp-items="((SpecificationAttributeType)Model.AddSpecificationAttributeModel.AttributeTypeId).ToSelectList()" />
+                    <admin-select asp-for="AddSpecificationAttributeModel.AttributeTypeId" asp-items="((SpecificationAttributeType)Model.AddSpecificationAttributeModel.AttributeTypeId).ToSelectList(Context)" />
                     <span asp-validation-for="AddSpecificationAttributeModel.AttributeTypeId"></span>
                 </div>
             </div>
@@ -309,9 +311,9 @@
             <div class="form-group" id="pnlAllowFiltering">
                 <admin-label asp-for="AddSpecificationAttributeModel.AllowFiltering" />
                 <div class="col-md-9 col-sm-9">
-                    <label class="mt-checkbox mt-checkbox-outline">
+                    <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                         <admin-input asp-for="AddSpecificationAttributeModel.AllowFiltering" />
-                        <span></span>
+                         <div class="control__indicator"></div>
                     </label>
                     <span asp-validation-for="AddSpecificationAttributeModel.AllowFiltering"></span>
                 </div>
@@ -319,9 +321,9 @@
             <div class="form-group">
                 <admin-label asp-for="AddSpecificationAttributeModel.ShowOnProductPage" />
                 <div class="col-md-9 col-sm-9">
-                    <label class="mt-checkbox mt-checkbox-outline">
+                    <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                         <admin-input asp-for="AddSpecificationAttributeModel.ShowOnProductPage" />
-                        <span></span>
+                         <div class="control__indicator"></div>
                     </label>
                     <span asp-validation-for="AddSpecificationAttributeModel.ShowOnProductPage"></span>
                 </div>
@@ -334,9 +336,9 @@
                 </div>
             </div>
             <div class="form-actions">
-                    <div class="col-md-offset-3 col-md-9 col-sm-9">
-                        <input type="button" id="addProductSpec" class="btn green" value="@T("Admin.Catalog.Products.SpecificationAttributes.AddButton")" />
-                    </div>
+                <div class="col-md-offset-3 col-md-9 col-sm-9">
+                    <button type="button" id="addProductSpec" class="k-button"><i class="fa fa-plus"></i>&nbsp;@T("Admin.Catalog.Products.SpecificationAttributes.AddButton")</button>
+                </div>
             </div>
         </div>
     </div>

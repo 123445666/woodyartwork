@@ -5,24 +5,27 @@ using Grand.Core.Domain.Configuration;
 using Grand.Core.Infrastructure;
 using Grand.Framework.Infrastructure.Extensions;
 using Grand.Services.Configuration;
-using Grand.Services.Events;
+using MediatR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Tests.Configuration
 {
     public class ConfigFileSettingService : SettingService
     {
+        private readonly ICacheManager _cacheManager;
         public ConfigFileSettingService(ICacheManager cacheManager,
-            IEventPublisher eventPublisher,
-            IRepository<Setting> settingRepository) :
-            base(cacheManager, eventPublisher, settingRepository)
+            IMediator eventPublisher,
+            IRepository<Setting> settingRepository,
+            IServiceProvider serviceProvider) :
+            base(cacheManager, eventPublisher, settingRepository, serviceProvider)
         {
-
+            _cacheManager = cacheManager;
         }
         public override Setting GetSettingById(string settingId)
         {
@@ -54,12 +57,12 @@ namespace Grand.Services.Tests.Configuration
             return defaultValue;
         }
 
-        public override void DeleteSetting(Setting setting)
+        public override Task DeleteSetting(Setting setting)
         {
             throw new InvalidOperationException("Deleting settings is not supported");
         }
 
-        public override void SetSetting<T>(string key, T value, string storeId = "", bool clearCache = true)
+        public override Task SetSetting<T>(string key, T value, string storeId = "", bool clearCache = true)
         {
             throw new NotImplementedException();
         }
@@ -95,8 +98,9 @@ namespace Grand.Services.Tests.Configuration
             return settings;
         }
 
-        public override void ClearCache()
+        public override Task ClearCache()
         {
+            return Task.CompletedTask;
         }
     }
 }

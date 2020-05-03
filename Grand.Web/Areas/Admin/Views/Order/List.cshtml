@@ -5,11 +5,11 @@
     ViewBag.Title = T("Admin.Orders").Text;
 }
 <form asp-controller="Order" asp-action="List" method="post">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="icon-basket"></i>
                         @T("Admin.Orders")
@@ -37,6 +37,7 @@
                                         <input type="button" id="exportexcel-selected" class="btn default" style="width: 100%;" value="@T("Admin.Common.ExportToExcel.Selected")" />
                                     </li>
                                 </ul>
+                                <vc:admin-widget widget-zone="order_list_buttons" additional-data="null" />
                             </div>
                         }
                         <button type="submit" name="pdf-invoice-all" class="btn green">
@@ -47,26 +48,32 @@
                             <i class="fa fa-file-pdf-o"></i>
                             @T("Admin.Orders.PdfInvoice.Selected")
                         </button>
+                        <button type="button" name="delete-selected" id="delete-selected" class="btn red" onclick=" return confirm('@T("Admin.Common.AreYouSure")'); ">
+                            <i class="fa fa-trash-o"></i>
+                            @T("Admin.Common.Delete.Selected")
+                        </button>
                     </div>
 
                 </div>
-                <div class="portlet-body form">
+                <div class="x_content form">
                     <div class="form-horizontal">
 
                         <div class="form-body col-md-6">
                             <div class="form-group">
-                                <admin-label asp-for="BillingEmail" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="BillingEmail" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-input asp-for="BillingEmail" />
                                 </div>
                             </div>
                         </div>
                         <div class="form-body col-md-6">
-                            <div class="form-group">
-                                <admin-label asp-for="GoDirectlyToNumber" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
-                                    <admin-input asp-for="GoDirectlyToNumber" />
-                                    <input type="submit" name="go-to-order-by-number" id="gotoorderbynumber" class="k-button" value="@T("Admin.Common.Go")" />
+                            <div class="form-group form-inline">
+                                <admin-label asp-for="GoDirectlyToNumber" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
+                                    <div class="input-group">
+                                        <admin-input asp-for="GoDirectlyToNumber" />
+                                    </div>
+                                    <input type="submit" name="go-to-order-by-number" id="gotoorderbynumber" class="input-group k-button" value="@T("Admin.Common.Go")" />
                                 </div>
                             </div>
                         </div>
@@ -74,34 +81,34 @@
 
                         <div class="form-body col-md-6 extend-collapse">
                             <div class="form-group">
-                                <admin-label asp-for="StartDate" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="StartDate" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-input asp-for="StartDate" />
                                 </div>
                             </div>
                             <div class="form-group">
-                                <admin-label asp-for="EndDate" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="EndDate" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-input asp-for="EndDate" />
                                 </div>
                             </div>
                             <div class="form-group">
-                                <admin-label asp-for="BillingLastName" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="BillingLastName" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-input asp-for="BillingLastName" />
                                 </div>
                             </div>
 
 
                             <div class="form-group">
-                                <admin-label asp-for="BillingCountryId" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="BillingCountryId" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-select asp-for="BillingCountryId" asp-items="Model.AvailableCountries" />
                                 </div>
                             </div>
                             <div class="form-group">
-                                <admin-label asp-for="ProductId" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="ProductId" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <input class="form-control" type="text" id="search-product-name" autocomplete="off" />
                                     <span id="search-product-friendly-name"></span>
                                     <input type="button" id="search-product-clear" class="k-button" style="display:none;" value="@T("Admin.Common.Clear")" />
@@ -133,52 +140,52 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <admin-label asp-for="OrderGuid" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="OrderGuid" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-input asp-for="OrderGuid" />
                                 </div>
                             </div>
                         </div>
                         <div class="form-body col-md-6 extend-collapse">
                             <div class="form-group" @(Model.IsLoggedInAsVendor ? Html.Raw("style='display: none;'") : null)>
-                                <admin-label asp-for="OrderStatusId" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="OrderStatusId" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-select asp-for="OrderStatusId" asp-items="Model.AvailableOrderStatuses" />
                                 </div>
                             </div>
                             <div class="form-group">
-                                <admin-label asp-for="PaymentStatusId" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="PaymentStatusId" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-select asp-for="PaymentStatusId" asp-items="Model.AvailablePaymentStatuses" />
                                 </div>
                             </div>
                             <div class="form-group" @(Model.IsLoggedInAsVendor ? Html.Raw("style='display: none;'") : null)>
-                                <admin-label asp-for="ShippingStatusId" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="ShippingStatusId" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-select asp-for="ShippingStatusId" asp-items="Model.AvailableShippingStatuses" />
                                 </div>
                             </div>
                             <div class="form-group">
-                                <admin-label asp-for="StoreId" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="StoreId" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-select asp-for="StoreId" asp-items="Model.AvailableStores" />
                                 </div>
                             </div>
                             <div class="form-group" @(Model.IsLoggedInAsVendor ? Html.Raw("style='display: none;'") : null)>
-                                <admin-label asp-for="VendorId" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="VendorId" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-select asp-for="VendorId" asp-items="Model.AvailableVendors" />
                                 </div>
                             </div>
                             <div class="form-group">
-                                <admin-label asp-for="WarehouseId" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="WarehouseId" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-select asp-for="WarehouseId" asp-items="Model.AvailableWarehouses" />
                                 </div>
                             </div>
                             <div class="form-group" @(Model.IsLoggedInAsVendor ? Html.Raw("style='display: none;'") : null)>
-                                <admin-label asp-for="PaymentMethodSystemName" class="col-sm-4 col-md4 control-label" />
-                                <div class="col-md-8 col-sm-8">
+                                <admin-label asp-for="PaymentMethodSystemName" class="col-xs-4 col-sm-4 col-md-4 control-label" />
+                                <div class="col-xs-8 col-md-8 col-sm-8">
                                     <admin-select asp-for="PaymentMethodSystemName" asp-items="Model.AvailablePaymentMethods" />
                                 </div>
                             </div>
@@ -196,7 +203,7 @@
                             </div>
                         </div>
 
-                        <div class="portlet-body">
+                        <div class="x_content">
                             <div id="orders-grid"></div>
                         </div>
                     </div>
@@ -228,7 +235,22 @@
                     schema: {
                         data: "Data",
                         total: "Total",
-                        errors: "Errors"
+                        errors: "Errors",
+                        model: {
+                            id: "Id",
+                            fields: {
+                                Id: { editable: false, type: "string" },
+                                CreatedOn: { type: "Date" },
+                                StoreName: { editable: false, type: "string" },
+                                OrderTotal: { editable: false, type: "string" },
+                                OrderStatus: { editable: false, type: "string" },
+                                PaymentStatus: { editable: false, type: "string" },
+                                ShippingStatus: { editable: false, type: "string" },
+                                CustomerEmail: { editable: false, type: "string" },
+                                CustomerFullName: { editable: false, type: "string" },
+                                OrderStatusId: { editable: false, type: "number" },
+                            }
+                        }
                     },
                     requestEnd: function (e) {
                         if (e.type == "read") {
@@ -239,7 +261,7 @@
                             }
                         }
                     },
-                    error: function(e) {
+                    error: function (e) {
                         display_kendoui_grid_error(e);
                         // Cancel the changes
                         this.cancelChanges();
@@ -262,10 +284,10 @@
                 columns: [
                     {
                         field: "Id",
-                        headerTemplate: "<label class='mt-checkbox mt-checkbox-outline'><input id='mastercheckbox' type='checkbox'/><span></span></label>",
+                        headerTemplate: "<label class='mt-checkbox mt-checkbox-outline control control-checkbox'><input id='mastercheckbox' type='checkbox'/> <div class='control__indicator'></div></label>",
                         headerAttributes: { style: "text-align:center" },
                         attributes: { style: "text-align:center" },
-                        template: "<label class='mt-checkbox mt-checkbox-outline'><input type='checkbox' value='#=Id#' class='checkboxGroups'/><span></span></label>",
+                        template: "<label class='mt-checkbox mt-checkbox-outline control control-checkbox'><input type='checkbox' value='#=Id#' class='checkboxGroups'/> <div class='control__indicator'></div></label>",
                         width: 40
                     },
                     {
@@ -278,34 +300,46 @@
                     {
                         //a vendor does not have access to this functionality
                         <text>{
-                            field: "OrderStatus",
-                            title: "@T("Admin.Orders.Fields.OrderStatus")",
-                            width: 120,
-                            template: '<a class="k-link" href="Edit/#=Id#">#=OrderStatus#</a>'
+                        field: "OrderStatus",
+                        title: "@T("Admin.Orders.Fields.OrderStatus")",
+                        width: 120,
+                        template: '<h4><a class="k-link orderstatuslist" href="Edit/#=Id#"><span class="label label-' +
+                            '# if(OrderStatusId == 10) {#warning #} #' +
+                            '# if(OrderStatusId == 20) {#info #} #' +
+                            '# if(OrderStatusId == 30) {#success #} #' +
+                            '# if(OrderStatusId == 40) {#danger #} #' +
+                            '">#=OrderStatus#</span></a></h4>'
                         },</text>
-                                }
-                        {
-                            field: "PaymentStatus",
-                            title: "@T("Admin.Orders.Fields.PaymentStatus")",
-                            width: 120,
-                            template: '<a class="k-link" href="Edit/#=Id#">#=PaymentStatus#</a>'
+                    }
+                    {
+                        field: "PaymentStatus",
+                        title: "@T("Admin.Orders.Fields.PaymentStatus")",
+                        width: 120,
+                        template: '<a class="k-link" href="Edit/#=Id#">#=PaymentStatus#</a>'
                     },
                     @if (!Model.IsLoggedInAsVendor)
                     {
                         //a vendor does not have access to this functionality
                         <text>{
-                            field: "ShippingStatus",
-                            title: "@T("Admin.Orders.Fields.ShippingStatus")",
-                            width: 120,
-                            template: '<a class="k-link" href="Edit/#=Id#">#=ShippingStatus#</a>'
-                        },</text>
+                        field: "ShippingStatus",
+                        title: "@T("Admin.Orders.Fields.ShippingStatus")",
+                        width: 120,
+                        template: '<a class="k-link" href="Edit/#=Id#">#=ShippingStatus#</a>'
+                    },</text>
                                 }
                     {
                         field: "CustomerEmail",
                         title: "@T("Admin.Orders.Fields.Customer")",
                         width: 220,
-                        template: '<a class="k-link" href="@Url.Content("~/Admin/Customer/Edit/")#=CustomerId#">#=CustomerFullName# (#=CustomerEmail#)</a>'
-                    },
+                        @if (!Model.IsLoggedInAsVendor)
+                        {
+                            <text>
+                            template: function(dataItem) {
+                                    return "<a class=\"k-link\" href='@Url.Content("~/Admin/Customer/Edit/")" + dataItem.CustomerId + "'>" + kendo.htmlEncode(dataItem.CustomerFullName) + " (" + dataItem.CustomerEmail + ")</a>";
+                            }
+                            </text>
+                        }
+                        },
                     {
                         field: "StoreName",
                         title: "@T("Admin.Orders.Fields.Store")",
@@ -317,7 +351,7 @@
                         width: 180,
                         type: "date",
                         format: "{0:G}",
-                        
+
                     },
                     @if (!Model.IsLoggedInAsVendor)
                     {
@@ -326,6 +360,7 @@
                         field: "OrderTotal",
                         title: "@T("Admin.Orders.Fields.OrderTotal")",
                         width: 150,
+                        template: '#=OrderTotal#',
                         headerAttributes: { style: "text-align:right" },
                         attributes: { style: "text-align:right" },
                         footerTemplate: '<div><strong>@T("Admin.Orders.Report.Summary"):</strong></div>' +
@@ -406,6 +441,33 @@
                 }
             });
 
+            $('#delete-selected').click(function(e) {
+
+                e.preventDefault();
+
+                var postData = {
+                    selectedIds: selectedIds
+                };
+                addAntiForgeryToken(postData);
+
+                $.ajax({
+                    cache: false,
+                    type: "POST",
+                    url: "@(Url.Action("DeleteSelected", "Order"))",
+                    data: postData,
+                    complete: function(data) {
+                        //reload grid
+                        var grid = $('#orders-grid').data('kendoGrid');
+                        grid.dataSource.read();
+                    },
+                    error: function(xhr, ajaxOptions, thrownError) {
+                        alert(thrownError);
+                    },
+                    traditional: true
+                });
+                return false;
+            });
+
             $('#mastercheckbox').click(function () {
                 $('.checkboxGroups').prop('checked', $(this).is(':checked')).change();
             });
@@ -448,7 +510,8 @@
                 BillingCountryId: $('#@Html.FieldIdFor(model => model.BillingCountryId)').val(),
                 PaymentMethodSystemName: $('#@Html.FieldIdFor(model => model.PaymentMethodSystemName)').val(),
                 ProductId: $('#@Html.FieldIdFor(model => model.ProductId)').val(),
-                OrderGuid: $('#@Html.FieldIdFor(model => model.OrderGuid)').val()
+                OrderGuid: $('#@Html.FieldIdFor(model => model.OrderGuid)').val(),
+                GoDirectlyToNumber: $('#@Html.FieldIdFor(model => model.GoDirectlyToNumber)').val(),
             };
             addAntiForgeryToken(data);
             return data;
@@ -487,7 +550,7 @@
 
 @*export selected (XML). We don't use GET approach because it's limited to 2K-4K chars and won't work for large number of entities*@
 <form asp-controller="Order" asp-action="ExportXmlSelected" method="post" id="export-xml-selected-form">
-    <antiforgery-token />
+    
     <input type="hidden" id="selectedIds" name="selectedIds" value="" />
 </form>
 
@@ -507,7 +570,7 @@
 
 @*export selected (Excel). We don't use GET approach because it's limited to 2K-4K chars and won't work for large number of entities*@
 <form asp-controller="Order" asp-action="ExportExcelSelected" method="post" id="export-excel-selected-form">
-    <antiforgery-token />
+    
     <input type="hidden" id="selectedIds" name="selectedIds" value="" />
 </form>
 <script type="text/javascript">
@@ -526,7 +589,7 @@
 
 @*Print packaging slips selected (XML). We don't use GET approach because it's limited to 2K-4K chars and won't work for large number of entities*@
 <form asp-controller="Order" asp-action="PdfInvoiceSelected" method="post" id="pdf-invoice-selected-form">    
-    <antiforgery-token />
+    
     <input type="hidden" id="selectedIds" name="selectedIds" value="" />
 </form>
 

@@ -1,4 +1,5 @@
 using Grand.Core.Domain.Catalog;
+using Grand.Core.Domain.Payments;
 using Grand.Core.Domain.Tax;
 using Grand.Framework.Mvc.ModelBinding;
 using Grand.Framework.Mvc.Models;
@@ -29,6 +30,8 @@ namespace Grand.Web.Areas.Admin.Models.Orders
 
         [GrandResourceDisplayName("Admin.Orders.Fields.ID")]
         public int OrderNumber { get; set; }
+        [GrandResourceDisplayName("Admin.Orders.Fields.Code")]
+        public string Code { get; set; }
 
         [GrandResourceDisplayName("Admin.Orders.Fields.OrderGuid")]
         public Guid OrderGuid { get; set; }
@@ -98,7 +101,12 @@ namespace Grand.Web.Areas.Admin.Models.Orders
         public string RefundedAmount { get; set; }
         [GrandResourceDisplayName("Admin.Orders.Fields.Profit")]
         public string Profit { get; set; }
+        [GrandResourceDisplayName("Admin.Orders.Fields.Currency")]
+        public string CurrencyCode { get; set; }
+        [GrandResourceDisplayName("Admin.Orders.Fields.CurrencyRate")]
 
+        [UIHint("DecimalN4")]
+        public decimal CurrencyRate { get; set; }
         //edit totals
         [GrandResourceDisplayName("Admin.Orders.Fields.Edit.OrderSubtotal")]
         public decimal OrderSubtotalInclTaxValue { get; set; }
@@ -138,6 +146,7 @@ namespace Grand.Web.Areas.Admin.Models.Orders
         //payment info
         [GrandResourceDisplayName("Admin.Orders.Fields.PaymentStatus")]
         public string PaymentStatus { get; set; }
+        public PaymentStatus PaymentStatusEnum { get; set; }
         [GrandResourceDisplayName("Admin.Orders.Fields.PaymentMethod")]
         public string PaymentMethod { get; set; }
 
@@ -280,6 +289,9 @@ namespace Grand.Web.Areas.Admin.Models.Orders
             public DownloadActivationType DownloadActivationType { get; set; }
             public bool IsDownloadActivated { get; set; }
             public Guid LicenseDownloadGuid { get; set; }
+
+            public string Commission { get; set; }
+            public decimal CommissionValue { get; set; } 
         }
 
         public partial class TaxRate : BaseGrandModel

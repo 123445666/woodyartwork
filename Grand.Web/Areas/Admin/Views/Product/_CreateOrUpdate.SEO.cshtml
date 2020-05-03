@@ -1,6 +1,6 @@
 ﻿@model ProductModel
-
-@(Html.LocalizedEditor<ProductModel, ProductLocalizedModel>("product-seo-localized",
+<vc:admin-widget widget-zone="product_details_seo_top" additional-data="Model" />
+@(await Html.LocalizedEditor<ProductModel, ProductLocalizedModel>("product-seo-localized",
     @<div class="form-horizontal">
         <div class="form-body">
             <div class="form-group">
@@ -67,3 +67,4 @@
             </div>
         </div>
     </div>))
+     <vc:admin-widget widget-zone="product_details_seo_bottom" additional-data="Model" />

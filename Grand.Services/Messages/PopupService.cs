@@ -3,6 +3,10 @@ using Grand.Core.Domain.Messages;
 using Grand.Services.Events;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Driver.Linq;
+using MediatR;
 
 namespace Grand.Services.Messages
 {
@@ -10,56 +14,49 @@ namespace Grand.Services.Messages
     {
         private readonly IRepository<PopupActive> _popupActiveRepository;
         private readonly IRepository<PopupArchive> _popupArchiveRepository;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         /// <summary>
         /// Ctor
         /// </summary>
         /// <param name="popupActiveRepository">Popup Active repository</param>
         /// <param name="popupArchiveRepository">Popup Archive repository</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public PopupService(IRepository<PopupActive> popupActiveRepository,
             IRepository<PopupArchive> popupArchiveRepository,
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
-            this._popupActiveRepository = popupActiveRepository;
-            this._popupArchiveRepository = popupArchiveRepository;
-            this._eventPublisher = eventPublisher;
+            _popupActiveRepository = popupActiveRepository;
+            _popupArchiveRepository = popupArchiveRepository;
+            _mediator = mediator;
         }
 
         /// <summary>
         /// Inserts a popup
         /// </summary>
         /// <param name="popup">Popup</param>        
-        public virtual void InsertPopupActive(PopupActive popup)
+        public virtual async Task InsertPopupActive(PopupActive popup)
         {
             if (popup == null)
                 throw new ArgumentNullException("popup");
 
-            _popupActiveRepository.Insert(popup);
+            await _popupActiveRepository.InsertAsync(popup);
 
             //event notification
-            _eventPublisher.EntityInserted(popup);
+            await _mediator.EntityInserted(popup);
         }
 
 
-        /// <summary>
-        /// Gets a popup by identifier
-        /// </summary>
-        /// <param name="popupId">Popup identifier</param>
-        /// <returns>Banner</returns>
-        public virtual PopupActive GetActivePopupByCustomerId(string customerId)
+        public virtual async Task<PopupActive> GetActivePopupByCustomerId(string customerId)
         {
             var query = from c in _popupActiveRepository.Table
                         where c.CustomerId == customerId
                         orderby c.CreatedOnUtc
                         select c;
-            var popup = query.FirstOrDefault();
-            return popup;
-
+            return await query.FirstOrDefaultAsync();
         }
 
-        public virtual void MovepopupToArchive(string id, string customerId)
+        public virtual async Task MovepopupToArchive(string id, string customerId)
         {
             if (String.IsNullOrEmpty(customerId) || String.IsNullOrEmpty(id))
                 return;
@@ -67,7 +64,8 @@ namespace Grand.Services.Messages
             var query = from c in _popupActiveRepository.Table
                         where c.CustomerId == customerId && c.Id == id
                         select c;
-            var popup = query.FirstOrDefault();
+
+            var popup = await query.FirstOrDefaultAsync();
             if (popup != null)
             {
                 var archiveBanner = new PopupArchive()
@@ -81,8 +79,8 @@ namespace Grand.Services.Messages
                     PopupTypeId = popup.PopupTypeId,
                     Name = popup.Name,
                 };
-                _popupArchiveRepository.Insert(archiveBanner);
-                _popupActiveRepository.Delete(popup);
+                await _popupArchiveRepository.InsertAsync(archiveBanner);
+                await _popupActiveRepository.DeleteAsync(popup);
             }
 
         }

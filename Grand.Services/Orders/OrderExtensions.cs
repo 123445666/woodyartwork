@@ -1,10 +1,10 @@
 ﻿using Grand.Core.Domain.Orders;
 using Grand.Core.Html;
-using Grand.Core.Infrastructure;
 using Grand.Services.Catalog;
 using Grand.Services.Shipping;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Orders
 {
@@ -36,14 +36,14 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="orderItem">Order item</param>
         /// <returns>Total number of items in all shipmentss</returns>
-        public static int GetTotalNumberOfItemsInAllShipment(this OrderItem orderItem)
+        public static async Task<int> GetTotalNumberOfItemsInAllShipment(this OrderItem orderItem, IOrderService orderService, IShipmentService shipmentService)
         {
             if (orderItem == null)
                 throw new ArgumentNullException("orderItem");
 
             var totalInShipments = 0;
-            var order = EngineContext.Current.Resolve<IOrderService>().GetOrderByOrderItemId(orderItem.Id);
-            var shipments = EngineContext.Current.Resolve<IShipmentService>().GetShipmentsByOrder(order.Id);
+            var order = await orderService.GetOrderByOrderItemId(orderItem.Id);
+            var shipments = await shipmentService.GetShipmentsByOrder(order.Id);
             for (int i = 0; i < shipments.Count; i++)
             {
                 var shipment = shipments[i];
@@ -62,12 +62,12 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="orderItem">Order item</param>
         /// <returns>Total number of already delivered items which can be added to new shipments</returns>
-        public static int GetTotalNumberOfItemsCanBeAddedToShipment(this OrderItem orderItem)
+        public static async Task<int> GetTotalNumberOfItemsCanBeAddedToShipment(this OrderItem orderItem, IOrderService orderService, IShipmentService shipmentService)
         {
             if (orderItem == null)
                 throw new ArgumentNullException("orderItem");
 
-            var totalInShipments = orderItem.GetTotalNumberOfItemsInAllShipment();
+            var totalInShipments = await orderItem.GetTotalNumberOfItemsInAllShipment(orderService, shipmentService);
 
             var qtyOrdered = orderItem.Quantity;
             var qtyCanBeAddedToShipmentTotal = qtyOrdered - totalInShipments;
@@ -82,15 +82,15 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="orderItem">Order item</param>
         /// <returns>Total number of not yet shipped items (but added to shipments)</returns>
-        public static int GetTotalNumberOfNotYetShippedItems(this OrderItem orderItem)
+        public static async Task<int> GetTotalNumberOfNotYetShippedItems(this OrderItem orderItem, IOrderService orderService, IShipmentService shipmentService)
         {
             if (orderItem == null)
                 throw new ArgumentNullException("orderItem");
 
-            var order = EngineContext.Current.Resolve<IOrderService>().GetOrderByOrderItemId(orderItem.Id);
+            var order = await orderService.GetOrderByOrderItemId(orderItem.Id);
 
             var result = 0;
-            var shipments = EngineContext.Current.Resolve<IShipmentService>().GetShipmentsByOrder(order.Id);
+            var shipments = await shipmentService.GetShipmentsByOrder(order.Id);
             for (int i = 0; i < shipments.Count; i++)
             {
                 var shipment = shipments[i];
@@ -114,14 +114,13 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="orderItem">Order item</param>
         /// <returns>Total number of already shipped items</returns>
-        public static int GetTotalNumberOfShippedItems(this OrderItem orderItem)
+        public static async Task<int> GetTotalNumberOfShippedItems(this OrderItem orderItem, Order order, IShipmentService shipmentService)
         {
             if (orderItem == null)
                 throw new ArgumentNullException("orderItem");
 
             var result = 0;
-            var order = EngineContext.Current.Resolve<IOrderService>().GetOrderByOrderItemId(orderItem.Id);
-            var shipments = EngineContext.Current.Resolve<IShipmentService>().GetShipmentsByOrder(order.Id);
+            var shipments = await shipmentService.GetShipmentsByOrder(order.Id);
             for (int i = 0; i < shipments.Count; i++)
             {
                 var shipment = shipments[i];
@@ -145,14 +144,13 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="orderItem">Order  item</param>
         /// <returns>Total number of already delivered items</returns>
-        public static int GetTotalNumberOfDeliveredItems(this OrderItem orderItem)
+        public static async Task<int> GetTotalNumberOfDeliveredItems(this OrderItem orderItem, Order order, IShipmentService shipmentService)
         {
             if (orderItem == null)
                 throw new ArgumentNullException("orderItem");
 
             var result = 0;
-            var order = EngineContext.Current.Resolve<IOrderService>().GetOrderByOrderItemId(orderItem.Id);
-            var shipments = EngineContext.Current.Resolve<IShipmentService>().GetShipmentsByOrder(order.Id);
+            var shipments = await shipmentService.GetShipmentsByOrder(order.Id);
             for (int i = 0; i < shipments.Count; i++)
             {
                 var shipment = shipments[i];
@@ -178,7 +176,7 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="order">Order</param>
         /// <returns>A value indicating whether an order has items to be added to a shipment</returns>
-        public static bool HasItemsToAddToShipment(this Order order)
+        public static async Task<bool> HasItemsToAddToShipment(this Order order, IOrderService orderService, IShipmentService shipmentService, IProductService productService)
         {
             if (order == null)
                 throw new ArgumentNullException("order");
@@ -186,11 +184,11 @@ namespace Grand.Services.Orders
             foreach (var orderItem in order.OrderItems)
             {
                 //we can ship only shippable products
-                var product = EngineContext.Current.Resolve<IProductService>().GetProductByIdIncludeArch(orderItem.ProductId);
+                var product = await productService.GetProductByIdIncludeArch(orderItem.ProductId);
                 if (!product.IsShipEnabled)
                     continue;
 
-                var totalNumberOfItemsCanBeAddedToShipment = orderItem.GetTotalNumberOfItemsCanBeAddedToShipment();
+                var totalNumberOfItemsCanBeAddedToShipment = await orderItem.GetTotalNumberOfItemsCanBeAddedToShipment(orderService, shipmentService);
                 if (totalNumberOfItemsCanBeAddedToShipment <= 0)
                     continue;
 
@@ -204,7 +202,7 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="order">Order</param>
         /// <returns>A value indicating whether an order has items to ship</returns>
-        public static bool HasItemsToShip(this Order order)
+        public static async Task<bool> HasItemsToShip(this Order order, IOrderService orderService, IShipmentService shipmentService, IProductService productService)
         {
             if (order == null)
                 throw new ArgumentNullException("order");
@@ -212,11 +210,11 @@ namespace Grand.Services.Orders
             foreach (var orderItem in order.OrderItems)
             {
                 //we can ship only shippable products
-                var product = EngineContext.Current.Resolve<IProductService>().GetProductByIdIncludeArch(orderItem.ProductId);
+                var product = await productService.GetProductByIdIncludeArch(orderItem.ProductId);
                 if (!product.IsShipEnabled)
                     continue;
 
-                var totalNumberOfNotYetShippedItems = orderItem.GetTotalNumberOfNotYetShippedItems();
+                var totalNumberOfNotYetShippedItems = await orderItem.GetTotalNumberOfNotYetShippedItems(orderService, shipmentService);
                 if (totalNumberOfNotYetShippedItems <= 0)
                     continue;
 
@@ -230,7 +228,7 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="order">Order</param>
         /// <returns>A value indicating whether an order has items to deliver</returns>
-        public static bool HasItemsToDeliver(this Order order)
+        public static async Task<bool> HasItemsToDeliver(this Order order, IShipmentService shipmentService, IProductService productService)
         {
             if (order == null)
                 throw new ArgumentNullException("order");
@@ -238,12 +236,12 @@ namespace Grand.Services.Orders
             foreach (var orderItem in order.OrderItems)
             {
                 //we can ship only shippable products
-                var product = EngineContext.Current.Resolve<IProductService>().GetProductByIdIncludeArch(orderItem.ProductId);
+                var product = await productService.GetProductByIdIncludeArch(orderItem.ProductId);
                 if (!product.IsShipEnabled)
                     continue;
 
-                var totalNumberOfShippedItems = orderItem.GetTotalNumberOfShippedItems();
-                var totalNumberOfDeliveredItems = orderItem.GetTotalNumberOfDeliveredItems();
+                var totalNumberOfShippedItems = await orderItem.GetTotalNumberOfShippedItems(order, shipmentService);
+                var totalNumberOfDeliveredItems = await orderItem.GetTotalNumberOfDeliveredItems(order, shipmentService);
                 if (totalNumberOfShippedItems <= totalNumberOfDeliveredItems)
                     continue;
 

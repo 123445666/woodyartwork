@@ -1,5 +1,6 @@
 ﻿using Grand.Core.Domain.Customers;
 using Grand.Framework.Kendoui;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Common;
 using Grand.Services.Customers;
 using Grand.Services.Directory;
@@ -9,10 +10,12 @@ using Grand.Services.Security;
 using Grand.Web.Areas.Admin.Models.Customers;
 using Microsoft.AspNetCore.Mvc;
 using System;
-using System.Linq;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.Customers)]
     public partial class OnlineCustomerController : BaseAdminController
     {
         #region Fields
@@ -21,7 +24,6 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly IGeoLookupService _geoLookupService;
         private readonly IDateTimeHelper _dateTimeHelper;
         private readonly CustomerSettings _customerSettings;
-        private readonly IPermissionService _permissionService;
         private readonly ILocalizationService _localizationService;
 
         #endregion
@@ -31,49 +33,44 @@ namespace Grand.Web.Areas.Admin.Controllers
         public OnlineCustomerController(ICustomerService customerService,
             IGeoLookupService geoLookupService, IDateTimeHelper dateTimeHelper,
             CustomerSettings customerSettings,
-            IPermissionService permissionService, ILocalizationService localizationService)
+            ILocalizationService localizationService)
         {
             this._customerService = customerService;
             this._geoLookupService = geoLookupService;
             this._dateTimeHelper = dateTimeHelper;
             this._customerSettings = customerSettings;
-            this._permissionService = permissionService;
             this._localizationService = localizationService;
         }
 
         #endregion
-        
+
         #region Methods
 
-        public IActionResult List()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult List() => View();
 
         [HttpPost]
-        public IActionResult List(DataSourceRequest command)
+        public async Task<IActionResult> List(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
-                return AccessDeniedView();
-
-            var customers = _customerService.GetOnlineCustomers(DateTime.UtcNow.AddMinutes(-_customerSettings.OnlineCustomerMinutes),
+            var customers = await _customerService.GetOnlineCustomers(DateTime.UtcNow.AddMinutes(-_customerSettings.OnlineCustomerMinutes),
                 null, command.Page - 1, command.PageSize);
-            var gridModel = new DataSourceResult
+            var items = new List<OnlineCustomerModel>();
+            foreach (var x in customers)
             {
-                Data = customers.Select(x => new OnlineCustomerModel
-                {
+                var item = new OnlineCustomerModel() {
                     Id = x.Id,
                     CustomerInfo = !string.IsNullOrEmpty(x.Email) ? x.Email : _localizationService.GetResource("Admin.Customers.Guest"),
                     LastIpAddress = x.LastIpAddress,
                     Location = _geoLookupService.LookupCountryName(x.LastIpAddress),
                     LastActivityDate = _dateTimeHelper.ConvertToUserTime(x.LastActivityDateUtc, DateTimeKind.Utc),
                     LastVisitedPage = _customerSettings.StoreLastVisitedPage ?
-                        x.GetAttribute<string>(SystemCustomerAttributeNames.LastVisitedPage) :
+                        x.GetAttributeFromEntity<string>(SystemCustomerAttributeNames.LastVisitedPage) :
                         _localizationService.GetResource("Admin.Customers.OnlineCustomers.Fields.LastVisitedPage.Disabled")
-                }),
+                };
+                items.Add(item);
+            }
+
+            var gridModel = new DataSourceResult {
+                Data = items,
                 Total = customers.TotalCount
             };
 

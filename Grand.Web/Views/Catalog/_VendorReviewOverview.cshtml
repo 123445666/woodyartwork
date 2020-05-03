@@ -9,33 +9,36 @@
 }
 @if (Model.AllowCustomerReviews)
 {
-    <div class="vendor-reviews-overview" @if (Model.TotalReviews > 0) { <text> itemprop="aggregateRating" itemscope itemtype="http://schema.org/AggregateRating" </text>  }>
-        <div class="vendor-review-box pb-1">
-            <div class="rating">
+    <div class="vendor-reviews-overview d-inline-flex align-items-center flex-wrap" @if (Model.TotalReviews > 0) { <text> itemprop="aggregateRating" itemscope itemtype="http://schema.org/AggregateRating" </text>  }>
+        <div class="vendor-review-box d-inline-block order-1">
+            <div class="ratings">
+                <div class="rating-box">
+                    <div class="rating" style="width: @(ratingPercent)%">
+                    </div>
+                </div>
             </div>
         </div>
-        <script asp-location="Footer">
-            $(document).ready(function () {
-                productStarProgress10('@(ratingPercent)', 'rating');
-            });
-        </script>
         @if (Model.TotalReviews > 0)
         {
-            <div class="vendor-review-links">
-                <a class="btn btn-secondary btn-sm" href="@Url.RouteUrl("VendorReviews", new { VendorId = Model.VendorId })">
+            <div class="vendor-review-links order-3 mt-1">
+                <a class="btn btn-sm" href="@Url.RouteUrl("VendorReviews", new { VendorId = Model.VendorId })">
                     @Model.TotalReviews
                     @T("VendorReviews.Overview.Reviews")
-                </a> <span class="separator">|</span> <a class="btn btn-secondary btn-sm" href="@Url.RouteUrl("VendorReviews", new { VendorId = Model.VendorId })">@T("VendorReviews.Overview.AddNew")</a>
+                </a><a class="btn btn-outline-secondary btn-sm" href="@Url.RouteUrl("VendorReviews", new { VendorId = Model.VendorId })">@T("VendorReviews.Overview.AddNew")</a>
             </div>
             @*hidden microdata info*@
-        decimal ratingValue = ratingPercent / (decimal)20;
-        <span itemprop="ratingValue" style="display: none;">@ratingValue.ToString("0.0", new CultureInfo("en-US"))</span>
-        <span itemprop="reviewCount" style="display: none;">@Model.TotalReviews</span>
+            decimal ratingValue = ratingPercent / (decimal)20;
+            <div class="order-2 mr-2 review-count mt-1" itemprop="ratingValue">
+                    <a class="btn btn-sm py-0 pr-0 review-scroll-button">
+                        <strong>(@ratingValue.ToString("0.0", new CultureInfo("en-US")))</strong>
+                    </a>
+            </div>
+            <span itemprop="reviewCount" style="display: none;">@Model.TotalReviews</span>
         }
         else
         {
-            <div class="vendor-no-reviews">
-                <a class="btn btn-secondary btn-sm" href="@Url.RouteUrl("VendorReviews", new { VendorId = Model.VendorId })">@T("VendorReviews.Overview.First")</a>
+            <div class="vendor-no-reviews order-3 mt-1">
+                <a class="btn btn-sm" href="@Url.RouteUrl("VendorReviews", new { VendorId = Model.VendorId })">@T("VendorReviews.Overview.First")</a>
             </div>
         }
     </div>

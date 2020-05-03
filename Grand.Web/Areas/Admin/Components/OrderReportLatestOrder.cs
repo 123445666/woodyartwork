@@ -1,24 +1,29 @@
-﻿using Grand.Framework.Components;
+﻿using Grand.Core;
+using Grand.Framework.Components;
 using Grand.Services.Security;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Components
 {
     public class OrderReportLatestOrderViewComponent : BaseViewComponent
     {
         private readonly IPermissionService _permissionService;
+        private readonly IWorkContext _workContext;
 
-        public OrderReportLatestOrderViewComponent(IPermissionService permissionService)
+        public OrderReportLatestOrderViewComponent(IPermissionService permissionService, IWorkContext workContext)
         {
-            this._permissionService = permissionService;
+            _permissionService = permissionService;
+            _workContext = workContext;
         }
 
-        public IViewComponentResult Invoke()
+        public async Task<IViewComponentResult> InvokeAsync()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageOrders))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManageOrders))
                 return Content("");
 
-            return View();
+            var isLoggedInAsVendor = _workContext.CurrentVendor != null;
+            return View(isLoggedInAsVendor);
         }
     }
 }

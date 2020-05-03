@@ -1,17 +1,21 @@
 ﻿using Grand.Core;
 using Grand.Framework.Controllers;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Plugin.Payments.CashOnDelivery.Models;
 using Grand.Services.Configuration;
 using Grand.Services.Localization;
+using Grand.Services.Security;
 using Grand.Services.Stores;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Threading.Tasks;
 
 namespace Grand.Plugin.Payments.CashOnDelivery.Controllers
 {
     [AuthorizeAdmin]
     [Area("Admin")]
+    [PermissionAuthorize(PermissionSystemName.PaymentMethods)]
     public class PaymentCashOnDeliveryController : BasePaymentController
     {
         private readonly IWorkContext _workContext;
@@ -27,25 +31,25 @@ namespace Grand.Plugin.Payments.CashOnDelivery.Controllers
             ILocalizationService localizationService,
             ILanguageService languageService)
         {
-            this._workContext = workContext;
-            this._storeService = storeService;
-            this._settingService = settingService;
-            this._localizationService = localizationService;
-            this._languageService = languageService;
+            _workContext = workContext;
+            _storeService = storeService;
+            _settingService = settingService;
+            _localizationService = localizationService;
+            _languageService = languageService;
         }
         
-        public IActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
             //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = await this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var cashOnDeliveryPaymentSettings = _settingService.LoadSetting<CashOnDeliveryPaymentSettings>(storeScope);
 
             var model = new ConfigurationModel();
             model.DescriptionText = cashOnDeliveryPaymentSettings.DescriptionText;
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
-                locale.DescriptionText = cashOnDeliveryPaymentSettings.GetLocalizedSetting(x => x.DescriptionText, languageId, "", false, false);
+                locale.DescriptionText = cashOnDeliveryPaymentSettings.GetLocalizedSetting(_settingService, x => x.DescriptionText, languageId, "", false, false);
             });
             model.AdditionalFee = cashOnDeliveryPaymentSettings.AdditionalFee;
             model.AdditionalFeePercentage = cashOnDeliveryPaymentSettings.AdditionalFeePercentage;
@@ -64,13 +68,13 @@ namespace Grand.Plugin.Payments.CashOnDelivery.Controllers
         }
 
         [HttpPost]
-        public IActionResult Configure(ConfigurationModel model)
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
 
             //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = await this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var cashOnDeliveryPaymentSettings = _settingService.LoadSetting<CashOnDeliveryPaymentSettings>(storeScope);
 
             //save settings
@@ -83,31 +87,31 @@ namespace Grand.Plugin.Payments.CashOnDelivery.Controllers
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
             if (model.DescriptionText_OverrideForStore || String.IsNullOrEmpty(storeScope))
-                _settingService.SaveSetting(cashOnDeliveryPaymentSettings, x => x.DescriptionText, storeScope, false);
+                await _settingService.SaveSetting(cashOnDeliveryPaymentSettings, x => x.DescriptionText, storeScope, false);
             else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(cashOnDeliveryPaymentSettings, x => x.DescriptionText, storeScope);
+                await _settingService.DeleteSetting(cashOnDeliveryPaymentSettings, x => x.DescriptionText, storeScope);
 
             if (model.AdditionalFee_OverrideForStore || String.IsNullOrEmpty(storeScope))
-                _settingService.SaveSetting(cashOnDeliveryPaymentSettings, x => x.AdditionalFee, storeScope, false);
+                await _settingService.SaveSetting(cashOnDeliveryPaymentSettings, x => x.AdditionalFee, storeScope, false);
             else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(cashOnDeliveryPaymentSettings, x => x.AdditionalFee, storeScope);
+                await _settingService.DeleteSetting(cashOnDeliveryPaymentSettings, x => x.AdditionalFee, storeScope);
 
             if (model.AdditionalFeePercentage_OverrideForStore || String.IsNullOrEmpty(storeScope))
-                _settingService.SaveSetting(cashOnDeliveryPaymentSettings, x => x.AdditionalFeePercentage, storeScope, false);
+                await _settingService.SaveSetting(cashOnDeliveryPaymentSettings, x => x.AdditionalFeePercentage, storeScope, false);
             else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(cashOnDeliveryPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
+                await _settingService.DeleteSetting(cashOnDeliveryPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
 
             if (model.ShippableProductRequired_OverrideForStore || String.IsNullOrEmpty(storeScope))
-                _settingService.SaveSetting(cashOnDeliveryPaymentSettings, x => x.ShippableProductRequired, storeScope, false);
+                await _settingService.SaveSetting(cashOnDeliveryPaymentSettings, x => x.ShippableProductRequired, storeScope, false);
             else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(cashOnDeliveryPaymentSettings, x => x.ShippableProductRequired, storeScope);
+                await _settingService.DeleteSetting(cashOnDeliveryPaymentSettings, x => x.ShippableProductRequired, storeScope);
 
             //now clear settings cache
-            _settingService.ClearCache();
+            await _settingService.ClearCache();
 
             SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Configure();
         }
        
     }

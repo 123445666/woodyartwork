@@ -1,6 +1,7 @@
 ﻿using Grand.Core.Domain.Tax;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Configuration;
 using Grand.Services.Security;
 using Grand.Services.Tax;
@@ -10,9 +11,11 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.TaxSettings)]
     public partial class TaxController : BaseAdminController
 	{
 		#region Fields
@@ -21,48 +24,38 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly ITaxCategoryService _taxCategoryService;
         private readonly TaxSettings _taxSettings;
         private readonly ISettingService _settingService;
-        private readonly IPermissionService _permissionService;
-
+        private readonly IServiceProvider _serviceProvider;
 	    #endregion
 
 		#region Constructors
 
         public TaxController(ITaxService taxService,
             ITaxCategoryService taxCategoryService, TaxSettings taxSettings,
-            ISettingService settingService, IPermissionService permissionService)
+            ISettingService settingService, IServiceProvider serviceProvider)
 		{
             this._taxService = taxService;
             this._taxCategoryService = taxCategoryService;
             this._taxSettings = taxSettings;
             this._settingService = settingService;
-            this._permissionService = permissionService;
-		}
+            this._serviceProvider = serviceProvider;
+        }
 
 		#endregion 
 
         #region Tax Providers
 
-        public IActionResult Providers()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageTaxSettings))
-                return AccessDeniedView();
-            
-            return View();
-        }
+        public IActionResult Providers() => View();
 
         [HttpPost]
         public IActionResult Providers(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageTaxSettings))
-                return AccessDeniedView();
-
             var taxProviders = _taxService.LoadAllTaxProviders()
                 .ToList();
             var taxProvidersModel = new List<TaxProviderModel>();
             foreach (var tax in taxProviders)
             {
                 var tmp1 = tax.ToModel();
-                tmp1.ConfigurationUrl = tax.PluginDescriptor.Instance().GetConfigurationPageUrl();
+                tmp1.ConfigurationUrl = tax.PluginDescriptor.Instance(_serviceProvider).GetConfigurationPageUrl();
                 tmp1.IsPrimaryTaxProvider = tmp1.SystemName.Equals(_taxSettings.ActiveTaxProviderSystemName, StringComparison.OrdinalIgnoreCase);
                 taxProvidersModel.Add(tmp1);
             }
@@ -75,21 +68,17 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
-        public IActionResult MarkAsPrimaryProvider(string systemName)
+        public async Task<IActionResult> MarkAsPrimaryProvider(string systemName)
         {
             if (String.IsNullOrEmpty(systemName))
             {
                 return RedirectToAction("Providers");
             }
-
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageTaxSettings))
-                return AccessDeniedView();
-
             var taxProvider = _taxService.LoadTaxProviderBySystemName(systemName);
             if (taxProvider != null)
             {
                 _taxSettings.ActiveTaxProviderSystemName = systemName;
-                _settingService.SaveSetting(_taxSettings);
+                await _settingService.SaveSetting(_taxSettings);
             }
 
             return RedirectToAction("Providers");
@@ -99,21 +88,12 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Tax Categories
 
-        public IActionResult Categories()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageTaxSettings))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult Categories() => View();
 
         [HttpPost]
-        public IActionResult Categories(DataSourceRequest command)
+        public async Task<IActionResult> Categories(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageTaxSettings))
-                return AccessDeniedView();
-
-            var categoriesModel = _taxCategoryService.GetAllTaxCategories()
+            var categoriesModel = (await _taxCategoryService.GetAllTaxCategories())
                 .Select(x => x.ToModel())
                 .ToList();
             var gridModel = new DataSourceResult
@@ -126,29 +106,23 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult CategoryUpdate(TaxCategoryModel model)
+        public async Task<IActionResult> CategoryUpdate(TaxCategoryModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageTaxSettings))
-                return AccessDeniedView();
-
             if (!ModelState.IsValid)
             {
                 return Json(new DataSourceResult { Errors = ModelState.SerializeErrors() });
             }
 
-            var taxCategory = _taxCategoryService.GetTaxCategoryById(model.Id);
+            var taxCategory = await _taxCategoryService.GetTaxCategoryById(model.Id);
             taxCategory = model.ToEntity(taxCategory);
-            _taxCategoryService.UpdateTaxCategory(taxCategory);
+            await _taxCategoryService.UpdateTaxCategory(taxCategory);
 
             return new NullJsonResult();
         }
 
         [HttpPost]
-        public IActionResult CategoryAdd( TaxCategoryModel model)
+        public async Task<IActionResult> CategoryAdd( TaxCategoryModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageTaxSettings))
-                return AccessDeniedView();
-
             if (!ModelState.IsValid)
             {
                 return Json(new DataSourceResult { Errors = ModelState.SerializeErrors() });
@@ -156,21 +130,18 @@ namespace Grand.Web.Areas.Admin.Controllers
 
             var taxCategory = new TaxCategory();
             taxCategory = model.ToEntity(taxCategory);
-            _taxCategoryService.InsertTaxCategory(taxCategory);
+            await _taxCategoryService.InsertTaxCategory(taxCategory);
 
             return new NullJsonResult();
         }
 
         [HttpPost]
-        public IActionResult CategoryDelete(string id)
+        public async Task<IActionResult> CategoryDelete(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageTaxSettings))
-                return AccessDeniedView();
-
-            var taxCategory = _taxCategoryService.GetTaxCategoryById(id);
+            var taxCategory = await _taxCategoryService.GetTaxCategoryById(id);
             if (taxCategory == null)
                 throw new ArgumentException("No tax category found with the specified id");
-            _taxCategoryService.DeleteTaxCategory(taxCategory);
+            await _taxCategoryService.DeleteTaxCategory(taxCategory);
 
             return new NullJsonResult();
         }

@@ -6,80 +6,77 @@ using Grand.Services.Catalog;
 using Grand.Services.Orders;
 using Grand.Services.Security;
 using Grand.Services.Stores;
+using Grand.Web.Features.Models.Products;
 using Grand.Web.Infrastructure.Cache;
-using Grand.Web.Services;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Components
 {
     public class HomePageBestSellersViewComponent : BaseViewComponent
     {
         #region Fields
-        private readonly IProductService _productService;
-        private readonly IAclService _aclService;
-        private readonly IStoreMappingService _storeMappingService;
-        private readonly IProductViewModelService _productViewModelService;
-        private readonly IStoreContext _storeContext;
-        private readonly ICacheManager _cacheManager;
         private readonly IOrderReportService _orderReportService;
+        private readonly ICacheManager _cacheManager;
+        private readonly IStoreContext _storeContext;
+        private readonly IProductService _productService;
+        private readonly IMediator _mediator;
+
         private readonly CatalogSettings _catalogSettings;
         #endregion
 
         #region Constructors
 
         public HomePageBestSellersViewComponent(
-            IProductService productService,
-            IAclService aclService,
-            IStoreMappingService storeMappingService,
-            IProductViewModelService productViewModelService,
-            IStoreContext storeContext,
-            ICacheManager cacheManager,
             IOrderReportService orderReportService,
-            CatalogSettings catalogSettings
-)
+            ICacheManager cacheManager,
+            IStoreContext storeContext,
+            IProductService productService,
+            IMediator mediator,
+            CatalogSettings catalogSettings)
         {
-            this._productService = productService;
-            this._aclService = aclService;
-            this._catalogSettings = catalogSettings;
-            this._productViewModelService = productViewModelService;
-            this._storeMappingService = storeMappingService;
-            this._storeContext = storeContext;
-            this._orderReportService = orderReportService;
-            this._cacheManager = cacheManager;
+            _orderReportService = orderReportService;
+            _cacheManager = cacheManager;
+            _storeContext = storeContext;
+            _productService = productService;
+            _mediator = mediator;
+            _catalogSettings = catalogSettings;
         }
+
 
         #endregion
 
         #region Invoker
 
-        public IViewComponentResult Invoke(int? productThumbPictureSize)
+        public async Task<IViewComponentResult> InvokeAsync(int? productThumbPictureSize)
         {
             if (!_catalogSettings.ShowBestsellersOnHomepage || _catalogSettings.NumberOfBestsellersOnHomepage == 0)
                 return Content("");
 
             //load and cache report
-            var report = _cacheManager.Get(string.Format(ModelCacheEventConsumer.HOMEPAGE_BESTSELLERS_IDS_KEY, _storeContext.CurrentStore.Id),
-                () => _orderReportService.BestSellersReport(
-                        storeId: _storeContext.CurrentStore.Id,
-                        pageSize: _catalogSettings.NumberOfBestsellersOnHomepage)
-                        .ToList());
-
+            var fromdate = DateTime.UtcNow.AddMonths(_catalogSettings.PeriodBestsellers > 0 ? -_catalogSettings.PeriodBestsellers : -12);
+            var report = await _cacheManager.GetAsync(string.Format(ModelCacheEventConst.HOMEPAGE_BESTSELLERS_IDS_KEY, _storeContext.CurrentStore.Id), async () =>
+                                await _orderReportService.BestSellersReport(
+                                    createdFromUtc: fromdate,
+                                    ps: Core.Domain.Payments.PaymentStatus.Paid,
+                                    storeId: _storeContext.CurrentStore.Id,
+                                    pageSize: _catalogSettings.NumberOfBestsellersOnHomepage));
 
             //load products
-            var products = _productService.GetProductsByIds(report.Select(x => x.ProductId).ToArray());
-            //ACL and store mapping
-            products = products.Where(p => _aclService.Authorize(p) && _storeMappingService.Authorize(p)).ToList();
-            //availability dates
-            products = products.Where(p => p.IsAvailable()).ToList();
-
+            var products = await _productService.GetProductsByIds(report.Select(x => x.ProductId).ToArray());
+            
             if (!products.Any())
                 return Content("");
 
-            //prepare model
-            var model = _productViewModelService.PrepareProductOverviewModels(products, true, true, productThumbPictureSize).ToList();
-            return View(model);
+            var model = await _mediator.Send(new GetProductOverview() {
+                ProductThumbPictureSize = productThumbPictureSize,
+                Products = products,
+            });
 
+            return View(model);
         }
 
         #endregion

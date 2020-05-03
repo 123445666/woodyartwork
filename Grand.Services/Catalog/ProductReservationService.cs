@@ -2,10 +2,13 @@
 using Grand.Core.Data;
 using Grand.Core.Domain.Catalog;
 using Grand.Services.Events;
+using MediatR;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Catalog
 {
@@ -16,31 +19,29 @@ namespace Grand.Services.Catalog
     {
         private readonly IRepository<ProductReservation> _productReservationRepository;
         private readonly IRepository<CustomerReservationsHelper> _customerReservationsHelperRepository;
-        private readonly IEventPublisher _eventPublisher;
-        private readonly IWorkContext _workContext;
+        private readonly IMediator _mediator;
 
-        public ProductReservationService(IRepository<ProductReservation> productReservationRepository,
+        public ProductReservationService(
+            IRepository<ProductReservation> productReservationRepository,
             IRepository<CustomerReservationsHelper> customerReservationsHelperRepository,
-            IEventPublisher eventPublisher,
-            IWorkContext workContext)
+            IMediator mediator)
         {
             _productReservationRepository = productReservationRepository;
             _customerReservationsHelperRepository = customerReservationsHelperRepository;
-            _eventPublisher = eventPublisher;
-            _workContext = workContext;
+            _mediator = mediator;
         }
 
         /// <summary>
         /// Deletes a product reservation
         /// </summary>
         /// <param name="productReservation">Product reservation</param>
-        public virtual void DeleteProductReservation(ProductReservation productReservation)
+        public virtual async Task DeleteProductReservation(ProductReservation productReservation)
         {
             if (productReservation == null)
                 throw new ArgumentNullException("productReservation");
 
-            _productReservationRepository.Delete(productReservation);
-            _eventPublisher.EntityDeleted(productReservation);
+            await _productReservationRepository.DeleteAsync(productReservation);
+            await _mediator.EntityDeleted(productReservation);
         }
 
         /// <summary>
@@ -48,7 +49,7 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="productId">Product Id</param>
         /// <returns>Product reservations</returns>
-        public virtual IPagedList<ProductReservation> GetProductReservationsByProductId(string productId, bool? showVacant, DateTime? date,
+        public virtual async Task<IPagedList<ProductReservation>> GetProductReservationsByProductId(string productId, bool? showVacant, DateTime? date,
             int pageIndex = 0, int pageSize = int.MaxValue)
         {
             var query = _productReservationRepository.Table.Where(x => x.ProductId == productId);
@@ -74,34 +75,33 @@ namespace Grand.Services.Catalog
             }
 
             query = query.OrderBy(x => x.Date);
-
-            return new PagedList<ProductReservation>(query, pageIndex, pageSize);
+            return await PagedList<ProductReservation>.Create(query, pageIndex, pageSize);
         }
 
         /// <summary>
         /// Adds product reservation
         /// </summary>
         /// <param name="productReservation">Product reservation</param>
-        public virtual void InsertProductReservation(ProductReservation productReservation)
+        public virtual async Task InsertProductReservation(ProductReservation productReservation)
         {
             if (productReservation == null)
                 throw new ArgumentNullException("productAttribute");
 
-            _productReservationRepository.Insert(productReservation);
-            _eventPublisher.EntityInserted(productReservation);
+            await _productReservationRepository.InsertAsync(productReservation);
+            await _mediator.EntityInserted(productReservation);
         }
 
         /// <summary>
         /// Updates product reservation
         /// </summary>
         /// <param name="productReservation">Product reservation</param>
-        public virtual void UpdateProductReservation(ProductReservation productReservation)
+        public virtual async Task UpdateProductReservation(ProductReservation productReservation)
         {
             if (productReservation == null)
                 throw new ArgumentNullException("productAttribute");
 
-            _productReservationRepository.Update(productReservation);
-            _eventPublisher.EntityInserted(productReservation);
+            await _productReservationRepository.UpdateAsync(productReservation);
+            await _mediator.EntityInserted(productReservation);
         }
 
         /// <summary>
@@ -109,35 +109,35 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="Id">Product Id</param>
         /// <returns>Product reservation</returns>
-        public virtual ProductReservation GetProductReservation(string Id)
+        public virtual Task<ProductReservation> GetProductReservation(string Id)
         {
-            return _productReservationRepository.GetById(Id);
+            return _productReservationRepository.GetByIdAsync(Id);
         }
 
         /// <summary>
         /// Adds customer reservations helper
         /// </summary>
         /// <param name="crh"></param>
-        public virtual void InsertCustomerReservationsHelper(CustomerReservationsHelper crh)
+        public virtual async Task InsertCustomerReservationsHelper(CustomerReservationsHelper crh)
         {
             if (crh == null)
                 throw new ArgumentNullException("CustomerReservationsHelper");
 
-            _customerReservationsHelperRepository.Insert(crh);
-            _eventPublisher.EntityInserted(crh);
+            await _customerReservationsHelperRepository.InsertAsync(crh);
+            await _mediator.EntityInserted(crh);
         }
 
         /// <summary>
         /// Deletes customer reservations helper
         /// </summary>
         /// <param name="crh"></param>
-        public virtual void DeleteCustomerReservationsHelper(CustomerReservationsHelper crh)
+        public virtual async Task DeleteCustomerReservationsHelper(CustomerReservationsHelper crh)
         {
             if (crh == null)
                 throw new ArgumentNullException("CustomerReservationsHelper");
 
-            _customerReservationsHelperRepository.Delete(crh);
-            _eventPublisher.EntityDeleted(crh);
+            await _customerReservationsHelperRepository.DeleteAsync(crh);
+            await _mediator.EntityDeleted(crh);
         }
 
 
@@ -145,12 +145,12 @@ namespace Grand.Services.Catalog
         /// Cancel reservations by orderId 
         /// </summary>
         /// <param name="orderId"></param>
-        public virtual void CancelReservationsByOrderId(string orderId)
+        public virtual async Task CancelReservationsByOrderId(string orderId)
         {
             if (!string.IsNullOrEmpty(orderId))
             {
                 var update = new UpdateDefinitionBuilder<ProductReservation>().Set(x => x.OrderId, "");
-                var result = _productReservationRepository.Collection.UpdateManyAsync(x => x.OrderId == orderId, update).Result;
+                await _productReservationRepository.Collection.UpdateManyAsync(x => x.OrderId == orderId, update);
             }
         }
 
@@ -159,18 +159,18 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="Id"></param>
         /// <returns>CustomerReservationsHelper</returns>
-        public virtual CustomerReservationsHelper GetCustomerReservationsHelperById(string Id)
+        public virtual Task<CustomerReservationsHelper> GetCustomerReservationsHelperById(string Id)
         {
-            return _customerReservationsHelperRepository.GetById(Id);
+            return _customerReservationsHelperRepository.GetByIdAsync(Id);
         }
 
         /// <summary>
         /// Gets customer reservations helpers
         /// </summary>
         /// <returns>List<CustomerReservationsHelper></returns>
-        public virtual List<CustomerReservationsHelper> GetCustomerReservationsHelpers()
+        public virtual async Task<IList<CustomerReservationsHelper>> GetCustomerReservationsHelpers(string customerId)
         {
-            return _customerReservationsHelperRepository.Table.Where(x => x.CustomerId == _workContext.CurrentCustomer.Id).ToList();
+            return await _customerReservationsHelperRepository.Table.Where(x => x.CustomerId == customerId).ToListAsync();
         }
 
         /// <summary>
@@ -178,9 +178,9 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="Id"></param>
         /// <returns>List<CustomerReservationsHelper></returns>
-        public virtual List<CustomerReservationsHelper> GetCustomerReservationsHelperBySciId(string sciId)
+        public virtual async Task<IList<CustomerReservationsHelper>> GetCustomerReservationsHelperBySciId(string sciId)
         {
-            return _customerReservationsHelperRepository.Table.Where(x => x.ShoppingCartItemId == sciId).ToList();
+            return await _customerReservationsHelperRepository.Table.Where(x => x.ShoppingCartItemId == sciId).ToListAsync();
         }
     }
 }

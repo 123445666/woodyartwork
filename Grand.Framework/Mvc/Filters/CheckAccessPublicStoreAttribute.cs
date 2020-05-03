@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Framework.Mvc.Filters
 {
@@ -20,8 +21,8 @@ namespace Grand.Framework.Mvc.Filters
         /// <param name="ignore">Whether to ignore the execution of filter actions</param>
         public CheckAccessPublicStoreAttribute(bool ignore = false) : base(typeof(CheckAccessPublicStoreFilter))
         {
-            this._ignoreFilter = ignore;
-            this.Arguments = new object[] { ignore };
+            _ignoreFilter = ignore;
+            Arguments = new object[] { ignore };
         }
 
         public bool IgnoreFilter => _ignoreFilter;
@@ -31,7 +32,7 @@ namespace Grand.Framework.Mvc.Filters
         /// <summary>
         /// Represents a filter that confirms access to public store
         /// </summary>
-        private class CheckAccessPublicStoreFilter : IAuthorizationFilter
+        private class CheckAccessPublicStoreFilter : IAsyncAuthorizationFilter
         {
             #region Fields
 
@@ -44,8 +45,8 @@ namespace Grand.Framework.Mvc.Filters
 
             public CheckAccessPublicStoreFilter(bool ignoreFilter, IPermissionService permissionService)
             {
-                this._ignoreFilter = ignoreFilter;
-                this._permissionService = permissionService;
+                _ignoreFilter = ignoreFilter;
+                _permissionService = permissionService;
             }
 
             #endregion
@@ -56,7 +57,7 @@ namespace Grand.Framework.Mvc.Filters
             /// Called early in the filter pipeline to confirm request is authorized
             /// </summary>
             /// <param name="filterContext">Authorization filter context</param>
-            public void OnAuthorization(AuthorizationFilterContext filterContext)
+            public async Task OnAuthorizationAsync(AuthorizationFilterContext filterContext)
             {
                 //ignore filter (the action available even when navigation is not allowed)
                 if (filterContext == null)
@@ -75,7 +76,7 @@ namespace Grand.Framework.Mvc.Filters
                     return;
 
                 //check whether current customer has access to a public store
-                if (_permissionService.Authorize(StandardPermissionProvider.PublicStoreAllowNavigation))
+                if (await _permissionService.Authorize(StandardPermissionProvider.PublicStoreAllowNavigation))
                     return;
 
                 //customer hasn't access to a public store

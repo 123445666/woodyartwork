@@ -14,7 +14,7 @@
                 <div id="conditions-grid"></div>
             </div>
             <div class="panel-footer">
-                <input type="submit" id="btnAddNewCondition" name="btnAddNewCondition" value="@T("Admin.Customers.CustomerReminder.Conditions.AddNew")" onclick="javascript:setLocation('@(Url.Action("AddCondition", "CustomerReminder", new { customerReminderId = Model.Id }))'); return false;" class="btn default" />
+                <button type="submit" id="btnAddNewCondition" name="btnAddNewCondition" onclick="javascript:setLocation('@(Url.Action("AddCondition", "CustomerReminder", new { customerReminderId = Model.Id }))'); return false;" class="k-button"><i class="fa fa-plus"></i>&nbsp;@T("Admin.Customers.CustomerReminder.Conditions.AddNew")</button>
             </div>
         </div>
         <script>
@@ -68,7 +68,7 @@
                         field: "Name",
                         title: "@T("Admin.Customers.CustomerReminder.Fields.Name")",
                         width: 300,
-                        template: '<a class="k-link" href="@Url.Content("~/Admin/CustomerReminder/EditCondition")?customerReminderId=@(Model.Id)&cid=#=Id#">#=Name#</a>',
+                        template: '<a class="k-link" href="@Url.Content("~/Admin/CustomerReminder/EditCondition")?customerReminderId=@(Model.Id)&cid=#=Id#">#=kendo.htmlEncode(Name)#</a>',
                     },
                     {
                         field: "Condition",

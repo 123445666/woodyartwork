@@ -150,9 +150,9 @@
 
     function togglePreOrder() {
         if ($('#@Html.FieldIdFor(model => model.AvailableForPreOrder)').is(':checked')) {
-            $('#pnlPreOrderAvailabilityStartDateTimeUtc').show();
+            $('#pnlPreOrderAvailabilityStartDateTime').show();
         } else {
-            $('#pnlPreOrderAvailabilityStartDateTimeUtc').hide();
+            $('#pnlPreOrderAvailabilityStartDateTime').hide();
         }
     }
 
@@ -344,6 +344,35 @@
                 $('#pnlAllowBackInStockSubscriptions').hide();
             }
             $('#pnlAllowAddingOnlyExistingAttributeCombinations').hide();
+        } else if (selectedManageInventoryMethodId == @(((int) ManageInventoryMethod.ManageStockByAttributes).ToString())) {
+            $('#pnlAllowAddingOnlyExistingAttributeCombinations').show();
+            $('#pnlUseMultipleWarehouses').show();
+            $('#pnlMultipleWarehouses').hide();
+            $('#pnlStockQuantity').hide();
+            $('#pnlMinStockQuantity').show();
+            $('#pnlLowStockActivity').show();
+            $('#pnlNotifyForQuantityBelow').show();
+            $('#pnlBackorders').show();
+            if ($('#@Html.FieldIdFor(model => model.UseMultipleWarehouses)').is(':checked')) {
+                $('#pnlWarehouse').hide();
+            } else {
+                $('#pnlWarehouse').show();
+            }
+            $('#pnlDisplayStockAvailability').show();
+            if ($('#@Html.FieldIdFor(model => model.DisplayStockAvailability)').is(':checked')) {
+                $('#pnlDisplayStockQuantity').show();
+            } else {
+                $('#pnlDisplayStockQuantity').hide();
+            }
+            var selectedBackorderModeId = $("#@Html.FieldIdFor(model => model.BackorderModeId)").val();
+            if (selectedBackorderModeId == @(((int) BackorderMode.NoBackorders).ToString())) {
+                //no backorders
+                $('#pnlAllowBackInStockSubscriptions').show();
+            } else {
+                //backorders are enabled
+                $('#pnlAllowBackInStockSubscriptions').hide();
+            }
+
         } else {
             if ($('#@Html.FieldIdFor(model => model.UseMultipleWarehouses)').is(':checked')) {
                 $('#pnlWarehouse').hide();
@@ -369,17 +398,17 @@
 
     function toggleMarkAsNew() {
         if ($('#@Html.FieldIdFor(model => model.MarkAsNew)').is(':checked')) {
-            $('#pnlMarkAsNewStartDateTimeUtc').show();
-            $('#pnlMarkAsNewEndDateTimeUtc').show();
+            $('#pnlMarkAsNewStartDateTime').show();
+            $('#pnlMarkAsNewEndDateTime').show();
         } else {
-            $('#pnlMarkAsNewStartDateTimeUtc').hide();
-            $('#pnlMarkAsNewEndDateTimeUtc').hide();
+            $('#pnlMarkAsNewStartDateTime').hide();
+            $('#pnlMarkAsNewEndDateTime').hide();
         }
     }
 
     @{
         //TODO move to Model
-        var productTags = productTagService.GetAllProductTags();
+        var productTags = await productTagService.GetAllProductTags();
         var productTagsSb = new StringBuilder();
         productTagsSb.Append("var initialProductTags = [");
         for (int i = 0; i < productTags.Count; i++)
@@ -455,21 +484,22 @@
     }
 
 </script>
+<vc:admin-widget widget-zone="product_details_info_column_left_top" additional-data="Model" />
 <div class="form-horizontal">
     <div class="form-body">
         <div class="form-group">
             <admin-label asp-for="ProductTypeId" />
             <div class="col-md-9 col-sm-9">
-                <admin-select asp-for="ProductTypeId" asp-items="((ProductType)Model.ProductTypeId).ToSelectList()" />
+                <admin-select asp-for="ProductTypeId" asp-items="((ProductType)Model.ProductTypeId).ToSelectList(Context)" />
                 <span asp-validation-for="ProductTypeId"></span>
             </div>
         </div>
         <div class="form-group">
             <admin-label asp-for="VisibleIndividually" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="VisibleIndividually" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="VisibleIndividually"></span>
             </div>
@@ -494,7 +524,7 @@
         </div>
     </div>
 </div>
-@(Html.LocalizedEditor<ProductModel, ProductLocalizedModel>("product-info-localized",
+@(await Html.LocalizedEditor<ProductModel, ProductLocalizedModel>("product-info-localized",
     @<div class="form-horizontal portlet bg-inverse form-fit">
         <div class="form-body">
             <div class="form-group">
@@ -574,9 +604,9 @@
         <div class="form-group" @(Model.IsLoggedInAsVendor ? Html.Raw("style='display: none;'") : null)>
             <admin-label asp-for="ShowOnHomePage" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="ShowOnHomePage" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="ShowOnHomePage"></span>
             </div>
@@ -591,9 +621,9 @@
         <div class="form-group">
             <admin-label asp-for="AllowCustomerReviews" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="AllowCustomerReviews" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="AllowCustomerReviews"></span>
             </div>
@@ -631,49 +661,49 @@
 <div class="form-horizontal">
     <div class="form-body">
         <div class="form-group">
-            <admin-label asp-for="AvailableStartDateTimeUtc" />
+            <admin-label asp-for="AvailableStartDateTime" />
             <div class="col-md-9 col-sm-9">
-                <admin-input asp-for="AvailableStartDateTimeUtc" />
-                <span asp-validation-for="AvailableStartDateTimeUtc"></span>
+                <admin-input asp-for="AvailableStartDateTime" />
+                <span asp-validation-for="AvailableStartDateTime"></span>
             </div>
         </div>
         <div class="form-group">
-            <admin-label asp-for="AvailableEndDateTimeUtc" />
+            <admin-label asp-for="AvailableEndDateTime" />
             <div class="col-md-9 col-sm-9">
-                <admin-input asp-for="AvailableEndDateTimeUtc" />
-                <span asp-validation-for="AvailableEndDateTimeUtc"></span>
+                <admin-input asp-for="AvailableEndDateTime" />
+                <span asp-validation-for="AvailableEndDateTime"></span>
             </div>
         </div>
         <div class="form-group">
             <admin-label asp-for="MarkAsNew" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="MarkAsNew" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="MarkAsNew"></span>
             </div>
         </div>
-        <div class="form-group" id="pnlMarkAsNewStartDateTimeUtc">
-            <admin-label asp-for="MarkAsNewStartDateTimeUtc" />
+        <div class="form-group" id="pnlMarkAsNewStartDateTime">
+            <admin-label asp-for="MarkAsNewStartDateTime" />
             <div class="col-md-9 col-sm-9">
-                <admin-input asp-for="MarkAsNewStartDateTimeUtc" />
-                <span asp-validation-for="MarkAsNewStartDateTimeUtc"></span>
+                <admin-input asp-for="MarkAsNewStartDateTime" />
+                <span asp-validation-for="MarkAsNewStartDateTime"></span>
             </div>
         </div>
-        <div class="form-group" id="pnlMarkAsNewEndDateTimeUtc">
-            <admin-label asp-for="MarkAsNewEndDateTimeUtc" />
+        <div class="form-group" id="pnlMarkAsNewEndDateTime">
+            <admin-label asp-for="MarkAsNewEndDateTime" />
             <div class="col-md-9 col-sm-9">
-                <admin-input asp-for="MarkAsNewEndDateTimeUtc" />
-                <span asp-validation-for="MarkAsNewEndDateTimeUtc"></span>
+                <admin-input asp-for="MarkAsNewEndDateTime" />
+                <span asp-validation-for="MarkAsNewEndDateTime"></span>
             </div>
         </div>
         <div class="form-group">
             <admin-label asp-for="Published" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="Published" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="Published"></span>
             </div>
@@ -698,3 +728,4 @@
         }
     </div>
 </div>
+<vc:admin-widget widget-zone="product_details_info_column_left_bottom" additional-data="Model" />

@@ -9,8 +9,10 @@
 @using Grand.Services.Tax
 @inject IPluginFinder pluginFinder
 @inject IWebHelper webHelper
+@inject IServiceProvider serviceProvider    
 @{
-    var plugin = PluginManager.FindPlugin((this.ViewContext.ActionDescriptor as ControllerActionDescriptor).ControllerTypeInfo.AsType()).Instance();
+    var plugin = PluginManager.FindPlugin((this.ViewContext.ActionDescriptor as ControllerActionDescriptor).ControllerTypeInfo.AsType()).Instance(serviceProvider);
+    var menuitem = "";
 
     //friendly name
     var friendlyName = plugin?.PluginDescriptor.FriendlyName;
@@ -29,6 +31,7 @@
         backToLocale = "Admin.Configuration.Payment.Methods.BackToList";
         listActionMethodName = "Methods";
         listControllerName = "Payment";
+        menuitem = "/Admin/Payment/Methods";
     }
     else if (plugin is IShippingRateComputationMethod)
     {
@@ -38,6 +41,7 @@
         backToLocale = "Admin.Configuration.Shipping.Providers.BackToList";
         listActionMethodName = "Providers";
         listControllerName = "Shipping";
+        menuitem = "/Admin/Shipping/Providers";
     }
     else if (plugin is ITaxProvider)
     {
@@ -47,6 +51,7 @@
         backToLocale = "Admin.Configuration.Tax.Providers.BackToList";
         listActionMethodName = "Providers";
         listControllerName = "Tax";
+        menuitem = "/Admin/Tax/Providers";
     }
     else if (plugin is IExternalAuthenticationMethod)
     {
@@ -56,6 +61,7 @@
         backToLocale = "Admin.Configuration.ExternalAuthenticationMethods.BackToList";
         listActionMethodName = "Methods";
         listControllerName = "ExternalAuthentication";
+        menuitem = "/Admin/ExternalAuthentication/Methods";
     }
     else if (plugin is IWidgetPlugin)
     {
@@ -65,6 +71,7 @@
         backToLocale = "Admin.ContentManagement.Widgets.BackToList";
         listActionMethodName = "List";
         listControllerName = "Widget";
+        menuitem = "/Admin/Widget/List";
     }
     else if (plugin is IMiscPlugin)
     {
@@ -74,6 +81,7 @@
         backToLocale = "Admin.Configuration.Plugins.Misc.BackToList";
         listActionMethodName = "List";
         listControllerName = "Plugin";
+        menuitem = "/Admin/Plugin/List";
     }
 
     Layout = "_AdminLayout";
@@ -83,20 +91,21 @@
     Html.SetActiveMenuItemSystemName(activeMenuSystemName);
 
 }
+<input id="active-menu-item" type="hidden" value="@menuitem" />
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
-                <div class="caption">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
+                <div class="caption caption-flex">
                     <i class="fa fa-tasks"></i>
-                    @T(configureLocale) - @friendlyName
+                    <div class="captionText">@T(configureLocale) - @friendlyName</div>
                     <small><i class="fa fa-arrow-circle-left"></i>@Html.ActionLink(T(backToLocale).Text, listActionMethodName, listControllerName)</small>
                 </div>
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div class="form-horizontal">
                     <div class="form-body">
-                        <div class="portlet-body">
+                        <div class="x_content">
                             @RenderBody()
                         </div>
                     </div>

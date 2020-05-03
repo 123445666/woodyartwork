@@ -23,6 +23,7 @@ namespace Grand.Web.Areas.Admin.Models.Customers
             this.AvailableCountries = new List<SelectListItem>();
             this.AvailableStates = new List<SelectListItem>();
             this.AvailableVendors = new List<SelectListItem>();
+            this.AvailableStores = new List<SelectListItem>();
             this.CustomerAttributes = new List<CustomerAttributeModel>();
             this.AvailableNewsletterSubscriptionStores = new List<StoreModel>();
             this.RewardPointsAvailableStores = new List<SelectListItem>();
@@ -50,6 +51,10 @@ namespace Grand.Web.Areas.Admin.Models.Customers
         [GrandResourceDisplayName("Admin.Customers.Customers.Fields.Vendor")]
         public string VendorId { get; set; }
         public IList<SelectListItem> AvailableVendors { get; set; }
+
+        [GrandResourceDisplayName("Admin.Customers.Customers.Fields.StaffStore")]
+        public string StaffStoreId { get; set; }
+        public IList<SelectListItem> AvailableStores { get; set; }
 
         //form fields & properties
         public bool GenderEnabled { get; set; }
@@ -134,7 +139,7 @@ namespace Grand.Web.Areas.Admin.Models.Customers
         public string AffiliateId { get; set; }
         [GrandResourceDisplayName("Admin.Customers.Customers.Fields.Affiliate")]
         public string AffiliateName { get; set; }
-
+        public string CustomAttributes { get; set; }
         //time zone
         [GrandResourceDisplayName("Admin.Customers.Customers.Fields.TimeZoneId")]
         
@@ -228,11 +233,6 @@ namespace Grand.Web.Areas.Admin.Models.Customers
 
         #region Nested classes
 
-        public partial class StoreModel : BaseGrandEntityModel
-        {
-            public string Name { get; set; }
-        }
-
         public partial class AssociatedExternalAuthModel : BaseGrandEntityModel
         {
             [GrandResourceDisplayName("Admin.Customers.Customers.AssociatedExternalAuth.Fields.Email")]
@@ -296,22 +296,18 @@ namespace Grand.Web.Areas.Admin.Models.Customers
             public override string Id { get; set; }
             [GrandResourceDisplayName("Admin.Customers.Customers.Orders.ID")]
             public int OrderNumber { get; set; }
-
+            [GrandResourceDisplayName("Admin.Customers.Customers.Orders.Code")]
+            public string OrderCode { get; set; }
             [GrandResourceDisplayName("Admin.Customers.Customers.Orders.OrderStatus")]
             public string OrderStatus { get; set; }
-
             [GrandResourceDisplayName("Admin.Customers.Customers.Orders.PaymentStatus")]
             public string PaymentStatus { get; set; }
-
             [GrandResourceDisplayName("Admin.Customers.Customers.Orders.ShippingStatus")]
             public string ShippingStatus { get; set; }
-
             [GrandResourceDisplayName("Admin.Customers.Customers.Orders.OrderTotal")]
             public string OrderTotal { get; set; }
-
             [GrandResourceDisplayName("Admin.Customers.Customers.Orders.Store")]
             public string StoreName { get; set; }
-
             [GrandResourceDisplayName("Admin.Customers.Customers.Orders.CreatedOn")]
             public DateTime CreatedOn { get; set; }
         }
@@ -386,6 +382,7 @@ namespace Grand.Web.Areas.Admin.Models.Customers
             public string ProductId { get; set; }
             [GrandResourceDisplayName("Admin.Customers.Customers.BackInStockSubscriptions.Product")]
             public string ProductName { get; set; }
+            public string AttributeDescription { get; set; }
             [GrandResourceDisplayName("Admin.Customers.Customers.BackInStockSubscriptions.CreatedOn")]
             public DateTime CreatedOn { get; set; }
         }

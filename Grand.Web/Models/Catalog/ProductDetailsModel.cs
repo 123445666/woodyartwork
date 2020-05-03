@@ -2,6 +2,7 @@
 using Grand.Core.Domain.Orders;
 using Grand.Framework.Mvc.ModelBinding;
 using Grand.Framework.Mvc.Models;
+using Grand.Services.Discounts;
 using Grand.Web.Models.Media;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
@@ -29,6 +30,7 @@ namespace Grand.Web.Models.Catalog
             TierPrices = new List<TierPriceModel>();
             Parameters = new List<SelectListItem>();
             ProductBundleModels = new List<ProductBundleModel>();
+            ProductWarehouses = new List<ProductWarehouseModel>();
         }
         //picture(s)
         public bool DefaultPictureZoomEnabled { get; set; }
@@ -56,6 +58,8 @@ namespace Grand.Web.Models.Catalog
         public bool IsShipEnabled { get; set; }
         public bool NotReturnable { get; set; }
         public bool IsFreeShipping { get; set; }
+        public bool AllowToSelectWarehouse { get; set; }
+        public IList<ProductWarehouseModel> ProductWarehouses { get; set; }
         public decimal AdditionalShippingCharge { get; set; }
         public string AdditionalShippingChargeStr { get; set; }
         public bool FreeShippingNotificationEnabled { get; set; }
@@ -93,6 +97,7 @@ namespace Grand.Web.Models.Catalog
         public decimal StartPrice { get; set; }
         public decimal HighestBidValue { get; set; }
         public DateTime? EndTime { get; set; }
+        public DateTime? EndTimeLocalTime { get; set; }
         public bool AuctionEnded { get; set; }
 
         #region Nested Classes
@@ -145,6 +150,11 @@ namespace Grand.Web.Models.Catalog
 
         public partial class ProductPriceModel : BaseGrandModel
         {
+            public ProductPriceModel()
+            {
+                AppliedDiscounts = new List<AppliedDiscount>();
+            }
+
             /// <summary>
             /// The currency (in 3-letter ISO 4217 format) of the offer price 
             /// </summary>
@@ -177,6 +187,9 @@ namespace Grand.Web.Models.Catalog
             /// PAngV baseprice (used in Germany)
             /// </summary>
             public string BasePricePAngV { get; set; }
+
+            public List<AppliedDiscount> AppliedDiscounts { get; set; }
+            public TierPrice PreferredTierPrice { get; set; }
         }
 
         public partial class GiftCardModel : BaseGrandModel
@@ -268,6 +281,11 @@ namespace Grand.Web.Models.Catalog
 
         public partial class ProductBundleModel : BaseGrandModel
         {
+            public ProductBundleModel()
+            {
+                ProductAttributes = new List<ProductAttributeModel>();
+            }
+
             public string ProductId { get; set; }
             public string Name { get; set; }
             public string SeName { get; set; }
@@ -279,8 +297,18 @@ namespace Grand.Web.Models.Catalog
             public string Price { get; set; }
             public decimal PriceValue { get; set; }
             public PictureModel DefaultPictureModel { get; set; }
+            public IList<ProductAttributeModel> ProductAttributes { get; set; }
         }
 
+        public partial class ProductWarehouseModel : BaseGrandModel
+        {
+            public bool Use { get; set; }
+            public string WarehouseId { get; set; }
+            public string Name { get; set; }
+            public int StockQuantity { get; set; }
+            public int ReservedQuantity { get; set; }
+            public bool Selected { get; set; }
+        }
         #endregion
     }
 }

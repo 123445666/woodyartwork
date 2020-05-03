@@ -1,179 +1,103 @@
-﻿using Grand.Core;
-using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Localization;
-using Grand.Framework.Kendoui;
+﻿using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Customers;
 using Grand.Services.Localization;
 using Grand.Services.Security;
-using Grand.Web.Areas.Admin.Extensions;
+using Grand.Web.Areas.Admin.Interfaces;
 using Grand.Web.Areas.Admin.Models.Customers;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.Settings)]
     public partial class CustomerAttributeController : BaseAdminController
     {
         #region Fields
-
         private readonly ICustomerAttributeService _customerAttributeService;
+        private readonly ICustomerAttributeViewModelService _customerAttributeViewModelService;
         private readonly ILanguageService _languageService;
         private readonly ILocalizationService _localizationService;
-        private readonly IWorkContext _workContext;
-        private readonly IPermissionService _permissionService;
-
         #endregion
 
         #region Constructors
 
         public CustomerAttributeController(ICustomerAttributeService customerAttributeService,
-            ILanguageService languageService, 
-            ILocalizationService localizationService,
-            IWorkContext workContext,
-            IPermissionService permissionService)
+            ICustomerAttributeViewModelService customerAttributeViewModelService,
+            ILanguageService languageService,
+            ILocalizationService localizationService)
         {
             this._customerAttributeService = customerAttributeService;
+            this._customerAttributeViewModelService = customerAttributeViewModelService;
             this._languageService = languageService;
             this._localizationService = localizationService;
-            this._workContext = workContext;
-            this._permissionService = permissionService;
         }
 
         #endregion
-        
-        #region Utilities
 
-        [NonAction]
-        protected virtual List<LocalizedProperty> UpdateAttributeLocales(CustomerAttribute customerAttribute, CustomerAttributeModel model)
-        {
-            List<LocalizedProperty> localized = new List<LocalizedProperty>();
-            foreach (var local in model.Locales)
-            {
-                if (!(String.IsNullOrEmpty(local.Name)))
-                    localized.Add(new LocalizedProperty()
-                    {
-                        LanguageId = local.LanguageId,
-                        LocaleKey = "Name",
-                        LocaleValue = local.Name
-                    });
-            }
-            return localized;
-        }
-
-        [NonAction]
-        protected virtual List<LocalizedProperty> UpdateValueLocales(CustomerAttributeValue customerAttributeValue, CustomerAttributeValueModel model)
-        {
-            List<LocalizedProperty> localized = new List<LocalizedProperty>();
-            foreach (var local in model.Locales)
-            {
-                    if (!(String.IsNullOrEmpty(local.Name)))
-                        localized.Add(new LocalizedProperty()
-                        {
-                            LanguageId = local.LanguageId,
-                            LocaleKey = "Name",
-                            LocaleValue = local.Name
-                        });
-            }
-            return localized;
-        }
-
-        #endregion
-        
         #region Customer attributes
 
-        public IActionResult Index()
-        {
-            return RedirectToAction("List");
-        }
+        public IActionResult Index() => RedirectToAction("List");
 
-        public IActionResult ListBlock()
-        {
-            return PartialView("ListBlock");
-        }
+        public IActionResult ListBlock() => PartialView("ListBlock");
 
-        public IActionResult List()
+        public async Task<IActionResult> List()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
             //we just redirect a user to the customer settings page
-            
             //select second tab
             const int customerFormFieldIndex = 1;
-            SaveSelectedTabIndex(customerFormFieldIndex);
+            await SaveSelectedTabIndex(customerFormFieldIndex);
             return RedirectToAction("CustomerUser", "Setting");
         }
 
         [HttpPost]
-        public IActionResult List(DataSourceRequest command)
+        public async Task<IActionResult> List(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var customerAttributes = _customerAttributeService.GetAllCustomerAttributes();
+            var customerAttributes = await _customerAttributeViewModelService.PrepareCustomerAttributes();
             var gridModel = new DataSourceResult
             {
-                Data = customerAttributes.Select(x =>
-                {
-                    var attributeModel = x.ToModel();
-                    attributeModel.AttributeControlTypeName = x.AttributeControlType.GetLocalizedEnum(_localizationService, _workContext);
-                    return attributeModel;
-                }),
+                Data = customerAttributes.ToList(),
                 Total = customerAttributes.Count()
             };
             return Json(gridModel);
         }
-        
-        //create
-        public IActionResult Create()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
 
-            var model = new CustomerAttributeModel();
+        //create
+        public async Task<IActionResult> Create()
+        {
+            var model = _customerAttributeViewModelService.PrepareCustomerAttributeModel();
             //locales
-            AddLocales(_languageService, model.Locales);
+            await AddLocales(_languageService, model.Locales);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Create(CustomerAttributeModel model, bool continueEditing)
+        public async Task<IActionResult> Create(CustomerAttributeModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
-                var customerAttribute = model.ToEntity();
-                customerAttribute.Locales = UpdateAttributeLocales(customerAttribute, model);
-                _customerAttributeService.InsertCustomerAttribute(customerAttribute);
-                
+                var customerAttribute = await _customerAttributeViewModelService.InsertCustomerAttributeModel(model);
                 SuccessNotification(_localizationService.GetResource("Admin.Customers.CustomerAttributes.Added"));
                 return continueEditing ? RedirectToAction("Edit", new { id = customerAttribute.Id }) : RedirectToAction("List");
             }
-
             //If we got this far, something failed, redisplay form
             return View(model);
         }
 
         //edit
-        public IActionResult Edit(string id)
+        public async Task<IActionResult> Edit(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var customerAttribute = _customerAttributeService.GetCustomerAttributeById(id);
+            var customerAttribute = await _customerAttributeService.GetCustomerAttributeById(id);
             if (customerAttribute == null)
                 //No customer attribute found with the specified id
                 return RedirectToAction("List");
 
-            var model = customerAttribute.ToModel();
+            var model = _customerAttributeViewModelService.PrepareCustomerAttributeModel(customerAttribute);
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
                 locale.Name = customerAttribute.GetLocalized(x => x.Name, languageId, false, false);
             });
@@ -181,29 +105,24 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Edit(CustomerAttributeModel model, bool continueEditing)
+        public async Task<IActionResult> Edit(CustomerAttributeModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var customerAttribute = _customerAttributeService.GetCustomerAttributeById(model.Id);
+            var customerAttribute = await _customerAttributeService.GetCustomerAttributeById(model.Id);
             if (customerAttribute == null)
                 //No customer attribute found with the specified id
                 return RedirectToAction("List");
 
             if (ModelState.IsValid)
             {
-                customerAttribute = model.ToEntity(customerAttribute);
-                customerAttribute.Locales = UpdateAttributeLocales(customerAttribute, model);
-                _customerAttributeService.UpdateCustomerAttribute(customerAttribute);
+                customerAttribute = await _customerAttributeViewModelService.UpdateCustomerAttributeModel(model, customerAttribute);
 
                 SuccessNotification(_localizationService.GetResource("Admin.Customers.CustomerAttributes.Updated"));
                 if (continueEditing)
                 {
                     //selected tab
-                    SaveSelectedTabIndex();
+                    await SaveSelectedTabIndex();
 
-                    return RedirectToAction("Edit", new {id = customerAttribute.Id});
+                    return RedirectToAction("Edit", new { id = customerAttribute.Id });
                 }
                 return RedirectToAction("List");
             }
@@ -214,13 +133,9 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         //delete
         [HttpPost]
-        public IActionResult Delete(string id)
+        public async Task<IActionResult> Delete(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var customerAttribute = _customerAttributeService.GetCustomerAttributeById(id);
-            _customerAttributeService.DeleteCustomerAttribute(customerAttribute);
+            await _customerAttributeViewModelService.DeleteCustomerAttribute(id);
 
             SuccessNotification(_localizationService.GetResource("Admin.Customers.CustomerAttributes.Deleted"));
             return RedirectToAction("List");
@@ -232,69 +147,42 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         //list
         [HttpPost]
-        public IActionResult ValueList(string customerAttributeId, DataSourceRequest command)
+        public async Task<IActionResult> ValueList(string customerAttributeId, DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var values = _customerAttributeService.GetCustomerAttributeById(customerAttributeId).CustomerAttributeValues;
+            var values = await _customerAttributeViewModelService.PrepareCustomerAttributeValues(customerAttributeId);
             var gridModel = new DataSourceResult
             {
-                Data = values.Select(x => new CustomerAttributeValueModel
-                {
-                    Id = x.Id,
-                    CustomerAttributeId = x.CustomerAttributeId,
-                    Name = x.Name,
-                    IsPreSelected = x.IsPreSelected,
-                    DisplayOrder = x.DisplayOrder,
-                }),
+                Data = values.ToList(),
                 Total = values.Count()
             };
             return Json(gridModel);
         }
 
         //create
-        public IActionResult ValueCreatePopup(string customerAttributeId)
+        public async Task<IActionResult> ValueCreatePopup(string customerAttributeId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var customerAttribute = _customerAttributeService.GetCustomerAttributeById(customerAttributeId);
+            var customerAttribute = await _customerAttributeService.GetCustomerAttributeById(customerAttributeId);
             if (customerAttribute == null)
                 //No customer attribute found with the specified id
                 return RedirectToAction("List");
 
-            var model = new CustomerAttributeValueModel();
-            model.CustomerAttributeId = customerAttributeId;
+            var model = _customerAttributeViewModelService.PrepareCustomerAttributeValueModel(customerAttributeId);
             //locales
-            AddLocales(_languageService, model.Locales);
+            await AddLocales(_languageService, model.Locales);
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult ValueCreatePopup(CustomerAttributeValueModel model)
+        public async Task<IActionResult> ValueCreatePopup(CustomerAttributeValueModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var customerAttribute = _customerAttributeService.GetCustomerAttributeById(model.CustomerAttributeId);
+            var customerAttribute = await _customerAttributeService.GetCustomerAttributeById(model.CustomerAttributeId);
             if (customerAttribute == null)
                 //No customer attribute found with the specified id
                 return RedirectToAction("List");
-            
+
             if (ModelState.IsValid)
             {
-                var cav = new CustomerAttributeValue
-                {
-                    CustomerAttributeId = model.CustomerAttributeId,
-                    Name = model.Name,
-                    IsPreSelected = model.IsPreSelected,
-                    DisplayOrder = model.DisplayOrder
-                };
-                cav.Locales = UpdateValueLocales(cav, model);
-                _customerAttributeService.InsertCustomerAttributeValue(cav);
-                
-
+                await _customerAttributeViewModelService.InsertCustomerAttributeValueModel(model);
                 ViewBag.RefreshPage = true;
                 return View(model);
             }
@@ -304,26 +192,17 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         //edit
-        public IActionResult ValueEditPopup(string id, string customerAttributeId)
+        public async Task<IActionResult> ValueEditPopup(string id, string customerAttributeId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-            var av = _customerAttributeService.GetCustomerAttributeById(customerAttributeId);
-            var cav = av.CustomerAttributeValues.FirstOrDefault(x=>x.Id == id);
+            var av = await _customerAttributeService.GetCustomerAttributeById(customerAttributeId);
+            var cav = av.CustomerAttributeValues.FirstOrDefault(x => x.Id == id);
             if (cav == null)
                 //No customer attribute value found with the specified id
                 return RedirectToAction("List");
 
-            var model = new CustomerAttributeValueModel
-            {
-                CustomerAttributeId = cav.CustomerAttributeId,
-                Name = cav.Name,
-                IsPreSelected = cav.IsPreSelected,
-                DisplayOrder = cav.DisplayOrder
-            };
-
+            var model = _customerAttributeViewModelService.PrepareCustomerAttributeValueModel(cav);
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
                 locale.Name = cav.GetLocalized(x => x.Name, languageId, false, false);
             });
@@ -332,12 +211,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ValueEditPopup(CustomerAttributeValueModel model)
+        public async Task<IActionResult> ValueEditPopup(CustomerAttributeValueModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var av = _customerAttributeService.GetCustomerAttributeById(model.CustomerAttributeId);
+            var av = await _customerAttributeService.GetCustomerAttributeById(model.CustomerAttributeId);
             var cav = av.CustomerAttributeValues.FirstOrDefault(x => x.Id == model.Id);
             if (cav == null)
                 //No customer attribute value found with the specified id
@@ -345,11 +221,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                cav.Name = model.Name;
-                cav.IsPreSelected = model.IsPreSelected;
-                cav.DisplayOrder = model.DisplayOrder;
-                cav.Locales = UpdateValueLocales(cav, model);
-                _customerAttributeService.UpdateCustomerAttributeValue(cav);
+                await _customerAttributeViewModelService.UpdateCustomerAttributeValueModel(model, cav);
 
                 ViewBag.RefreshPage = true;
                 return View(model);
@@ -361,21 +233,12 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         //delete
         [HttpPost]
-        public IActionResult ValueDelete(CustomerAttributeValueModel model)
+        public async Task<IActionResult> ValueDelete(CustomerAttributeValueModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageSettings))
-                return AccessDeniedView();
-
-            var av = _customerAttributeService.GetCustomerAttributeById(model.CustomerAttributeId);
-            var cav = av.CustomerAttributeValues.FirstOrDefault(x => x.Id == model.Id);
-            if (cav == null)
-                throw new ArgumentException("No customer attribute value found with the specified id");
-            _customerAttributeService.DeleteCustomerAttributeValue(cav);
+            await _customerAttributeViewModelService.DeleteCustomerAttributeValue(model);
 
             return new NullJsonResult();
         }
-
-
         #endregion
     }
 }

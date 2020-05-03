@@ -4,6 +4,10 @@ using Grand.Services.Events;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using MongoDB.Driver.Linq;
+using MongoDB.Driver;
+using MediatR;
 
 namespace Grand.Services.Catalog
 {
@@ -15,7 +19,7 @@ namespace Grand.Services.Catalog
         #region Fields
 
         private readonly IRepository<ProductTemplate> _productTemplateRepository;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         #endregion
         
@@ -25,12 +29,12 @@ namespace Grand.Services.Catalog
         /// Ctor
         /// </summary>
         /// <param name="productTemplateRepository">Product template repository</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public ProductTemplateService(IRepository<ProductTemplate> productTemplateRepository,
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
-            this._productTemplateRepository = productTemplateRepository;
-            this._eventPublisher = eventPublisher;
+            _productTemplateRepository = productTemplateRepository;
+            _mediator = mediator;
         }
 
         #endregion
@@ -41,29 +45,28 @@ namespace Grand.Services.Catalog
         /// Delete product template
         /// </summary>
         /// <param name="productTemplate">Product template</param>
-        public virtual void DeleteProductTemplate(ProductTemplate productTemplate)
+        public virtual async Task DeleteProductTemplate(ProductTemplate productTemplate)
         {
             if (productTemplate == null)
                 throw new ArgumentNullException("productTemplate");
 
-            _productTemplateRepository.Delete(productTemplate);
+            await _productTemplateRepository.DeleteAsync(productTemplate);
 
             //event notification
-            _eventPublisher.EntityDeleted(productTemplate);
+            await _mediator.EntityDeleted(productTemplate);
         }
 
         /// <summary>
         /// Gets all product templates
         /// </summary>
         /// <returns>Product templates</returns>
-        public virtual IList<ProductTemplate> GetAllProductTemplates()
+        public virtual async Task<IList<ProductTemplate>> GetAllProductTemplates()
         {
             var query = from pt in _productTemplateRepository.Table
                         orderby pt.DisplayOrder
                         select pt;
 
-            var templates = query.ToList();
-            return templates;
+            return await query.ToListAsync();
         }
 
         /// <summary>
@@ -71,39 +74,39 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="productTemplateId">Product template identifier</param>
         /// <returns>Product template</returns>
-        public virtual ProductTemplate GetProductTemplateById(string productTemplateId)
+        public virtual Task<ProductTemplate> GetProductTemplateById(string productTemplateId)
         {
-            return _productTemplateRepository.GetById(productTemplateId);
+            return _productTemplateRepository.GetByIdAsync(productTemplateId);
         }
 
         /// <summary>
         /// Inserts product template
         /// </summary>
         /// <param name="productTemplate">Product template</param>
-        public virtual void InsertProductTemplate(ProductTemplate productTemplate)
+        public virtual async Task InsertProductTemplate(ProductTemplate productTemplate)
         {
             if (productTemplate == null)
                 throw new ArgumentNullException("productTemplate");
 
-            _productTemplateRepository.Insert(productTemplate);
+            await _productTemplateRepository.InsertAsync(productTemplate);
 
             //event notification
-            _eventPublisher.EntityInserted(productTemplate);
+            await _mediator.EntityInserted(productTemplate);
         }
 
         /// <summary>
         /// Updates the product template
         /// </summary>
         /// <param name="productTemplate">Product template</param>
-        public virtual void UpdateProductTemplate(ProductTemplate productTemplate)
+        public virtual async Task UpdateProductTemplate(ProductTemplate productTemplate)
         {
             if (productTemplate == null)
                 throw new ArgumentNullException("productTemplate");
 
-            _productTemplateRepository.Update(productTemplate);
+            await _productTemplateRepository.UpdateAsync(productTemplate);
 
             //event notification
-            _eventPublisher.EntityUpdated(productTemplate);
+            await _mediator.EntityUpdated(productTemplate);
         }
         
         #endregion

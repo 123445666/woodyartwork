@@ -3,13 +3,14 @@ using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Media;
 using Grand.Core.Domain.Orders;
 using Grand.Core.Domain.Payments;
-using Grand.Core.Infrastructure;
-using Grand.Services.Catalog;
 using Grand.Services.Events;
-using Grand.Services.Orders;
+using MediatR;
 using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Media
 {
@@ -21,7 +22,7 @@ namespace Grand.Services.Media
         #region Fields
 
         private readonly IRepository<Download> _downloadRepository;
-        private readonly IEventPublisher _eventPubisher;
+        private readonly IMediator _mediator;
 
         #endregion
 
@@ -31,12 +32,12 @@ namespace Grand.Services.Media
         /// Ctor
         /// </summary>
         /// <param name="downloadRepository">Download repository</param>
-        /// <param name="eventPubisher"></param>
+        /// <param name="mediator">Mediator</param>
         public DownloadService(IRepository<Download> downloadRepository,
-            IEventPublisher eventPubisher)
+            IMediator mediator)
         {
             _downloadRepository = downloadRepository;
-            _eventPubisher = eventPubisher;
+            _mediator = mediator;
         }
 
         #endregion
@@ -48,22 +49,22 @@ namespace Grand.Services.Media
         /// </summary>
         /// <param name="downloadId">Download identifier</param>
         /// <returns>Download</returns>
-        public virtual Download GetDownloadById(string downloadId)
+        public virtual async Task<Download> GetDownloadById(string downloadId)
         {
-            if (String.IsNullOrEmpty(downloadId))
+            if (string.IsNullOrEmpty(downloadId))
                 return null;
 
-            var _download = _downloadRepository.GetById(downloadId);
-            if(!_download.UseDownloadUrl)
-                _download.DownloadBinary = DownloadAsBytes(_download.DownloadObjectId);
+            var _download = await _downloadRepository.GetByIdAsync(downloadId);
+            if (!_download.UseDownloadUrl)
+                _download.DownloadBinary = await DownloadAsBytes(_download.DownloadObjectId);
 
             return _download;
         }
 
-        protected virtual byte[] DownloadAsBytes(ObjectId objectId)
+        protected virtual async Task<byte[]> DownloadAsBytes(ObjectId objectId)
         {
             var bucket = new MongoDB.Driver.GridFS.GridFSBucket(_downloadRepository.Database);
-            var binary = bucket.DownloadAsBytesAsync(objectId, new MongoDB.Driver.GridFS.GridFSDownloadOptions() { CheckMD5 = true, Seekable = true }).Result;
+            var binary = await bucket.DownloadAsBytesAsync(objectId, new MongoDB.Driver.GridFS.GridFSDownloadOptions() { CheckMD5 = true, Seekable = true });
             return binary;
         }
         /// <summary>
@@ -71,7 +72,7 @@ namespace Grand.Services.Media
         /// </summary>
         /// <param name="downloadGuid">Download GUID</param>
         /// <returns>Download</returns>
-        public virtual Download GetDownloadByGuid(Guid downloadGuid)
+        public virtual async Task<Download> GetDownloadByGuid(Guid downloadGuid)
         {
             if (downloadGuid == Guid.Empty)
                 return null;
@@ -79,9 +80,9 @@ namespace Grand.Services.Media
             var query = from o in _downloadRepository.Table
                         where o.DownloadGuid == downloadGuid
                         select o;
-            var order = query.FirstOrDefault();
-            if(!order.UseDownloadUrl)
-                order.DownloadBinary = DownloadAsBytes(order.DownloadObjectId); 
+            var order = await query.FirstOrDefaultAsync();
+            if (!order.UseDownloadUrl)
+                order.DownloadBinary = await DownloadAsBytes(order.DownloadObjectId);
 
             return order;
         }
@@ -90,62 +91,63 @@ namespace Grand.Services.Media
         /// Deletes a download
         /// </summary>
         /// <param name="download">Download</param>
-        public virtual void DeleteDownload(Download download)
+        public virtual async Task DeleteDownload(Download download)
         {
             if (download == null)
                 throw new ArgumentNullException("download");
 
-            _downloadRepository.Delete(download);
+            await _downloadRepository.DeleteAsync(download);
 
-            _eventPubisher.EntityDeleted(download);
+            await _mediator.EntityDeleted(download);
         }
 
         /// <summary>
         /// Inserts a download
         /// </summary>
         /// <param name="download">Download</param>
-        public virtual void InsertDownload(Download download)
+        public virtual async Task InsertDownload(Download download)
         {
             if (download == null)
                 throw new ArgumentNullException("download");
             if (!download.UseDownloadUrl)
             {
                 var bucket = new MongoDB.Driver.GridFS.GridFSBucket(_downloadRepository.Database);
-                var id = bucket.UploadFromBytesAsync(download.Filename, download.DownloadBinary).Result;
+                var id = await bucket.UploadFromBytesAsync(download.Filename, download.DownloadBinary);
                 download.DownloadObjectId = id;
             }
 
             download.DownloadBinary = null;
-            _downloadRepository.Insert(download);
+            await _downloadRepository.InsertAsync(download);
 
-            _eventPubisher.EntityInserted(download);
+            await _mediator.EntityInserted(download);
         }
 
         /// <summary>
         /// Updates the download
         /// </summary>
         /// <param name="download">Download</param>
-        public virtual void UpdateDownload(Download download)
+        public virtual async Task UpdateDownload(Download download)
         {
             if (download == null)
                 throw new ArgumentNullException("download");
 
-            _downloadRepository.Update(download);
+            await _downloadRepository.UpdateAsync(download);
 
-            _eventPubisher.EntityUpdated(download);
+            await _mediator.EntityUpdated(download);
         }
 
         /// <summary>
         /// Gets a value indicating whether download is allowed
         /// </summary>
+        /// <param name="order">Order</param>
         /// <param name="orderItem">Order item to check</param>
+        /// <param name="product">Product</param>
         /// <returns>True if download is allowed; otherwise, false.</returns>
-        public virtual bool IsDownloadAllowed(OrderItem orderItem)
+        public virtual bool IsDownloadAllowed(Order order, OrderItem orderItem, Product product)
         {
             if (orderItem == null)
                 return false;
 
-            var order = EngineContext.Current.Resolve<IOrderService>().GetOrderByOrderItemId(orderItem.Id);
             if (order == null || order.Deleted)
                 return false;
 
@@ -153,7 +155,6 @@ namespace Grand.Services.Media
             if (order.OrderStatus == OrderStatus.Cancelled)
                 return false;
 
-            var product = EngineContext.Current.Resolve<IProductService>().GetProductById(orderItem.ProductId);
             if (product == null || !product.IsDownload)
                 return false;
 
@@ -208,15 +209,16 @@ namespace Grand.Services.Media
         /// <summary>
         /// Gets a value indicating whether license download is allowed
         /// </summary>
+        /// <param name="order">Order</param>
         /// <param name="orderItem">Order item to check</param>
+        /// <param name="product">Product</param>
         /// <returns>True if license download is allowed; otherwise, false.</returns>
-        public virtual bool IsLicenseDownloadAllowed(OrderItem orderItem)
+        public virtual bool IsLicenseDownloadAllowed(Order order, OrderItem orderItem, Product product)
         {
             if (orderItem == null)
                 return false;
 
-            return IsDownloadAllowed(orderItem) &&
-                !String.IsNullOrEmpty(orderItem.LicenseDownloadId);
+            return !string.IsNullOrEmpty(orderItem.LicenseDownloadId) && IsDownloadAllowed(order, orderItem, product);
         }
 
         #endregion

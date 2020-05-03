@@ -1,7 +1,9 @@
 ﻿using Grand.Core.Extensions;
 using Microsoft.AspNetCore.Http;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Core.Caching
 {
@@ -23,7 +25,7 @@ namespace Grand.Core.Caching
         /// </summary>
         public PerRequestCacheManager(IHttpContextAccessor httpContextAccessor)
         {
-            this._httpContextAccessor = httpContextAccessor;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         #endregion
@@ -41,6 +43,20 @@ namespace Grand.Core.Caching
         #endregion
 
         #region Methods
+        /// <summary>
+        /// Gets or sets the value associated with the specified key.
+        /// </summary>
+        /// <typeparam name="T">Type of cached item</typeparam>
+        /// <param name="key">Key of cached item</param>
+        /// <returns>The cached value associated with the specified key</returns>
+        public virtual Task<T> GetAsync<T>(string key)
+        {
+            var items = GetItems();
+            if (items == null)
+                return Task.FromResult(default(T));
+
+            return Task.FromResult((T)items[key]);
+        }
 
         /// <summary>
         /// Gets or sets the value associated with the specified key.
@@ -48,7 +64,7 @@ namespace Grand.Core.Caching
         /// <typeparam name="T">Type of cached item</typeparam>
         /// <param name="key">Key of cached item</param>
         /// <returns>The cached value associated with the specified key</returns>
-        public virtual T Get<T>(string key)
+        public T Get<T>(string key)
         {
             var items = GetItems();
             if (items == null)
@@ -58,19 +74,61 @@ namespace Grand.Core.Caching
         }
 
         /// <summary>
+        /// Gets or sets the value associated with the specified key.
+        /// </summary>
+        /// <typeparam name="T">Type of cached item</typeparam>
+        /// <param name="key">Key of cached item</param>
+        /// <returns>The cached value associated with the specified key</returns>
+        public virtual (T, bool) TryGetValue<T>(string key)
+        {
+            var items = GetItems();
+            if (items?[key] == null)
+                return (default(T), false);
+
+            return ((T)items[key], true);
+        }
+
+        public Task<(T Result, bool FromCache)> TryGetValueAsync<T>(string key)
+        {
+            return Task.FromResult(TryGetValue<T>(key));
+        }
+
+        /// <summary>
         /// Adds the specified key and object to the cache
         /// </summary>
         /// <param name="key">Key of cached item</param>
         /// <param name="data">Value for caching</param>
         /// <param name="cacheTime">Cache time in minutes</param>
-        public virtual void Set(string key, object data, int cacheTime)
+        public virtual Task SetAsync(string key, object data, int cacheTime)
         {
+            var items = GetItems();
+            if (items == null)
+                return Task.CompletedTask;
+
+            if (data != null)
+                items[key] = data;
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Adds the specified key and object to the cache
+        /// </summary>
+        /// <param name="key">Key of cached item</param>
+        /// <param name="data">Value for caching</param>
+        /// <param name="cacheTime">Cache time in minutes</param>
+        public void Set(string key, object data, int cacheTime)
+        {
+            if (data == null)
+            {
+                return;
+            }
+
             var items = GetItems();
             if (items == null)
                 return;
 
-            if (data != null)
-                items[key] = data;
+            items[key] = data;
         }
 
         /// <summary>
@@ -89,34 +147,55 @@ namespace Grand.Core.Caching
         /// Removes the value with the specified key from the cache
         /// </summary>
         /// <param name="key">Key of cached item</param>
-        public virtual void Remove(string key)
+        public virtual Task RemoveAsync(string key, bool publisher = true)
         {
             var items = GetItems();
 
             items?.Remove(key);
+            return Task.CompletedTask;
         }
 
         /// <summary>
-        /// Removes items by key pattern
+        /// Removes items by key prefix
         /// </summary>
-        /// <param name="pattern">String key pattern</param>
-        public virtual void RemoveByPattern(string pattern)
+        /// <param name="prefix">String prefix</param>
+        /// <param name="publisher">publisher</param>
+        public virtual Task RemoveByPrefix(string prefix, bool publisher = true)
         {
             var items = GetItems();
             if (items == null)
-                return;
+                return Task.CompletedTask;
 
-            this.RemoveByPattern(pattern, items.Keys.Select(p => p.ToString()));
+            var keysToRemove = items.Keys.Where(x => x.ToString().StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
+            foreach (var key in keysToRemove)
+            {
+                items.Remove(key);
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Removes items by key prefix
+        /// </summary>
+        /// <param name="prefix">String prefix</param>
+        /// <param name="publisher">publisher</param>
+        /// <param name="publisher">publisher</param>
+        public Task RemoveByPrefixAsync(string prefix, bool publisher = true)
+        {
+            return RemoveByPrefix(prefix);
         }
 
         /// <summary>
         /// Clear all cache data
         /// </summary>
-        public virtual void Clear()
+        /// <param name="publisher">publisher</param>
+        public virtual Task Clear(bool publisher = true)
         {
             var items = GetItems();
 
             items?.Clear();
+
+            return Task.CompletedTask;
         }
 
         /// <summary>

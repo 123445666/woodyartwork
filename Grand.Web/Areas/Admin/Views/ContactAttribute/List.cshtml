@@ -2,24 +2,25 @@
     //page title
     ViewBag.Title = T("Admin.Catalog.Attributes.ContactAttributes").Text;
 }
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
                 <div class="caption">
                     <i class="fa fa-list-alt"></i>
                     @T("Admin.Catalog.Attributes.ContactAttributes")
                 </div>
                 <div class="actions btn-group btn-group-devided">
                     <a href="@Url.Action("Create")" class="btn green"><i class="fa fa-plus"></i><span class="hidden-xs"> @T("Admin.Common.AddNew") </span></a>
+                    <vc:admin-widget widget-zone="contact_attribute_list_buttons" additional-data="null" />
                 </div>
 
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div class="form-horizontal">
                     <div class="form-body">
-                        <div class="portlet-body">
+                        <div class="x_content">
                             <div id="contactattributes-grid"></div>
                         </div>
                     </div>
@@ -69,7 +70,7 @@
             columns: [{
                 field: "Name",
                 title: "@T("Admin.Catalog.Attributes.ContactAttributes.Fields.Name")",
-                template: '<a class="k-link" href="Edit/#=Id#">#=Name#</a>',
+                template: '<a class="k-link" href="Edit/#=Id#">#=kendo.htmlEncode(Name)#</a>',
             }, {
                 field: "AttributeControlTypeName",
                 title: "@T("Admin.Catalog.Attributes.ContactAttributes.Fields.AttributeControlType")",

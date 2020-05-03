@@ -14,18 +14,20 @@ using Grand.Framework.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Threading.Tasks;
+using Grand.Framework.Security.Authorization;
 
 namespace Grand.Plugin.Shipping.ShippingPoint.Controllers
 {
     [AuthorizeAdmin]
     [Area("Admin")]
+    [PermissionAuthorize(PermissionSystemName.ShippingSettings)]
     public class ShippingPointController : BaseShippingController
     {
         private readonly IWorkContext _workContext;
         private readonly IStoreContext _storeContext;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly ILocalizationService _localizationService;
-        private readonly IPermissionService _permissionService;
         private readonly IShippingPointService _shippingPointService;
         private readonly ICountryService _countryService;
         private readonly IStoreService _storeService;
@@ -36,22 +38,20 @@ namespace Grand.Plugin.Shipping.ShippingPoint.Controllers
             IStoreContext storeContext,
             IGenericAttributeService genericAttributeService,
             ILocalizationService localizationService,
-            IPermissionService permissionService,
             IShippingPointService ShippingPointService,
             ICountryService countryService,
             IStoreService storeService,
             IPriceFormatter priceFormatter
             )
         {
-            this._workContext = workContext;
-            this._storeContext = storeContext;
-            this._genericAttributeService = genericAttributeService;
-            this._localizationService = localizationService;
-            this._permissionService = permissionService;
-            this._shippingPointService = ShippingPointService;
-            this._countryService = countryService;
-            this._storeService = storeService;
-            this._priceFormatter = priceFormatter;
+            _workContext = workContext;
+            _storeContext = storeContext;
+            _genericAttributeService = genericAttributeService;
+            _localizationService = localizationService;
+            _shippingPointService = ShippingPointService;
+            _countryService = countryService;
+            _storeService = storeService;
+            _priceFormatter = priceFormatter;
         }
 
         public IActionResult Configure()
@@ -60,17 +60,14 @@ namespace Grand.Plugin.Shipping.ShippingPoint.Controllers
         }
 
         [HttpPost]
-        public IActionResult List(DataSourceRequest command)
+        public async Task<IActionResult> List(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return Content("Access denied");
-
-            var shippingPoints = _shippingPointService.GetAllStoreShippingPoint(storeId: "", pageIndex: command.Page - 1, pageSize: command.PageSize);
+            var shippingPoints = await _shippingPointService.GetAllStoreShippingPoint(storeId: "", pageIndex: command.Page - 1, pageSize: command.PageSize);
             var viewModel = new List<ShippingPointModel>();
 
             foreach (var shippingPoint in shippingPoints)
             {
-                var storeName = _storeService.GetStoreById(shippingPoint.StoreId);
+                var storeName = await _storeService.GetStoreById(shippingPoint.StoreId);
                 viewModel.Add(new ShippingPointModel
                 {
                     ShippingPointName = shippingPoint.ShippingPointName,
@@ -78,7 +75,7 @@ namespace Grand.Plugin.Shipping.ShippingPoint.Controllers
                     Id = shippingPoint.Id,
                     OpeningHours = shippingPoint.OpeningHours,
                     PickupFee = shippingPoint.PickupFee,
-                    StoreName = storeName != null ? storeName.Name : _localizationService.GetResource("Admin.Configuration.Settings.StoreScope.AllStores"),
+                    StoreName = storeName != null ? storeName.Shortcut : _localizationService.GetResource("Admin.Configuration.Settings.StoreScope.AllStores"),
 
                 });
             }
@@ -90,68 +87,69 @@ namespace Grand.Plugin.Shipping.ShippingPoint.Controllers
             });
         }
 
-        private ShippingPointModel PrepareShippingPointModel(ShippingPointModel model)
+        private async Task<ShippingPointModel> PrepareShippingPointModel(ShippingPointModel model)
         {
             model.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = string.Empty });
-            foreach (var country in _countryService.GetAllCountries(showHidden: true))
+            foreach (var country in await _countryService.GetAllCountries(showHidden: true))
                 model.AvailableCountries.Add(new SelectListItem { Text = country.Name, Value = country.Id.ToString() });
             model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Settings.StoreScope.AllStores"), Value = string.Empty });
-            foreach (var store in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = store.Name, Value = store.Id.ToString() });
+            foreach (var store in await _storeService.GetAllStores())
+                model.AvailableStores.Add(new SelectListItem { Text = store.Shortcut, Value = store.Id.ToString() });
             return model;
         }
 
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
             var model = new ShippingPointModel();
-            return View("~/Plugins/Shipping.ShippingPoint/Views/Create.cshtml", PrepareShippingPointModel(model));
+            await PrepareShippingPointModel(model);
+            return View("~/Plugins/Shipping.ShippingPoint/Views/Create.cshtml", model);
         }
 
         [HttpPost]
-        public IActionResult Create(ShippingPointModel model)
+        public async Task<IActionResult> Create(ShippingPointModel model)
         {
             if (ModelState.IsValid)
             {
                 var shippingPoint = model.ToEntity();
-                _shippingPointService.InsertStoreShippingPoint(shippingPoint);
+                await _shippingPointService.InsertStoreShippingPoint(shippingPoint);
 
                 ViewBag.RefreshPage = true;
             }
 
-            PrepareShippingPointModel(model);
+            await PrepareShippingPointModel(model);
 
             return View("~/Plugins/Shipping.ShippingPoint/Views/Create.cshtml", model);
         }
 
-        public IActionResult Edit(string id)
+        public async Task<IActionResult> Edit(string id)
         {
-            var shippingPoints = _shippingPointService.GetStoreShippingPointById(id);
+            var shippingPoints = await _shippingPointService.GetStoreShippingPointById(id);
             var model = shippingPoints.ToModel();
-            PrepareShippingPointModel(model);
+            await PrepareShippingPointModel(model);
             return View("~/Plugins/Shipping.ShippingPoint/Views/Edit.cshtml", model);
         }
 
         [HttpPost]
-        public IActionResult Edit(ShippingPointModel model)
+        public async Task<IActionResult> Edit(ShippingPointModel model)
         {
             if (ModelState.IsValid)
             {
-                var shippingPoint = _shippingPointService.GetStoreShippingPointById(model.Id);
+                var shippingPoint = await _shippingPointService.GetStoreShippingPointById(model.Id);
                 shippingPoint = model.ToEntity();
-                _shippingPointService.UpdateStoreShippingPoint(shippingPoint);
+                await _shippingPointService.UpdateStoreShippingPoint(shippingPoint);
             }
             ViewBag.RefreshPage = true;
 
-            PrepareShippingPointModel(model);
+            await PrepareShippingPointModel(model);
 
             return View("~/Plugins/Shipping.ShippingPoint/Views/Edit.cshtml", model);
         }
 
         [HttpPost]
-        public IActionResult Delete(string id)
+        public async Task<IActionResult> Delete(string id)
         {
-            var model = _shippingPointService.GetStoreShippingPointById(id);
-            _shippingPointService.DeleteStoreShippingPoint(model);
+            var model = await _shippingPointService.GetStoreShippingPointById(id);
+            await _shippingPointService.DeleteStoreShippingPoint(model);
 
             return new NullJsonResult();
         }

@@ -5,8 +5,10 @@ using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Customers;
 using Grand.Core.Domain.Security;
 using Grand.Services.Events;
+using MediatR;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Security
 {
@@ -17,14 +19,6 @@ namespace Grand.Services.Security
     {
         #region Constants
         
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : entity ID
-        /// {1} : entity name
-        /// </remarks>
-        private const string ACLRECORD_BY_ENTITYID_NAME_KEY = "Grand.aclrecord.entityid-name-{0}-{1}";
         /// <summary>
         /// Key pattern to clear cache
         /// </summary>
@@ -37,7 +31,7 @@ namespace Grand.Services.Security
         private readonly IRepository<AclRecord> _aclRecordRepository;
         private readonly IWorkContext _workContext;
         private readonly ICacheManager _cacheManager;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
         private readonly CatalogSettings _catalogSettings;
 
         #endregion
@@ -51,18 +45,18 @@ namespace Grand.Services.Security
         /// <param name="workContext">Work context</param>
         /// <param name="aclRecordRepository">ACL record repository</param>
         /// <param name="catalogSettings">Catalog settings</param>
-        /// <param name="eventPublisher">Event publisher</param>
+        /// <param name="mediator">Mediator</param>
         public AclService(ICacheManager cacheManager, 
             IWorkContext workContext,
             IRepository<AclRecord> aclRecordRepository,
-            IEventPublisher eventPublisher,
+            IMediator mediator,
             CatalogSettings catalogSettings)
         {
-            this._cacheManager = cacheManager;
-            this._workContext = workContext;
-            this._aclRecordRepository = aclRecordRepository;
-            this._eventPublisher = eventPublisher;
-            this._catalogSettings = catalogSettings;
+            _cacheManager = cacheManager;
+            _workContext = workContext;
+            _aclRecordRepository = aclRecordRepository;
+            _mediator = mediator;
+            _catalogSettings = catalogSettings;
         }
 
         #endregion
@@ -73,18 +67,18 @@ namespace Grand.Services.Security
         /// Deletes an ACL record
         /// </summary>
         /// <param name="aclRecord">ACL record</param>
-        public virtual void DeleteAclRecord(AclRecord aclRecord)
+        public virtual async Task DeleteAclRecord(AclRecord aclRecord)
         {
             if (aclRecord == null)
                 throw new ArgumentNullException("aclRecord");
 
-            _aclRecordRepository.Delete(aclRecord);
+            await _aclRecordRepository.DeleteAsync(aclRecord);
 
             //cache
-            _cacheManager.RemoveByPattern(ACLRECORD_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(ACLRECORD_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(aclRecord);
+            await _mediator.EntityDeleted(aclRecord);
         }
 
         /// <summary>
@@ -92,12 +86,9 @@ namespace Grand.Services.Security
         /// </summary>
         /// <param name="aclRecordId">ACL record identifier</param>
         /// <returns>ACL record</returns>
-        public virtual AclRecord GetAclRecordById(string aclRecordId)
+        public virtual Task<AclRecord> GetAclRecordById(string aclRecordId)
         {
-            if (String.IsNullOrEmpty(aclRecordId))
-                return null;
-
-            return _aclRecordRepository.GetById(aclRecordId);
+            return _aclRecordRepository.GetByIdAsync(aclRecordId);
         }
 
         
@@ -105,36 +96,36 @@ namespace Grand.Services.Security
         /// Inserts an ACL record
         /// </summary>
         /// <param name="aclRecord">ACL record</param>
-        public virtual void InsertAclRecord(AclRecord aclRecord)
+        public virtual async Task InsertAclRecord(AclRecord aclRecord)
         {
             if (aclRecord == null)
                 throw new ArgumentNullException("aclRecord");
 
-            _aclRecordRepository.Insert(aclRecord);
+            await _aclRecordRepository.InsertAsync(aclRecord);
 
             //cache
-            _cacheManager.RemoveByPattern(ACLRECORD_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(ACLRECORD_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(aclRecord);
+            await _mediator.EntityInserted(aclRecord);
         }
 
         /// <summary>
         /// Updates the ACL record
         /// </summary>
         /// <param name="aclRecord">ACL record</param>
-        public virtual void UpdateAclRecord(AclRecord aclRecord)
+        public virtual async Task UpdateAclRecord(AclRecord aclRecord)
         {
             if (aclRecord == null)
                 throw new ArgumentNullException("aclRecord");
 
-            _aclRecordRepository.Update(aclRecord);
+            await _aclRecordRepository.UpdateAsync(aclRecord);
 
             //cache
-            _cacheManager.RemoveByPattern(ACLRECORD_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(ACLRECORD_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(aclRecord);
+            await _mediator.EntityUpdated(aclRecord);
         }
 
         /// <summary>

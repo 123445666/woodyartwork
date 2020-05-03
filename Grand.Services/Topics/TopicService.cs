@@ -2,15 +2,17 @@ using Grand.Core;
 using Grand.Core.Caching;
 using Grand.Core.Data;
 using Grand.Core.Domain.Catalog;
-using Grand.Core.Domain.Security;
 using Grand.Core.Domain.Topics;
 using Grand.Services.Customers;
 using Grand.Services.Events;
 using Grand.Services.Stores;
+using MediatR;
+using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Topics
 {
@@ -36,6 +38,16 @@ namespace Grand.Services.Topics
         /// {0} : topic ID
         /// </remarks>
         private const string TOPICS_BY_ID_KEY = "Grand.topics.id-{0}";
+
+        /// <summary>
+        /// Key for caching
+        /// </summary>
+        /// <remarks>
+        /// {0} : topic systemname
+        /// {1} : store id
+        /// </remarks>
+        private const string TOPICS_BY_SYSTEMNAME = "Grand.topics.systemname-{0}-{1}";
+
         /// <summary>
         /// Key pattern to clear cache
         /// </summary>
@@ -47,10 +59,9 @@ namespace Grand.Services.Topics
 
         private readonly IRepository<Topic> _topicRepository;
         private readonly IWorkContext _workContext;
-        private readonly IRepository<AclRecord> _aclRepository;
         private readonly IStoreMappingService _storeMappingService;
         private readonly CatalogSettings _catalogSettings;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
         private readonly ICacheManager _cacheManager;
 
         #endregion
@@ -58,20 +69,18 @@ namespace Grand.Services.Topics
         #region Ctor
 
         public TopicService(IRepository<Topic> topicRepository,
-            IRepository<AclRecord> aclRepository,
             IWorkContext workContext,
             IStoreMappingService storeMappingService,
             CatalogSettings catalogSettings,
-            IEventPublisher eventPublisher,
+            IMediator mediator,
             ICacheManager cacheManager)
         {
-            this._topicRepository = topicRepository;
-            this._aclRepository = aclRepository;
-            this._workContext = workContext;
-            this._storeMappingService = storeMappingService;
-            this._catalogSettings = catalogSettings;
-            this._eventPublisher = eventPublisher;
-            this._cacheManager = cacheManager;
+            _topicRepository = topicRepository;
+            _workContext = workContext;
+            _storeMappingService = storeMappingService;
+            _catalogSettings = catalogSettings;
+            _mediator = mediator;
+            _cacheManager = cacheManager;
         }
 
         #endregion
@@ -82,17 +91,17 @@ namespace Grand.Services.Topics
         /// Deletes a topic
         /// </summary>
         /// <param name="topic">Topic</param>
-        public virtual void DeleteTopic(Topic topic)
+        public virtual async Task DeleteTopic(Topic topic)
         {
             if (topic == null)
                 throw new ArgumentNullException("topic");
 
-            _topicRepository.Delete(topic);
+            await _topicRepository.DeleteAsync(topic);
 
             //cache
-            _cacheManager.RemoveByPattern(TOPICS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(TOPICS_PATTERN_KEY);
             //event notification
-            _eventPublisher.EntityDeleted(topic);
+            await _mediator.EntityDeleted(topic);
         }
 
         /// <summary>
@@ -100,10 +109,10 @@ namespace Grand.Services.Topics
         /// </summary>
         /// <param name="topicId">The topic identifier</param>
         /// <returns>Topic</returns>
-        public virtual Topic GetTopicById(string topicId)
+        public virtual Task<Topic> GetTopicById(string topicId)
         {
             string key = string.Format(TOPICS_BY_ID_KEY, topicId);
-            return _cacheManager.Get(key, () => _topicRepository.GetById(topicId));
+            return _cacheManager.GetAsync(key, () => _topicRepository.GetByIdAsync(topicId));
         }
 
         /// <summary>
@@ -112,20 +121,25 @@ namespace Grand.Services.Topics
         /// <param name="systemName">The topic system name</param>
         /// <param name="storeId">Store identifier; pass 0 to ignore filtering by store and load the first one</param>
         /// <returns>Topic</returns>
-        public virtual Topic GetTopicBySystemName(string systemName, string storeId = "")
+        public virtual async Task<Topic> GetTopicBySystemName(string systemName, string storeId = "")
         {
-            if (String.IsNullOrEmpty(systemName))
+            if (string.IsNullOrEmpty(systemName))
                 return null;
 
-            var query = _topicRepository.Table;
-            query = query.Where(t => t.SystemName.ToLower() == systemName.ToLower());
-            query = query.OrderBy(t => t.Id);
-            var topics = query.ToList();
-            if (!String.IsNullOrEmpty(storeId))
+            string key = string.Format(TOPICS_BY_SYSTEMNAME, systemName, storeId);
+            return await _cacheManager.GetAsync(key, async () =>
             {
-                topics = topics.Where(x => _storeMappingService.Authorize(x, storeId)).ToList();
-            }
-            return topics.FirstOrDefault();
+
+                var query = _topicRepository.Table;
+                query = query.Where(t => t.SystemName.ToLower() == systemName.ToLower());
+                query = query.OrderBy(t => t.Id);
+                var topics = await query.ToListAsync();
+                if (!String.IsNullOrEmpty(storeId))
+                {
+                    topics = topics.Where(x => _storeMappingService.Authorize(x, storeId)).ToList();
+                }
+                return topics.FirstOrDefault();
+            });
         }
 
         /// <summary>
@@ -133,10 +147,10 @@ namespace Grand.Services.Topics
         /// </summary>
         /// <param name="storeId">Store identifier; pass "" to load all records</param>
         /// <returns>Topics</returns>
-        public virtual IList<Topic> GetAllTopics(string storeId, bool ignorAcl = false)
+        public virtual async Task<IList<Topic>> GetAllTopics(string storeId, bool ignorAcl = false)
         {
             string key = string.Format(TOPICS_ALL_KEY, storeId, ignorAcl);
-            return _cacheManager.Get(key, () =>
+            return await _cacheManager.GetAsync(key, () =>
             {
                 var query = _topicRepository.Table;
 
@@ -162,10 +176,7 @@ namespace Grand.Services.Topics
                         query = query.OrderBy(t => t.SystemName);
                     }
                 }
-
-
-
-                return query.ToList();
+                return query.ToListAsync();
             });
         }
 
@@ -173,35 +184,35 @@ namespace Grand.Services.Topics
         /// Inserts a topic
         /// </summary>
         /// <param name="topic">Topic</param>
-        public virtual void InsertTopic(Topic topic)
+        public virtual async Task InsertTopic(Topic topic)
         {
             if (topic == null)
                 throw new ArgumentNullException("topic");
 
-            _topicRepository.Insert(topic);
+            await _topicRepository.InsertAsync(topic);
 
             //cache
-            _cacheManager.RemoveByPattern(TOPICS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(TOPICS_PATTERN_KEY);
             //event notification
-            _eventPublisher.EntityInserted(topic);
+            await _mediator.EntityInserted(topic);
         }
 
         /// <summary>
         /// Updates the topic
         /// </summary>
         /// <param name="topic">Topic</param>
-        public virtual void UpdateTopic(Topic topic)
+        public virtual async Task UpdateTopic(Topic topic)
         {
             if (topic == null)
                 throw new ArgumentNullException("topic");
 
-            _topicRepository.Update(topic);
+            await _topicRepository.UpdateAsync(topic);
 
             //cache
-            _cacheManager.RemoveByPattern(TOPICS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(TOPICS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(topic);
+            await _mediator.EntityUpdated(topic);
         }
 
         #endregion

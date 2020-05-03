@@ -5,8 +5,10 @@ using Grand.Core.Domain.Common;
 using Grand.Core.Domain.Forums;
 using Grand.Core.Domain.Knowledgebase;
 using Grand.Core.Domain.News;
-using Grand.Core.Domain.Security;
+using Grand.Services.Blogs;
 using Grand.Services.Catalog;
+using Grand.Services.Helpers;
+using Grand.Services.Media;
 using Grand.Services.Topics;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -14,6 +16,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Xml;
 
 namespace Grand.Services.Seo
@@ -41,13 +44,14 @@ namespace Grand.Services.Seo
         private readonly IProductService _productService;
         private readonly IManufacturerService _manufacturerService;
         private readonly ITopicService _topicService;
+        private readonly IBlogService _blogService;
+        private readonly IPictureService _pictureService;
         private readonly IWebHelper _webHelper;
         private readonly CommonSettings _commonSettings;
         private readonly BlogSettings _blogSettings;
         private readonly KnowledgebaseSettings _knowledgebaseSettings;
         private readonly NewsSettings _newsSettings;
         private readonly ForumSettings _forumSettings;
-        private readonly SecuritySettings _securitySettings;
 
         #endregion
 
@@ -58,26 +62,28 @@ namespace Grand.Services.Seo
             IProductService productService,
             IManufacturerService manufacturerService,
             ITopicService topicService,
+            IBlogService blogService,
+            IPictureService pictureService,
             IWebHelper webHelper,
             CommonSettings commonSettings,
             BlogSettings blogSettings,
             KnowledgebaseSettings knowledgebaseSettings,
             NewsSettings newsSettings,
-            ForumSettings forumSettings,
-            SecuritySettings securitySettings)
+            ForumSettings forumSettings)
         {
-            this._storeContext = storeContext;
-            this._categoryService = categoryService;
-            this._productService = productService;
-            this._manufacturerService = manufacturerService;
-            this._topicService = topicService;
-            this._webHelper = webHelper;
-            this._commonSettings = commonSettings;
-            this._blogSettings = blogSettings;
-            this._knowledgebaseSettings = knowledgebaseSettings;
-            this._newsSettings = newsSettings;
-            this._forumSettings = forumSettings;
-            this._securitySettings = securitySettings;
+            _storeContext = storeContext;
+            _categoryService = categoryService;
+            _productService = productService;
+            _manufacturerService = manufacturerService;
+            _topicService = topicService;
+            _blogService = blogService;
+            _pictureService = pictureService;
+            _webHelper = webHelper;
+            _commonSettings = commonSettings;
+            _blogSettings = blogSettings;
+            _knowledgebaseSettings = knowledgebaseSettings;
+            _newsSettings = newsSettings;
+            _forumSettings = forumSettings;
         }
 
         #endregion
@@ -89,9 +95,10 @@ namespace Grand.Services.Seo
         /// </summary>
         protected class SitemapUrl
         {
-            public SitemapUrl(string location, UpdateFrequency frequency, DateTime updatedOn)
+            public SitemapUrl(string location, string image, UpdateFrequency frequency, DateTime updatedOn)
             {
                 Location = location;
+                Image = image;
                 UpdateFrequency = frequency;
                 UpdatedOn = updatedOn;
             }
@@ -100,6 +107,11 @@ namespace Grand.Services.Seo
             /// Gets or sets URL of the page
             /// </summary>
             public string Location { get; set; }
+
+            /// <summary>
+            /// Gets or sets URL of the image
+            /// </summary>
+            public string Image { get; set; }
 
             /// <summary>
             /// Gets or sets a value indicating how frequently the page is likely to change
@@ -130,64 +142,67 @@ namespace Grand.Services.Seo
         /// </summary>
         /// <param name="urlHelper">URL helper</param>
         /// <returns>List of URL for the sitemap</returns>
-        protected virtual IList<SitemapUrl> GenerateUrls(IUrlHelper urlHelper)
+        protected virtual async Task<IList<SitemapUrl>> GenerateUrls(IUrlHelper urlHelper, string language)
         {
             var sitemapUrls = new List<SitemapUrl>();
 
             //home page
             var homePageUrl = urlHelper.RouteUrl("HomePage", null, GetHttpProtocol());
-            sitemapUrls.Add(new SitemapUrl(homePageUrl, UpdateFrequency.Weekly, DateTime.UtcNow));
+            sitemapUrls.Add(new SitemapUrl(homePageUrl, string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow));
 
             //search products
             var productSearchUrl = urlHelper.RouteUrl("ProductSearch", null, GetHttpProtocol());
-            sitemapUrls.Add(new SitemapUrl(productSearchUrl, UpdateFrequency.Weekly, DateTime.UtcNow));
+            sitemapUrls.Add(new SitemapUrl(productSearchUrl, string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow));
 
             //contact us
             var contactUsUrl = urlHelper.RouteUrl("ContactUs", null, GetHttpProtocol());
-            sitemapUrls.Add(new SitemapUrl(contactUsUrl, UpdateFrequency.Weekly, DateTime.UtcNow));
+            sitemapUrls.Add(new SitemapUrl(contactUsUrl, string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow));
 
             //news
             if (_newsSettings.Enabled)
             {
                 var url = urlHelper.RouteUrl("NewsArchive", null, GetHttpProtocol());
-                sitemapUrls.Add(new SitemapUrl(url, UpdateFrequency.Weekly, DateTime.UtcNow));
+                sitemapUrls.Add(new SitemapUrl(url, string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow));
             }
 
             //blog
             if (_blogSettings.Enabled)
             {
                 var url = urlHelper.RouteUrl("Blog", null, GetHttpProtocol());
-                sitemapUrls.Add(new SitemapUrl(url, UpdateFrequency.Weekly, DateTime.UtcNow));
+                sitemapUrls.Add(new SitemapUrl(url, string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow));
             }
 
             //knowledgebase
             if (_knowledgebaseSettings.Enabled)
             {
                 var url = urlHelper.RouteUrl("Knowledgebase", null, GetHttpProtocol());
-                sitemapUrls.Add(new SitemapUrl(url, UpdateFrequency.Weekly, DateTime.UtcNow));
+                sitemapUrls.Add(new SitemapUrl(url, string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow));
             }
 
             //forums
             if (_forumSettings.ForumsEnabled)
             {
                 var url = urlHelper.RouteUrl("Boards", null, GetHttpProtocol());
-                sitemapUrls.Add(new SitemapUrl(url, UpdateFrequency.Weekly, DateTime.UtcNow));
+                sitemapUrls.Add(new SitemapUrl(url, string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow));
             }
 
             //categories
             if (_commonSettings.SitemapIncludeCategories)
-                sitemapUrls.AddRange(GetCategoryUrls(urlHelper, ""));
+                sitemapUrls.AddRange(await GetCategoryUrls(urlHelper, "", language));
 
             //manufacturers
             if (_commonSettings.SitemapIncludeManufacturers)
-                sitemapUrls.AddRange(GetManufacturerUrls(urlHelper));
+                sitemapUrls.AddRange(await GetManufacturerUrls(urlHelper, language));
 
             //products
             if (_commonSettings.SitemapIncludeProducts)
-                sitemapUrls.AddRange(GetProductUrls(urlHelper));
+                sitemapUrls.AddRange(await GetProductUrls(urlHelper, language));
 
             //topics
-            sitemapUrls.AddRange(GetTopicUrls(urlHelper));
+            sitemapUrls.AddRange(await GetTopicUrls(urlHelper, language));
+
+            //blog posts
+            sitemapUrls.AddRange(await GetBlogPostsUrls(urlHelper, language));
 
             //custom URLs
             sitemapUrls.AddRange(GetCustomUrls());
@@ -201,16 +216,26 @@ namespace Grand.Services.Seo
         /// <param name="urlHelper">URL helper</param>
         /// <param name="sitemapUrls">Current list of URL</param>
         /// <returns>Collection of sitemap URLs</returns>
-        protected virtual IEnumerable<SitemapUrl> GetCategoryUrls(IUrlHelper urlHelper, string parentCategoryId)
+        protected virtual async Task<IEnumerable<SitemapUrl>> GetCategoryUrls(IUrlHelper urlHelper, string parentCategoryId, string language)
         {
-            return _categoryService.GetAllCategoriesByParentCategoryId(parentCategoryId: parentCategoryId).SelectMany(category =>
+            var allCategoriesByParentCategoryId = await _categoryService.GetAllCategoriesByParentCategoryId(parentCategoryId: parentCategoryId);
+            var categories = new List<SitemapUrl>();
+            var storeLocation = _webHelper.GetStoreLocation();
+            foreach (var category in allCategoriesByParentCategoryId)
             {
-                var sitemapUrls = new List<SitemapUrl>();
-                var url = urlHelper.RouteUrl("Category", new { SeName = category.GetSeName() }, GetHttpProtocol());
-                sitemapUrls.Add(new SitemapUrl(url, UpdateFrequency.Weekly, category.UpdatedOnUtc));
-                sitemapUrls.AddRange(GetCategoryUrls(urlHelper, category.Id));
-                return sitemapUrls;
-            });
+                var url = urlHelper.RouteUrl("Category", new { SeName = category.GetSeName(language) }, GetHttpProtocol());
+                var imageurl = string.Empty;
+                if(_commonSettings.SitemapIncludeImage)
+                {
+                    if(!string.IsNullOrEmpty(category.PictureId))
+                    {
+                        imageurl = await _pictureService.GetPictureUrl(category.PictureId, showDefaultPicture: false, storeLocation: storeLocation);
+                    }
+                }
+                categories.Add(new SitemapUrl(url, imageurl, UpdateFrequency.Weekly, category.UpdatedOnUtc));
+                categories.AddRange(await GetCategoryUrls(urlHelper, category.Id, language));
+            }
+            return categories;
         }
 
         /// <summary>
@@ -218,13 +243,25 @@ namespace Grand.Services.Seo
         /// </summary>
         /// <param name="urlHelper">URL helper</param>
         /// <returns>Collection of sitemap URLs</returns>
-        protected virtual IEnumerable<SitemapUrl> GetManufacturerUrls(IUrlHelper urlHelper)
+        protected virtual async Task<IEnumerable<SitemapUrl>> GetManufacturerUrls(IUrlHelper urlHelper, string language)
         {
-            return _manufacturerService.GetAllManufacturers(storeId: _storeContext.CurrentStore.Id).Select(manufacturer =>
+            var manuf = await _manufacturerService.GetAllManufacturers(storeId: _storeContext.CurrentStore.Id);
+            var manufactures = new List<SitemapUrl>();
+            var storeLocation = _webHelper.GetStoreLocation();
+            foreach (var manufacturer in manuf)
             {
-                var url = urlHelper.RouteUrl("Manufacturer", new { SeName = manufacturer.GetSeName() }, GetHttpProtocol());
-                return new SitemapUrl(url, UpdateFrequency.Weekly, manufacturer.UpdatedOnUtc);
-            });
+                var url = urlHelper.RouteUrl("Manufacturer", new { SeName = manufacturer.GetSeName(language) }, GetHttpProtocol());
+                var imageurl = string.Empty;
+                if (_commonSettings.SitemapIncludeImage)
+                {
+                    if (!string.IsNullOrEmpty(manufacturer.PictureId))
+                    {
+                        imageurl = await _pictureService.GetPictureUrl(manufacturer.PictureId, showDefaultPicture: false, storeLocation: storeLocation);
+                    }
+                }
+                manufactures.Add(new SitemapUrl(url, imageurl, UpdateFrequency.Weekly, manufacturer.UpdatedOnUtc));
+            }
+            return manufactures;
         }
 
         /// <summary>
@@ -232,14 +269,27 @@ namespace Grand.Services.Seo
         /// </summary>
         /// <param name="urlHelper">URL helper</param>
         /// <returns>Collection of sitemap URLs</returns>
-        protected virtual IEnumerable<SitemapUrl> GetProductUrls(IUrlHelper urlHelper)
+        protected virtual async Task<IEnumerable<SitemapUrl>> GetProductUrls(IUrlHelper urlHelper, string language)
         {
-            return _productService.SearchProducts(storeId: _storeContext.CurrentStore.Id,
-                visibleIndividuallyOnly: true, orderBy: ProductSortingEnum.CreatedOn).Select(product =>
+            var search = await _productService.SearchProducts(storeId: _storeContext.CurrentStore.Id,
+                visibleIndividuallyOnly: true, orderBy: ProductSortingEnum.CreatedOn);
+            var storeLocation = _webHelper.GetStoreLocation();
+            var products = new List<SitemapUrl>();
+            foreach (var product in search.products)
+            {
+                var url = urlHelper.RouteUrl("Product", new { SeName = product.GetSeName(language) }, GetHttpProtocol());
+                var imageurl = string.Empty;
+                if (_commonSettings.SitemapIncludeImage)
                 {
-                    var url = urlHelper.RouteUrl("Product", new { SeName = product.GetSeName() }, GetHttpProtocol());
-                    return new SitemapUrl(url, UpdateFrequency.Weekly, product.UpdatedOnUtc);
-                });
+                    if (!string.IsNullOrEmpty(product.ProductPictures.FirstOrDefault()?.PictureId))
+                    {
+                        imageurl = await _pictureService.GetPictureUrl(product.ProductPictures.FirstOrDefault().PictureId, showDefaultPicture: false, storeLocation: storeLocation);
+                    }
+                }
+                products.Add(new SitemapUrl(url, imageurl, UpdateFrequency.Weekly, product.UpdatedOnUtc));
+            }
+            return products;
+            
         }
 
         /// <summary>
@@ -247,13 +297,41 @@ namespace Grand.Services.Seo
         /// </summary>
         /// <param name="urlHelper">URL helper</param>
         /// <returns>Collection of sitemap URLs</returns>
-        protected virtual IEnumerable<SitemapUrl> GetTopicUrls(IUrlHelper urlHelper)
+        protected virtual async Task<IEnumerable<SitemapUrl>> GetTopicUrls(IUrlHelper urlHelper, string language)
         {
-            return _topicService.GetAllTopics(_storeContext.CurrentStore.Id).Where(t => t.IncludeInSitemap).Select(topic =>
+            var topics = await _topicService.GetAllTopics(_storeContext.CurrentStore.Id);
+            return topics.Where(t => t.IncludeInSitemap).Select(topic =>
             {
-                var url = urlHelper.RouteUrl("Topic", new { SeName = topic.GetSeName() }, GetHttpProtocol());
-                return new SitemapUrl(url, UpdateFrequency.Weekly, DateTime.UtcNow);
+                var url = urlHelper.RouteUrl("Topic", new { SeName = topic.GetSeName(language) }, GetHttpProtocol());
+                return new SitemapUrl(url, string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow);
             });
+        }
+
+        /// <summary>
+        /// Get blog posts URLs for the sitemap
+        /// </summary>
+        /// <param name="urlHelper">URL helper</param>
+        /// <returns>Collection of sitemap URLs</returns>
+        protected virtual async Task<IEnumerable<SitemapUrl>> GetBlogPostsUrls(IUrlHelper urlHelper, string language)
+        {
+            var blogposts = await _blogService.GetAllBlogPosts(_storeContext.CurrentStore.Id);
+            var blog = new List<SitemapUrl>();
+            var storeLocation = _webHelper.GetStoreLocation();
+            foreach (var blogpost in blogposts)
+            {
+                var url = urlHelper.RouteUrl("BlogPost", new { SeName = blogpost.GetSeName(language) }, GetHttpProtocol());
+                var imageurl = string.Empty;
+                if (_commonSettings.SitemapIncludeImage)
+                {
+                    if (!string.IsNullOrEmpty(blogpost.PictureId))
+                    {
+                        imageurl = await _pictureService.GetPictureUrl(blogpost.PictureId, showDefaultPicture: false, storeLocation: storeLocation);
+                    }
+                }
+                blog.Add(new SitemapUrl(url, imageurl, UpdateFrequency.Weekly, DateTime.UtcNow));
+            }
+            
+            return blog;
         }
 
         /// <summary>
@@ -265,7 +343,7 @@ namespace Grand.Services.Seo
             var storeLocation = _webHelper.GetStoreLocation();
 
             return _commonSettings.SitemapCustomUrls.Select(customUrl =>
-                new SitemapUrl(string.Concat(storeLocation, customUrl), UpdateFrequency.Weekly, DateTime.UtcNow));
+                new SitemapUrl(string.Concat(storeLocation, customUrl), string.Empty, UpdateFrequency.Weekly, DateTime.UtcNow));
         }
 
         /// <summary>
@@ -274,20 +352,20 @@ namespace Grand.Services.Seo
         /// <param name="urlHelper">URL helper</param>
         /// <param name="stream">Stream</param>
         /// <param name="sitemapNumber">The number of sitemaps</param>
-        protected virtual void WriteSitemapIndex(IUrlHelper urlHelper, Stream stream, int sitemapNumber)
+        protected virtual async Task WriteSitemapIndex(IUrlHelper urlHelper, Stream stream, int sitemapNumber)
         {
-            var xwSettings = new XmlWriterSettings
-            {
+            var xwSettings = new XmlWriterSettings {
                 ConformanceLevel = ConformanceLevel.Auto,
                 Indent = true,
                 IndentChars = "\t",
                 NewLineChars = "\r\n",
-                Encoding = Encoding.UTF8
+                Encoding = Encoding.UTF8,
+                Async = true
             };
 
             using (var writer = XmlWriter.Create(stream, xwSettings))
             {
-                writer.WriteStartDocument();
+                await writer.WriteStartDocumentAsync();
                 writer.WriteStartElement("sitemapindex");
                 writer.WriteAttributeString("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9");
                 writer.WriteAttributeString("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
@@ -306,7 +384,7 @@ namespace Grand.Services.Seo
                 }
 
                 writer.WriteEndElement();
-                writer.Flush();
+                await writer.FlushAsync();
             }
         }
 
@@ -316,39 +394,49 @@ namespace Grand.Services.Seo
         /// <param name="urlHelper">URL helper</param>
         /// <param name="stream">Stream</param>
         /// <param name="sitemapUrls">List of sitemap URLs</param>
-        protected virtual void WriteSitemap(IUrlHelper urlHelper, Stream stream, IList<SitemapUrl> sitemapUrls)
+        protected virtual async Task WriteSitemap(IUrlHelper urlHelper, Stream stream, IList<SitemapUrl> sitemapUrls)
         {
-            var xwSettings = new XmlWriterSettings
-            {
+            var xwSettings = new XmlWriterSettings {
                 ConformanceLevel = ConformanceLevel.Auto,
                 Indent = true,
                 IndentChars = "\t",
                 NewLineChars = "\r\n",
                 Encoding = Encoding.UTF8,
+                Async = true
             };
 
             using (var writer = XmlWriter.Create(stream, xwSettings))
             {
-                writer.WriteStartDocument();
+                await writer.WriteStartDocumentAsync();
                 writer.WriteStartElement("urlset");
-                writer.WriteAttributeString("urlset", "xmlns", null, "http://www.sitemaps.org/schemas/sitemap/0.9");
-                writer.WriteAttributeString("xmlns", "xsi", null, "http://www.w3.org/2001/XMLSchema-instance");
-                writer.WriteAttributeString("xsi", "schemaLocation", null ,"http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd");
+                await writer.WriteAttributeStringAsync("urlset", "xmlns", null, "http://www.sitemaps.org/schemas/sitemap/0.9");
+
+                if (_commonSettings.SitemapIncludeImage)
+                    await writer.WriteAttributeStringAsync("xmlns", "image", null, "http://www.google.com/schemas/sitemap-image/1.1");
+
+                await writer.WriteAttributeStringAsync("xsi", "schemaLocation", null, "http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd");
 
                 //write URLs from list to the sitemap
                 foreach (var url in sitemapUrls)
                 {
                     writer.WriteStartElement("url");
                     var location = XmlHelper.XmlEncode(url.Location);
-
                     writer.WriteElementString("loc", location);
+
+                    if (_commonSettings.SitemapIncludeImage && !string.IsNullOrEmpty(url.Image))
+                    {
+                        writer.WriteStartElement("image", "image", null);
+                        writer.WriteElementString("image", "loc", null, url.Image);
+                        writer.WriteEndElement();
+                    }
+
                     writer.WriteElementString("changefreq", url.UpdateFrequency.ToString().ToLowerInvariant());
                     writer.WriteElementString("lastmod", url.UpdatedOn.ToString(DateFormat));
                     writer.WriteEndElement();
                 }
 
-                writer.WriteEndElement();
-                writer.Flush();
+                await writer.WriteEndElementAsync();
+                await writer.FlushAsync();
             }
         }
 
@@ -363,11 +451,11 @@ namespace Grand.Services.Seo
         /// <param name="urlHelper">URL helper</param>
         /// <param name="id">Sitemap identifier</param>
         /// <returns>Sitemap.xml as string</returns>
-        public virtual string Generate(IUrlHelper urlHelper, int? id)
+        public virtual async Task<string> Generate(IUrlHelper urlHelper, int? id, string language)
         {
             using (var stream = new MemoryStream())
             {
-                Generate(urlHelper, stream, id);
+                await Generate(urlHelper, stream, id, language);
                 return Encoding.UTF8.GetString(stream.ToArray());
             }
         }
@@ -379,10 +467,10 @@ namespace Grand.Services.Seo
         /// <param name="urlHelper">URL helper</param>
         /// <param name="id">Sitemap identifier</param>
         /// <param name="stream">Stream of sitemap.</param>
-        public virtual void Generate(IUrlHelper urlHelper, Stream stream, int? id)
+        public virtual async Task Generate(IUrlHelper urlHelper, Stream stream, int? id, string language)
         {
             //generate all URLs for the sitemap
-            var sitemapUrls = GenerateUrls(urlHelper);
+            var sitemapUrls = await GenerateUrls(urlHelper, language);
 
             //split URLs into separate lists based on the max size 
             var sitemaps = sitemapUrls.Select((url, index) => new { Index = index, Value = url })
@@ -398,7 +486,7 @@ namespace Grand.Services.Seo
                     return;
 
                 //otherwise write a certain numbered sitemap file into the stream
-                WriteSitemap(urlHelper, stream, sitemaps.ElementAt(id.Value - 1));
+                await WriteSitemap(urlHelper, stream, sitemaps.ElementAt(id.Value - 1));
 
             }
             else
@@ -407,12 +495,12 @@ namespace Grand.Services.Seo
                 if (sitemapUrls.Count >= maxSitemapUrlNumber)
                 {
                     //write a sitemap index file into the stream
-                    WriteSitemapIndex(urlHelper, stream, sitemaps.Count);
+                    await WriteSitemapIndex(urlHelper, stream, sitemaps.Count);
                 }
                 else
                 {
                     //otherwise generate a standard sitemap
-                    WriteSitemap(urlHelper, stream, sitemaps.First());
+                    await WriteSitemap(urlHelper, stream, sitemaps.First());
                 }
             }
         }

@@ -4,10 +4,9 @@ using Grand.Core.Data;
 using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Common;
 using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Directory;
 using Grand.Core.Domain.Orders;
 using Grand.Core.Domain.Shipping;
-using Grand.Core.Infrastructure;
+using Grand.Core.Domain.Stores;
 using Grand.Core.Plugins;
 using Grand.Services.Catalog;
 using Grand.Services.Common;
@@ -16,11 +15,14 @@ using Grand.Services.Events;
 using Grand.Services.Localization;
 using Grand.Services.Logging;
 using Grand.Services.Orders;
+using MediatR;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Shipping
 {
@@ -54,6 +56,21 @@ namespace Grand.Services.Shipping
         private const string PICKUPPOINTS_PATTERN_KEY = "Grand.pickuppoint.";
 
         /// <summary>
+        /// Key for caching
+        /// </summary>
+        /// <remarks>
+        /// {0} : delivery date ID
+        /// </remarks>
+        private const string DELIVERYDATE_BY_ID_KEY = "Grand.deliverydate.id-{0}";
+
+        /// <summary>
+        /// Key for caching
+        /// </summary>
+        /// <remarks>
+        /// </remarks>
+        private const string DELIVERYDATE_PATTERN_KEY = "Grand.deliverydate.";
+
+        /// <summary>
         /// Key pattern to clear cache
         /// </summary>
         private const string PRODUCTS_PATTERN_KEY = "Grand.product.";
@@ -66,21 +83,22 @@ namespace Grand.Services.Shipping
         private readonly IRepository<DeliveryDate> _deliveryDateRepository;
         private readonly IRepository<Warehouse> _warehouseRepository;
         private readonly IRepository<PickupPoint> _pickupPointsRepository;
+        private readonly IRepository<Product> _productRepository;
         private readonly ILogger _logger;
         private readonly IProductService _productService;
         private readonly IProductAttributeParser _productAttributeParser;
         private readonly ICheckoutAttributeParser _checkoutAttributeParser;
-        private readonly IGenericAttributeService _genericAttributeService;
         private readonly ILocalizationService _localizationService;
         private readonly IAddressService _addressService;
-        private readonly ShippingSettings _shippingSettings;
+        private readonly ICountryService _countryService;
+        private readonly ICurrencyService _currencyService;
+        private readonly IStateProvinceService _stateProvinceService;
         private readonly IPluginFinder _pluginFinder;
         private readonly IStoreContext _storeContext;
-        private readonly IEventPublisher _eventPublisher;
-        private readonly ShoppingCartSettings _shoppingCartSettings;
+        private readonly IMediator _mediator;
         private readonly ICacheManager _cacheManager;
-        private readonly IRepository<Product> _productRepository;
-
+        private readonly ShippingSettings _shippingSettings;
+        private readonly ShoppingCartSettings _shoppingCartSettings;
 
         #endregion
 
@@ -89,23 +107,6 @@ namespace Grand.Services.Shipping
         /// <summary>
         /// Ctor
         /// </summary>
-        /// <param name="shippingMethodRepository">Shipping method repository</param>
-        /// <param name="deliveryDateRepository">Delivery date repository</param>
-        /// <param name="warehouseRepository">Warehouse repository</param>
-        /// <param name="pickupPointsRepository">Pickup points repository</param>
-        /// <param name="logger">Logger</param>
-        /// <param name="productService">Product service</param>
-        /// <param name="productAttributeParser">Product attribute parser</param>
-        /// <param name="checkoutAttributeParser">Checkout attribute parser</param>
-        /// <param name="genericAttributeService">Generic attribute service</param>
-        /// <param name="localizationService">Localization service</param>
-        /// <param name="addressService">Address service</param>
-        /// <param name="shippingSettings">Shipping settings</param>
-        /// <param name="pluginFinder">Plugin finder</param>
-        /// <param name="storeContext">Store context</param>
-        /// <param name="eventPublisher">Event published</param>
-        /// <param name="shoppingCartSettings">Shopping cart settings</param>
-        /// <param name="cacheManager">Cache manager</param>
         public ShippingService(IRepository<ShippingMethod> shippingMethodRepository,
             IRepository<DeliveryDate> deliveryDateRepository,
             IRepository<Warehouse> warehouseRepository,
@@ -114,39 +115,43 @@ namespace Grand.Services.Shipping
             IProductService productService,
             IProductAttributeParser productAttributeParser,
             ICheckoutAttributeParser checkoutAttributeParser,
-            IGenericAttributeService genericAttributeService,
             ILocalizationService localizationService,
             IAddressService addressService,
-            ShippingSettings shippingSettings,
+            ICountryService countryService,
+            IStateProvinceService stateProvinceService,
             IPluginFinder pluginFinder,
             IStoreContext storeContext,
-            IEventPublisher eventPublisher,
-            ShoppingCartSettings shoppingCartSettings,
+            IMediator mediator,
+            ICurrencyService currencyService,
             ICacheManager cacheManager,
-            IRepository<Product> productRepository)
+            IRepository<Product> productRepository,
+            ShoppingCartSettings shoppingCartSettings,
+            ShippingSettings shippingSettings)
         {
-            this._shippingMethodRepository = shippingMethodRepository;
-            this._deliveryDateRepository = deliveryDateRepository;
-            this._warehouseRepository = warehouseRepository;
-            this._pickupPointsRepository = pickupPointsRepository;
-            this._logger = logger;
-            this._productService = productService;
-            this._productAttributeParser = productAttributeParser;
-            this._checkoutAttributeParser = checkoutAttributeParser;
-            this._genericAttributeService = genericAttributeService;
-            this._localizationService = localizationService;
-            this._addressService = addressService;
-            this._shippingSettings = shippingSettings;
-            this._pluginFinder = pluginFinder;
-            this._storeContext = storeContext;
-            this._eventPublisher = eventPublisher;
-            this._shoppingCartSettings = shoppingCartSettings;
-            this._cacheManager = cacheManager;
-            this._productRepository = productRepository;
+            _shippingMethodRepository = shippingMethodRepository;
+            _deliveryDateRepository = deliveryDateRepository;
+            _warehouseRepository = warehouseRepository;
+            _pickupPointsRepository = pickupPointsRepository;
+            _logger = logger;
+            _productService = productService;
+            _productAttributeParser = productAttributeParser;
+            _checkoutAttributeParser = checkoutAttributeParser;
+            _localizationService = localizationService;
+            _addressService = addressService;
+            _countryService = countryService;
+            _stateProvinceService = stateProvinceService;
+            _pluginFinder = pluginFinder;
+            _storeContext = storeContext;
+            _currencyService = currencyService;
+            _mediator = mediator;
+            _cacheManager = cacheManager;
+            _productRepository = productRepository;
+            _shoppingCartSettings = shoppingCartSettings;
+            _shippingSettings = shippingSettings;
         }
 
         #endregion
-        
+
         #region Methods
 
         #region Shipping rate computation methods
@@ -156,12 +161,19 @@ namespace Grand.Services.Shipping
         /// </summary>
         /// <param name="storeId">Load records allowed only in a specified store; pass "" to load all records</param>
         /// <returns>Shipping rate computation methods</returns>
-        public virtual IList<IShippingRateComputationMethod> LoadActiveShippingRateComputationMethods(string storeId = "", IList<ShoppingCartItem> cart = null)
+        public virtual async Task<IList<IShippingRateComputationMethod>> LoadActiveShippingRateComputationMethods(string storeId = "", IList<ShoppingCartItem> cart = null)
         {
-            return LoadAllShippingRateComputationMethods(storeId)
+            var shippingMethods = LoadAllShippingRateComputationMethods(storeId)
                    .Where(provider => _shippingSettings.ActiveShippingRateComputationMethodSystemNames.Contains(provider.PluginDescriptor.SystemName, StringComparer.OrdinalIgnoreCase))
-                   .Where(provider => !provider.HideShipmentMethods(cart))
                    .ToList();
+
+            var availableShippingMethods = new List<IShippingRateComputationMethod>();
+            foreach (var sm in shippingMethods)
+            {
+                if (!await sm.HideShipmentMethods(cart))
+                    availableShippingMethods.Add(sm);
+            }
+            return availableShippingMethods;
         }
 
         /// <summary>
@@ -173,7 +185,7 @@ namespace Grand.Services.Shipping
         {
             var descriptor = _pluginFinder.GetPluginDescriptorBySystemName<IShippingRateComputationMethod>(systemName);
             if (descriptor != null)
-                return descriptor.Instance<IShippingRateComputationMethod>();
+                return descriptor.Instance<IShippingRateComputationMethod>(_pluginFinder.ServiceProvider);
 
             return null;
         }
@@ -197,18 +209,18 @@ namespace Grand.Services.Shipping
         /// Deletes a shipping method
         /// </summary>
         /// <param name="shippingMethod">The shipping method</param>
-        public virtual void DeleteShippingMethod(ShippingMethod shippingMethod)
+        public virtual async Task DeleteShippingMethod(ShippingMethod shippingMethod)
         {
             if (shippingMethod == null)
                 throw new ArgumentNullException("shippingMethod");
 
-            _shippingMethodRepository.Delete(shippingMethod);
+            await _shippingMethodRepository.DeleteAsync(shippingMethod);
 
             //clear cache
-            _cacheManager.RemoveByPattern(SHIPPINGMETHOD_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(SHIPPINGMETHOD_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(shippingMethod);
+            await _mediator.EntityDeleted(shippingMethod);
         }
 
         /// <summary>
@@ -216,35 +228,35 @@ namespace Grand.Services.Shipping
         /// </summary>
         /// <param name="shippingMethodId">The shipping method identifier</param>
         /// <returns>Shipping method</returns>
-        public virtual ShippingMethod GetShippingMethodById(string shippingMethodId)
+        public virtual Task<ShippingMethod> GetShippingMethodById(string shippingMethodId)
         {
-            return _shippingMethodRepository.GetById(shippingMethodId);
+            return _shippingMethodRepository.GetByIdAsync(shippingMethodId);
         }
-        
+
         /// <summary>
         /// Gets all shipping methods
         /// </summary>
         /// <param name="filterByCountryId">The country indentifier to filter by</param>
         /// <returns>Shipping methods</returns>
-        public virtual IList<ShippingMethod> GetAllShippingMethods(string filterByCountryId = "", Customer customer = null)
+        public virtual async Task<IList<ShippingMethod>> GetAllShippingMethods(string filterByCountryId = "", Customer customer = null)
         {
-            List<ShippingMethod> shippingMethods = new List<ShippingMethod>();
+            var shippingMethods = new List<ShippingMethod>();
 
-            shippingMethods = _cacheManager.Get(SHIPPINGMETHOD_PATTERN_KEY, () =>
+            shippingMethods = await _cacheManager.GetAsync(SHIPPINGMETHOD_PATTERN_KEY, () =>
             {
                 var query = from sm in _shippingMethodRepository.Table
                             orderby sm.DisplayOrder
                             select sm;
-                return query.ToList();
+                return query.ToListAsync();
             });
 
             if (!String.IsNullOrEmpty(filterByCountryId))
             {
                 shippingMethods = shippingMethods.Where(x => !x.CountryRestrictionExists(filterByCountryId)).ToList();
             }
-            if(customer !=null)
+            if (customer != null)
             {
-                shippingMethods = shippingMethods.Where(x => !x.CustomerRoleRestrictionExists(customer.CustomerRoles.Select(y=>y.Id).ToList())).ToList();
+                shippingMethods = shippingMethods.Where(x => !x.CustomerRoleRestrictionExists(customer.CustomerRoles.Select(y => y.Id).ToList())).ToList();
             }
 
             return shippingMethods;
@@ -254,36 +266,36 @@ namespace Grand.Services.Shipping
         /// Inserts a shipping method
         /// </summary>
         /// <param name="shippingMethod">Shipping method</param>
-        public virtual void InsertShippingMethod(ShippingMethod shippingMethod)
+        public virtual async Task InsertShippingMethod(ShippingMethod shippingMethod)
         {
             if (shippingMethod == null)
                 throw new ArgumentNullException("shippingMethod");
 
-            _shippingMethodRepository.Insert(shippingMethod);
+            await _shippingMethodRepository.InsertAsync(shippingMethod);
 
             //clear cache
-            _cacheManager.RemoveByPattern(SHIPPINGMETHOD_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(SHIPPINGMETHOD_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(shippingMethod);
+            await _mediator.EntityInserted(shippingMethod);
         }
 
         /// <summary>
         /// Updates the shipping method
         /// </summary>
         /// <param name="shippingMethod">Shipping method</param>
-        public virtual void UpdateShippingMethod(ShippingMethod shippingMethod)
+        public virtual async Task UpdateShippingMethod(ShippingMethod shippingMethod)
         {
             if (shippingMethod == null)
                 throw new ArgumentNullException("shippingMethod");
 
-            _shippingMethodRepository.Update(shippingMethod);
+            await _shippingMethodRepository.UpdateAsync(shippingMethod);
 
             //clear cache
-            _cacheManager.RemoveByPattern(SHIPPINGMETHOD_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(SHIPPINGMETHOD_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(shippingMethod);
+            await _mediator.EntityUpdated(shippingMethod);
         }
 
         #endregion
@@ -294,7 +306,7 @@ namespace Grand.Services.Shipping
         /// Deletes a delivery date
         /// </summary>
         /// <param name="deliveryDate">The delivery date</param>
-        public virtual void DeleteDeliveryDate(DeliveryDate deliveryDate)
+        public virtual async Task DeleteDeliveryDate(DeliveryDate deliveryDate)
         {
             if (deliveryDate == null)
                 throw new ArgumentNullException("deliveryDate");
@@ -303,13 +315,16 @@ namespace Grand.Services.Shipping
             var filter = builder.Eq(x => x.DeliveryDateId, deliveryDate.Id);
             var update = Builders<Product>.Update
                 .Set(x => x.DeliveryDateId, "");
-            var result = _productRepository.Collection.UpdateManyAsync(filter, update).Result;
+            await _productRepository.Collection.UpdateManyAsync(filter, update);
 
-            _deliveryDateRepository.Delete(deliveryDate);
-            _cacheManager.RemoveByPattern(PRODUCTS_PATTERN_KEY);
+            await _deliveryDateRepository.DeleteAsync(deliveryDate);
+
+            //clear cache
+            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(DELIVERYDATE_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(deliveryDate);
+            await _mediator.EntityDeleted(deliveryDate);
         }
 
         /// <summary>
@@ -317,52 +332,55 @@ namespace Grand.Services.Shipping
         /// </summary>
         /// <param name="deliveryDateId">The delivery date identifier</param>
         /// <returns>Delivery date</returns>
-        public virtual DeliveryDate GetDeliveryDateById(string deliveryDateId)
+        public virtual Task<DeliveryDate> GetDeliveryDateById(string deliveryDateId)
         {
-            return _deliveryDateRepository.GetById(deliveryDateId);
+            string key = string.Format(DELIVERYDATE_BY_ID_KEY, deliveryDateId);
+            return _cacheManager.GetAsync(key, () => _deliveryDateRepository.GetByIdAsync(deliveryDateId));
         }
 
         /// <summary>
         /// Gets all delivery dates
         /// </summary>
         /// <returns>Delivery dates</returns>
-        public virtual IList<DeliveryDate> GetAllDeliveryDates()
+        public virtual async Task<IList<DeliveryDate>> GetAllDeliveryDates()
         {
             var query = from dd in _deliveryDateRepository.Table
                         orderby dd.DisplayOrder
                         select dd;
-            var deliveryDates = query.ToList();
-            return deliveryDates;
+            return await query.ToListAsync();
         }
 
         /// <summary>
         /// Inserts a delivery date
         /// </summary>
         /// <param name="deliveryDate">Delivery date</param>
-        public virtual void InsertDeliveryDate(DeliveryDate deliveryDate)
+        public virtual async Task InsertDeliveryDate(DeliveryDate deliveryDate)
         {
             if (deliveryDate == null)
                 throw new ArgumentNullException("deliveryDate");
 
-            _deliveryDateRepository.Insert(deliveryDate);
+            await _deliveryDateRepository.InsertAsync(deliveryDate);
 
             //event notification
-            _eventPublisher.EntityInserted(deliveryDate);
+            await _mediator.EntityInserted(deliveryDate);
         }
 
         /// <summary>
         /// Updates the delivery date
         /// </summary>
         /// <param name="deliveryDate">Delivery date</param>
-        public virtual void UpdateDeliveryDate(DeliveryDate deliveryDate)
+        public virtual async Task UpdateDeliveryDate(DeliveryDate deliveryDate)
         {
             if (deliveryDate == null)
                 throw new ArgumentNullException("deliveryDate");
 
-            _deliveryDateRepository.Update(deliveryDate);
+            await _deliveryDateRepository.UpdateAsync(deliveryDate);
+
+            //clear cache
+            await _cacheManager.RemoveByPrefix(DELIVERYDATE_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(deliveryDate);
+            await _mediator.EntityUpdated(deliveryDate);
         }
 
         #endregion
@@ -373,29 +391,29 @@ namespace Grand.Services.Shipping
         /// Deletes a warehouse
         /// </summary>
         /// <param name="warehouse">The warehouse</param>
-        public virtual void DeleteWarehouse(Warehouse warehouse)
+        public virtual async Task DeleteWarehouse(Warehouse warehouse)
         {
             if (warehouse == null)
                 throw new ArgumentNullException("warehouse");
 
             var builder = Builders<Product>.Update;
             var updatefilter = builder.PullFilter(x => x.ProductWarehouseInventory, y => y.WarehouseId == warehouse.Id);
-            var result = _productRepository.Collection.UpdateManyAsync(new BsonDocument(), updatefilter).Result;
+            await _productRepository.Collection.UpdateManyAsync(new BsonDocument(), updatefilter);
 
             var builder2 = Builders<Product>.Filter;
             var filter2 = builder2.Eq(x => x.WarehouseId, warehouse.Id);
             var update2 = Builders<Product>.Update
                 .Set(x => x.WarehouseId, "");
-            var result2 = _productRepository.Collection.UpdateManyAsync(filter2, update2).Result;
+            await _productRepository.Collection.UpdateManyAsync(filter2, update2);
 
-            _warehouseRepository.Delete(warehouse);
+            await _warehouseRepository.DeleteAsync(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(WAREHOUSES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(warehouse);
+            await _mediator.EntityDeleted(warehouse);
         }
 
         /// <summary>
@@ -403,59 +421,58 @@ namespace Grand.Services.Shipping
         /// </summary>
         /// <param name="warehouseId">The warehouse identifier</param>
         /// <returns>Warehouse</returns>
-        public virtual Warehouse GetWarehouseById(string warehouseId)
+        public virtual Task<Warehouse> GetWarehouseById(string warehouseId)
         {
             string key = string.Format(WAREHOUSES_BY_ID_KEY, warehouseId);
-            return _cacheManager.Get(key, () => _warehouseRepository.GetById(warehouseId));
+            return _cacheManager.GetAsync(key, () => _warehouseRepository.GetByIdAsync(warehouseId));
         }
 
         /// <summary>
         /// Gets all warehouses
         /// </summary>
         /// <returns>Warehouses</returns>
-        public virtual IList<Warehouse> GetAllWarehouses()
+        public virtual async Task<IList<Warehouse>> GetAllWarehouses()
         {
             var query = from wh in _warehouseRepository.Table
                         orderby wh.Name
                         select wh;
-            var warehouses = query.ToList();
-            return warehouses;
+            return await query.ToListAsync();
         }
 
         /// <summary>
         /// Inserts a warehouse
         /// </summary>
         /// <param name="warehouse">Warehouse</param>
-        public virtual void InsertWarehouse(Warehouse warehouse)
+        public virtual async Task InsertWarehouse(Warehouse warehouse)
         {
             if (warehouse == null)
                 throw new ArgumentNullException("warehouse");
 
-            _warehouseRepository.Insert(warehouse);
+            await _warehouseRepository.InsertAsync(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(WAREHOUSES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(warehouse);
+            await _mediator.EntityInserted(warehouse);
         }
 
         /// <summary>
         /// Updates the warehouse
         /// </summary>
         /// <param name="warehouse">Warehouse</param>
-        public virtual void UpdateWarehouse(Warehouse warehouse)
+        public virtual async Task UpdateWarehouse(Warehouse warehouse)
         {
             if (warehouse == null)
                 throw new ArgumentNullException("warehouse");
 
-            _warehouseRepository.Update(warehouse);
+            await _warehouseRepository.UpdateAsync(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(WAREHOUSES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(warehouse);
+            await _mediator.EntityUpdated(warehouse);
         }
 
         #endregion
@@ -469,36 +486,34 @@ namespace Grand.Services.Shipping
         /// </summary>
         /// <param name="pickupPointId">The pickup point identifier</param>
         /// <returns>Delivery date</returns>
-        public virtual PickupPoint GetPickupPointById(string pickupPointId)
+        public virtual Task<PickupPoint> GetPickupPointById(string pickupPointId)
         {
-            return _pickupPointsRepository.GetById(pickupPointId);
+            return _pickupPointsRepository.GetByIdAsync(pickupPointId);
         }
 
         /// <summary>
         /// Gets all pickup points
         /// </summary>
         /// <returns>Warehouses</returns>
-        public virtual IList<PickupPoint> GetAllPickupPoints()
+        public virtual async Task<IList<PickupPoint>> GetAllPickupPoints()
         {
             var query = from pp in _pickupPointsRepository.Table
                         orderby pp.DisplayOrder
                         select pp;
-            var pickuppoints = query.ToList();
-            return pickuppoints;
+            return await query.ToListAsync();
         }
 
         /// <summary>
         /// Gets all pickup points
         /// </summary>
         /// <returns>Warehouses</returns>
-        public virtual IList<PickupPoint> LoadActivePickupPoints(string storeId = "")
+        public virtual async Task<IList<PickupPoint>> LoadActivePickupPoints(string storeId = "")
         {
             var query = from pp in _pickupPointsRepository.Table
                         where pp.StoreId == storeId || String.IsNullOrEmpty(pp.StoreId)
                         orderby pp.DisplayOrder
                         select pp;
-            var pickuppoints = query.ToList();
-            return pickuppoints;
+            return await query.ToListAsync();
         }
 
 
@@ -506,52 +521,52 @@ namespace Grand.Services.Shipping
         /// Inserts a warehouse
         /// </summary>
         /// <param name="warehouse">Warehouse</param>
-        public virtual void InsertPickupPoint(PickupPoint pickupPoint)
+        public virtual async Task InsertPickupPoint(PickupPoint pickupPoint)
         {
             if (pickupPoint == null)
                 throw new ArgumentNullException("pickupPoint");
 
-            _pickupPointsRepository.Insert(pickupPoint);
+            await _pickupPointsRepository.InsertAsync(pickupPoint);
 
             //clear cache
-            _cacheManager.RemoveByPattern(PICKUPPOINTS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PICKUPPOINTS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(pickupPoint);
+            await _mediator.EntityInserted(pickupPoint);
         }
 
         /// <summary>
         /// Updates the warehouse
         /// </summary>
         /// <param name="warehouse">Warehouse</param>
-        public virtual void UpdatePickupPoint(PickupPoint pickupPoint)
+        public virtual async Task UpdatePickupPoint(PickupPoint pickupPoint)
         {
             if (pickupPoint == null)
                 throw new ArgumentNullException("pickupPoint");
 
-            _pickupPointsRepository.Update(pickupPoint);
+            await _pickupPointsRepository.UpdateAsync(pickupPoint);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(WAREHOUSES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(pickupPoint);
+            await _mediator.EntityUpdated(pickupPoint);
         }
 
         /// <summary>
         /// Deletes a delivery date
         /// </summary>
         /// <param name="deliveryDate">The delivery date</param>
-        public virtual void DeletePickupPoint(PickupPoint pickupPoint)
+        public virtual async Task DeletePickupPoint(PickupPoint pickupPoint)
         {
             if (pickupPoint == null)
                 throw new ArgumentNullException("pickupPoint");
 
-            _pickupPointsRepository.Delete(pickupPoint);
-            _cacheManager.RemoveByPattern(PICKUPPOINTS_PATTERN_KEY);
+            await _pickupPointsRepository.DeleteAsync(pickupPoint);
+            await _cacheManager.RemoveByPrefix(PICKUPPOINTS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(pickupPoint);
+            await _mediator.EntityDeleted(pickupPoint);
         }
 
 
@@ -564,11 +579,11 @@ namespace Grand.Services.Shipping
         /// </summary>
         /// <param name="shoppingCartItem">Shopping cart item</param>
         /// <returns>Shopping cart item weight</returns>
-        public virtual decimal GetShoppingCartItemWeight(ShoppingCartItem shoppingCartItem)
+        public virtual async Task<decimal> GetShoppingCartItemWeight(ShoppingCartItem shoppingCartItem)
         {
             if (shoppingCartItem == null)
                 throw new ArgumentNullException("shoppingCartItem");
-            var product = _productService.GetProductById(shoppingCartItem.ProductId);
+            var product = await _productService.GetProductById(shoppingCartItem.ProductId);
             if (product == null)
                 return decimal.Zero;
 
@@ -582,20 +597,20 @@ namespace Grand.Services.Shipping
                     switch (attributeValue.AttributeValueType)
                     {
                         case AttributeValueType.Simple:
-                        {
-                            //simple attribute
-                            attributesTotalWeight += attributeValue.WeightAdjustment;
-                        }
+                            {
+                                //simple attribute
+                                attributesTotalWeight += attributeValue.WeightAdjustment;
+                            }
                             break;
                         case AttributeValueType.AssociatedToProduct:
-                        {
-                            //bundled product
-                            var associatedProduct = _productService.GetProductById(attributeValue.AssociatedProductId);
-                            if (associatedProduct != null && associatedProduct.IsShipEnabled)
                             {
-                                attributesTotalWeight += associatedProduct.Weight * attributeValue.Quantity;
+                                //bundled product
+                                var associatedProduct = await _productService.GetProductById(attributeValue.AssociatedProductId);
+                                if (associatedProduct != null && associatedProduct.IsShipEnabled)
+                                {
+                                    attributesTotalWeight += associatedProduct.Weight * attributeValue.Quantity;
+                                }
                             }
-                        }
                             break;
                     }
                 }
@@ -610,7 +625,7 @@ namespace Grand.Services.Shipping
         /// <param name="request">Request</param>
         /// <param name="includeCheckoutAttributes">A value indicating whether we should calculate weights of selected checkotu attributes</param>
         /// <returns>Total weight</returns>
-        public virtual decimal GetTotalWeight(GetShippingOptionRequest request, bool includeCheckoutAttributes = true)
+        public virtual async Task<decimal> GetTotalWeight(GetShippingOptionRequest request, bool includeCheckoutAttributes = true)
         {
             if (request == null)
                 throw new ArgumentNullException("request");
@@ -620,15 +635,15 @@ namespace Grand.Services.Shipping
             decimal totalWeight = decimal.Zero;
             //shopping cart items
             foreach (var packageItem in request.Items)
-                totalWeight += GetShoppingCartItemWeight(packageItem.ShoppingCartItem) * packageItem.GetQuantity();
+                totalWeight += await GetShoppingCartItemWeight(packageItem.ShoppingCartItem) * packageItem.GetQuantity();
 
             //checkout attributes
             if (customer != null && includeCheckoutAttributes)
             {
-                var checkoutAttributesXml = customer.GetAttribute<string>(SystemCustomerAttributeNames.CheckoutAttributes, _storeContext.CurrentStore.Id);
+                var checkoutAttributesXml = customer.GetAttributeFromEntity<string>(SystemCustomerAttributeNames.CheckoutAttributes, _storeContext.CurrentStore.Id);
                 if (!String.IsNullOrEmpty(checkoutAttributesXml))
                 {
-                    var attributeValues = _checkoutAttributeParser.ParseCheckoutAttributeValues(checkoutAttributesXml);
+                    var attributeValues = await _checkoutAttributeParser.ParseCheckoutAttributeValues(checkoutAttributesXml);
                     foreach (var attributeValue in attributeValues)
                         totalWeight += attributeValue.WeightAdjustment;
                 }
@@ -643,33 +658,35 @@ namespace Grand.Services.Shipping
         /// <param name="width">Width</param>
         /// <param name="length">Length</param>
         /// <param name="height">Height</param>
-        public virtual void GetAssociatedProductDimensions(ShoppingCartItem shoppingCartItem,
-            out decimal width, out decimal length, out decimal height)
+        public virtual async Task<(decimal width, decimal length, decimal height)> GetAssociatedProductDimensions(ShoppingCartItem shoppingCartItem)
         {
             if (shoppingCartItem == null)
                 throw new ArgumentNullException("shoppingCartItem");
 
-            width = length = height = decimal.Zero;
+            var width = decimal.Zero;
+            var length = decimal.Zero;
+            var height = decimal.Zero;
 
             //attributes
             if (String.IsNullOrEmpty(shoppingCartItem.AttributesXml))
-                return;
+                return (0, 0, 0);
 
-            var product = _productService.GetProductById(shoppingCartItem.ProductId);
+            var product = await _productService.GetProductById(shoppingCartItem.ProductId);
             //bundled products (associated attributes)
             var attributeValues = _productAttributeParser.ParseProductAttributeValues(product, shoppingCartItem.AttributesXml)
                 .Where(x => x.AttributeValueType == AttributeValueType.AssociatedToProduct)
                 .ToList();
             foreach (var attributeValue in attributeValues)
             {
-                var associatedProduct = _productService.GetProductById(attributeValue.AssociatedProductId);
+                var associatedProduct = await _productService.GetProductById(attributeValue.AssociatedProductId);
                 if (associatedProduct != null && associatedProduct.IsShipEnabled)
                 {
-                    width += associatedProduct.Width*attributeValue.Quantity;
+                    width += associatedProduct.Width * attributeValue.Quantity;
                     length += associatedProduct.Length * attributeValue.Quantity;
-                    height += associatedProduct.Height*attributeValue.Quantity;
+                    height += associatedProduct.Height * attributeValue.Quantity;
                 }
             }
+            return (width, length, height);
         }
 
         /// <summary>
@@ -679,11 +696,14 @@ namespace Grand.Services.Shipping
         /// <param name="width">Width</param>
         /// <param name="length">Length</param>
         /// <param name="height">Height</param>
-        public virtual void GetDimensions(IList<GetShippingOptionRequest.PackageItem> packageItems,
-            out decimal width, out decimal length, out decimal height)
+        public virtual async Task<(decimal width, decimal length, decimal height)> GetDimensions(IList<GetShippingOptionRequest.PackageItem> packageItems)
         {
             if (packageItems == null)
                 throw new ArgumentNullException("packageItems");
+
+            var length = decimal.Zero;
+            var width = decimal.Zero;
+            var height = decimal.Zero;
 
             if (_shippingSettings.UseCubeRootMethod)
             {
@@ -696,15 +716,14 @@ namespace Grand.Services.Shipping
                 {
                     var shoppingCartItem = packageItem.ShoppingCartItem;
 
-                    var product = _productService.GetProductById(shoppingCartItem.ProductId);
+                    var product = await _productService.GetProductById(shoppingCartItem.ProductId);
                     var qty = packageItem.GetQuantity();
 
                     //associated products
-                    decimal associatedProductsWidth;
-                    decimal associatedProductsLength;
-                    decimal associatedProductsHeight;
-                    GetAssociatedProductDimensions(shoppingCartItem, out associatedProductsWidth,
-                        out associatedProductsLength, out associatedProductsHeight);
+                    var dimenstions = await GetAssociatedProductDimensions(shoppingCartItem);
+                    decimal associatedProductsWidth = dimenstions.width;
+                    decimal associatedProductsLength = dimenstions.length;
+                    decimal associatedProductsHeight = dimenstions.height;
 
                     var productWidth = product.Width + associatedProductsWidth;
                     var productLength = product.Length + associatedProductsLength;
@@ -713,10 +732,7 @@ namespace Grand.Services.Shipping
                     //we do not use cube root method when we have only one item with "qty" set to 1
                     if (packageItems.Count == 1 && qty == 1)
                     {
-                        width = productWidth;
-                        length = productLength;
-                        height = productHeight;
-                        return;
+                        return (productWidth, productLength, productHeight);
                     }
 
                     totalVolume += qty * productHeight * productWidth * productLength;
@@ -729,8 +745,9 @@ namespace Grand.Services.Shipping
                         maxProductHeight = productHeight;
                 }
                 decimal dimension = Convert.ToDecimal(Math.Pow(Convert.ToDouble(totalVolume), (double)(1.0 / 3.0)));
-                length = width = height = dimension;
-
+                length = dimension;
+                width = dimension;
+                height = dimension;
                 //sometimes we have products with sizes like 1x1x20
                 //that's why let's ensure that a maximum dimension is always preserved
                 //otherwise, shipping rate computation methods can return low rates
@@ -748,24 +765,21 @@ namespace Grand.Services.Shipping
                 foreach (var packageItem in packageItems)
                 {
                     var shoppingCartItem = packageItem.ShoppingCartItem;
-                    var product = _productService.GetProductById(shoppingCartItem.ProductId);
+                    var product = await _productService.GetProductById(shoppingCartItem.ProductId);
                     var qty = packageItem.GetQuantity();
-                    width += product.Width*qty;
-                    length += product.Length*qty;
-                    height += product.Height*qty;
+                    width += product.Width * qty;
+                    length += product.Length * qty;
+                    height += product.Height * qty;
 
                     //associated products
-                    decimal associatedProductsWidth;
-                    decimal associatedProductsLength;
-                    decimal associatedProductsHeight;
-                    GetAssociatedProductDimensions(shoppingCartItem, out associatedProductsWidth,
-                        out associatedProductsLength, out associatedProductsHeight);
+                    var associatedProductDimensions = await GetAssociatedProductDimensions(shoppingCartItem);
 
-                    width += associatedProductsWidth;
-                    length += associatedProductsLength;
-                    height += associatedProductsHeight;
+                    width += associatedProductDimensions.width;
+                    length += associatedProductDimensions.length;
+                    height += associatedProductDimensions.height;
                 }
             }
+            return (width, length, height);
         }
 
         /// <summary>
@@ -774,9 +788,9 @@ namespace Grand.Services.Shipping
         /// <param name="address">Address</param>
         /// <param name="warehouses">List of warehouses, if null all warehouses are used.</param>
         /// <returns></returns>
-        public virtual Warehouse GetNearestWarehouse(Address address, IList<Warehouse> warehouses = null)
+        public virtual async Task<Warehouse> GetNearestWarehouse(Address address, IList<Warehouse> warehouses = null)
         {
-            warehouses = warehouses ?? GetAllWarehouses();
+            warehouses = warehouses ?? await GetAllWarehouses();
 
             //no address specified. return any
             if (address == null)
@@ -790,7 +804,7 @@ namespace Grand.Services.Shipping
             var matchedByCountry = new List<Warehouse>();
             foreach (var warehouse in warehouses)
             {
-                var warehouseAddress = _addressService.GetAddressByIdSettings(warehouse.AddressId);
+                var warehouseAddress = await _addressService.GetAddressByIdSettings(warehouse.AddressId);
                 if (warehouseAddress != null)
                     if (warehouseAddress.CountryId == address.CountryId)
                         matchedByCountry.Add(warehouse);
@@ -804,7 +818,7 @@ namespace Grand.Services.Shipping
             var matchedByState = new List<Warehouse>();
             foreach (var warehouse in matchedByCountry)
             {
-                var warehouseAddress = _addressService.GetAddressByIdSettings(warehouse.AddressId);
+                var warehouseAddress = await _addressService.GetAddressByIdSettings(warehouse.AddressId);
                 if (warehouseAddress != null)
                     if (warehouseAddress.StateProvinceId == address.StateProvinceId)
                         matchedByState.Add(warehouse);
@@ -824,9 +838,8 @@ namespace Grand.Services.Shipping
         /// <param name="storeId">Load records allowed only in a specified store; pass "" to load all records</param>
         /// <param name="shippingFromMultipleLocations">Value indicating whether shipping is done from multiple locations (warehouses)</param>
         /// <returns>Shipment packages (requests)</returns>
-        public virtual IList<GetShippingOptionRequest> CreateShippingOptionRequests(Customer customer,
-            IList<ShoppingCartItem> cart,
-            Address shippingAddress, string storeId, out bool shippingFromMultipleLocations)
+        public virtual async Task<(IList<GetShippingOptionRequest> shippingOptionRequest, bool shippingFromMultipleLocations)> CreateShippingOptionRequests(Customer customer,
+            IList<ShoppingCartItem> cart, Address shippingAddress, Store store)
         {
             //if we always ship from the default shipping origin, then there's only one request
             //if we ship from warehouses ("ShippingSettings.UseWarehouseLocation" enabled),
@@ -845,7 +858,7 @@ namespace Grand.Services.Shipping
                 if (!sci.IsShipEnabled)
                     continue;
 
-                var product = _productService.GetProductById(sci.ProductId);
+                var product = await _productService.GetProductById(sci.ProductId);
 
                 //warehouses
                 Warehouse warehouse = null;
@@ -859,18 +872,30 @@ namespace Grand.Services.Shipping
                         foreach (var pwi in product.ProductWarehouseInventory)
                         {
                             //TODO validate stock quantity when backorder is not allowed?
-                            var tmpWarehouse = GetWarehouseById(pwi.WarehouseId);
+                            var tmpWarehouse = await GetWarehouseById(pwi.WarehouseId);
                             if (tmpWarehouse != null)
                                 allWarehouses.Add(tmpWarehouse);
                         }
-                        warehouse = GetNearestWarehouse(shippingAddress, allWarehouses);
+                        warehouse = await GetNearestWarehouse(shippingAddress, allWarehouses);
                     }
                     else
                     {
                         //multiple warehouses are not supported
-                        warehouse = GetWarehouseById(product.WarehouseId);
+                        warehouse = await GetWarehouseById(product.WarehouseId);
                     }
                 }
+                else
+                {
+                    if (!string.IsNullOrEmpty(sci.WarehouseId))
+                        warehouse = await GetWarehouseById(sci.WarehouseId);
+                    else
+                    {
+                        if (!string.IsNullOrEmpty(store?.DefaultWarehouseId))
+                            warehouse = await GetWarehouseById(store.DefaultWarehouseId);
+                    }
+
+                }
+
                 string warehouseId = warehouse != null ? warehouse.Id : "";
 
                 if (requests.ContainsKey(warehouseId) && !product.ShipSeparately)
@@ -883,7 +908,7 @@ namespace Grand.Services.Shipping
                     //create a new request
                     var request = new GetShippingOptionRequest();
                     //store
-                    request.StoreId = storeId;
+                    request.StoreId = store?.Id;
                     //add item
                     request.Items.Add(new GetShippingOptionRequest.PackageItem(sci));
                     //ship to
@@ -893,18 +918,18 @@ namespace Grand.Services.Shipping
                     if (warehouse != null)
                     {
                         //warehouse address
-                        originAddress = _addressService.GetAddressByIdSettings(warehouse.AddressId);
+                        originAddress = await _addressService.GetAddressByIdSettings(warehouse.AddressId);
                         request.WarehouseFrom = warehouse;
                     }
                     if (originAddress == null)
                     {
                         //no warehouse address. in this case use the default shipping origin
-                        originAddress = _addressService.GetAddressByIdSettings(_shippingSettings.ShippingOriginAddressId);
+                        originAddress = (await _addressService.GetAddressByIdSettings(_shippingSettings.ShippingOriginAddressId));
                     }
                     if (originAddress != null)
                     {
-                        var country = EngineContext.Current.Resolve<ICountryService>().GetCountryById(originAddress.CountryId);
-                        var state = EngineContext.Current.Resolve<IStateProvinceService>().GetStateProvinceById(originAddress.StateProvinceId);
+                        var country = await _countryService.GetCountryById(originAddress.CountryId);
+                        var state = await _stateProvinceService.GetStateProvinceById(originAddress.StateProvinceId);
                         request.CountryFrom = country;
                         request.StateProvinceFrom = state;
                         request.ZipPostalCodeFrom = originAddress.ZipPostalCode;
@@ -928,13 +953,12 @@ namespace Grand.Services.Shipping
             //multiple locations?
             //currently we just compare warehouses
             //but we should also consider cases when several warehouses are located in the same address
-            shippingFromMultipleLocations = requests.Select(x => x.Key).Distinct().Count() > 1;
-
+            bool shippingFromMultipleLocations = requests.Select(x => x.Key).Distinct().Count() > 1;
 
             var result = requests.Values.ToList();
             result.AddRange(separateRequests);
 
-            return result;
+            return (result, shippingFromMultipleLocations);
         }
 
         /// <summary>
@@ -945,21 +969,20 @@ namespace Grand.Services.Shipping
         /// <param name="allowedShippingRateComputationMethodSystemName">Filter by shipping rate computation method identifier; null to load shipping options of all shipping rate computation methods</param>
         /// <param name="storeId">Load records allowed only in a specified store; pass "" to load all records</param>
         /// <returns>Shipping options</returns>
-        public virtual GetShippingOptionResponse GetShippingOptions(Customer customer, IList<ShoppingCartItem> cart,
-            Address shippingAddress, string allowedShippingRateComputationMethodSystemName = "", 
-            string storeId = "")
+        public virtual async Task<GetShippingOptionResponse> GetShippingOptions(Customer customer, IList<ShoppingCartItem> cart,
+            Address shippingAddress, string allowedShippingRateComputationMethodSystemName = "",
+            Store store = null)
         {
             if (cart == null)
                 throw new ArgumentNullException("cart");
 
             var result = new GetShippingOptionResponse();
-            
-            //create a package
-            bool shippingFromMultipleLocations;
-            var shippingOptionRequests = CreateShippingOptionRequests(customer, cart, shippingAddress, storeId, out shippingFromMultipleLocations);
-            result.ShippingFromMultipleLocations = shippingFromMultipleLocations;
 
-            var shippingRateComputationMethods = LoadActiveShippingRateComputationMethods(storeId, cart);
+            //create a package
+            var shippingOptionRequests = await CreateShippingOptionRequests(customer, cart, shippingAddress, store);
+            result.ShippingFromMultipleLocations = shippingOptionRequests.shippingFromMultipleLocations;
+
+            var shippingRateComputationMethods = await LoadActiveShippingRateComputationMethods(store?.Id, cart);
             //filter by system name
             if (!String.IsNullOrWhiteSpace(allowedShippingRateComputationMethodSystemName))
             {
@@ -977,9 +1000,9 @@ namespace Grand.Services.Shipping
             {
                 //request shipping options (separately for each package-request)
                 IList<ShippingOption> srcmShippingOptions = null;
-                foreach (var shippingOptionRequest in shippingOptionRequests)
+                foreach (var shippingOptionRequest in shippingOptionRequests.shippingOptionRequest)
                 {
-                    var getShippingOptionResponse = srcm.GetShippingOptions(shippingOptionRequest);
+                    var getShippingOptionResponse = await srcm.GetShippingOptions(shippingOptionRequest);
 
                     if (getShippingOptionResponse.Success)
                     {
@@ -1030,7 +1053,7 @@ namespace Grand.Services.Shipping
                             so.ShippingRateComputationMethodSystemName = srcm.PluginDescriptor.SystemName;
                         if (_shoppingCartSettings.RoundPricesDuringCalculation)
                         {
-                            var currency = EngineContext.Current.Resolve<ICurrencyService>().GetCurrencyById(EngineContext.Current.Resolve<CurrencySettings>().PrimaryExchangeRateCurrencyId);
+                            var currency = await _currencyService.GetPrimaryExchangeRateCurrency();
                             so.Rate = RoundingHelper.RoundPrice(so.Rate, currency);
                         }
                         result.ShippingOptions.Add(so);
@@ -1044,11 +1067,11 @@ namespace Grand.Services.Shipping
                 if (!result.ShippingOptions.Any() && !result.Errors.Any())
                     result.Errors.Clear();
             }
-            
+
             //no shipping options loaded
             if (result.ShippingOptions.Count == 0 && result.Errors.Count == 0)
                 result.Errors.Add(_localizationService.GetResource("Checkout.ShippingOptionCouldNotBeLoaded"));
-            
+
             return result;
         }
 

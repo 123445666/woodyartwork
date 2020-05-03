@@ -23,6 +23,7 @@ namespace Grand.Core.Domain.Catalog
         private ICollection<ProductWarehouseInventory> _productWarehouseInventory;
         private ICollection<string> _crossSellProduct;
         private ICollection<RelatedProduct> _relatedProduct;
+        private ICollection<SimilarProduct> _similarProduct;
         private ICollection<BundleProduct> _bundleProduct;
         private ICollection<string> _productTags;
         public Product()
@@ -286,7 +287,7 @@ namespace Grand.Core.Domain.Catalog
         /// <summary>
         /// Gets or sets a value indicating whether the product is telecommunications or broadcasting or electronic services
         /// </summary>
-        public bool IsTelecommunicationsOrBroadcastingOrElectronicServices { get; set; }
+        public bool IsTele { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating how to manage inventory
@@ -439,6 +440,11 @@ namespace Grand.Core.Domain.Catalog
         public string UnitId { get; set; }
 
         /// <summary>
+        /// Gets or sets a course ident
+        /// </summary>
+        public string CourseId { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether this product is marked as new
         /// </summary>
         public bool MarkAsNew { get; set; }
@@ -450,15 +456,6 @@ namespace Grand.Core.Domain.Catalog
         /// Gets or sets the end date and time of the new product (set product as "New" to date). Leave empty to ignore this property
         /// </summary>
         public DateTime? MarkAsNewEndDateTimeUtc { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether this product has tier prices configured
-        /// <remarks>The same as if we run this.TierPrices.Count > 0
-        /// We use this property for performance optimization:
-        /// if this property is set to false, then we do not need to load tier prices navigation property
-        /// </remarks>
-        /// </summary>
-        public bool HasTierPrices { get; set; }
 
         /// <summary>
         /// Gets or sets the weight
@@ -770,7 +767,10 @@ namespace Grand.Core.Domain.Catalog
             get { return _relatedProduct ?? (_relatedProduct = new List<RelatedProduct>()); }
             protected set { _relatedProduct = value; }
         }
-
+        public virtual ICollection<SimilarProduct> SimilarProducts {
+            get { return _similarProduct ?? (_similarProduct = new List<SimilarProduct>()); }
+            protected set { _similarProduct = value; }
+        }
         public virtual ICollection<BundleProduct> BundleProducts
         {
             get { return _bundleProduct ?? (_bundleProduct = new List<BundleProduct>()); }

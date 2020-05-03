@@ -1,16 +1,14 @@
-﻿using Grand.Core.Domain.Common;
-using Grand.Core.Infrastructure;
-using Grand.Framework.Controllers;
+﻿using Grand.Framework.Controllers;
 using Grand.Framework.Mvc.Filters;
-using Grand.Framework.Security;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
     [ValidateIpAddress]
     [AuthorizeAdmin]
-    [AdminAntiForgery]
+    [AutoValidateAntiforgeryToken]
     [Area("Admin")]
     [ValidateVendor]
     public abstract partial class BaseAdminController : BaseController
@@ -20,17 +18,24 @@ namespace Grand.Web.Areas.Admin.Controllers
         /// </summary>
         /// <param name="index">Idnex to save; null to automatically detect it</param>
         /// <param name="persistForTheNextRequest">A value indicating whether a message should be persisted for the next request</param>
-        protected void SaveSelectedTabIndex(int? index = null, bool persistForTheNextRequest = true)
+        protected async Task SaveSelectedTabIndex(int? index = null, bool persistForTheNextRequest = true)
         {
             //keep this method synchronized with
             //"GetSelectedTabIndex" method of \Grand.Framework\ViewEngines\Razor\WebViewPage.cs
             if (!index.HasValue)
             {
                 int tmp;
-                if (int.TryParse(this.Request.Form["selected-tab-index"], out tmp))
+                var form = await HttpContext.Request.ReadFormAsync();
+                var tabindex = form["selected-tab-index"];
+                if (tabindex.Count > 0)
                 {
-                    index = tmp;
+                    if (int.TryParse(tabindex[0], out tmp))
+                    {
+                        index = tmp;
+                    }
                 }
+                else
+                    index = 1;
             }
             if (index.HasValue)
             {
@@ -58,14 +63,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         /// <param name="behavior">The JSON request behavior</param>
         public override JsonResult Json(object data)
         {
-            //use IsoDateFormat on writing JSON text to fix issue with dates in KendoUI grid
-            //TODO rename setting
-            var useIsoDateTime = EngineContext.Current.Resolve<AdminAreaSettings>().UseIsoDateTimeConverterInJson;
-            var serializerSettings = new JsonSerializerSettings
-            {
-                DateFormatHandling = useIsoDateTime ? DateFormatHandling.IsoDateFormat : DateFormatHandling.MicrosoftDateFormat
+            var serializerSettings = new JsonSerializerSettings {
+                DateFormatHandling = DateFormatHandling.IsoDateFormat 
             };
-
             return base.Json(data, serializerSettings);
         }
     }

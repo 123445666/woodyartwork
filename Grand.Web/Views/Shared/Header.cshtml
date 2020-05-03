@@ -1,26 +1,27 @@
-﻿<header>
+﻿<header role="presentation">
+    @await Component.InvokeAsync("Widget", new { widgetZone = "header" })
     <div class="container">
         <div class="headBottom d-flex align-items-center d-lg-inline-flex text-lg-left text-center mt-0 mb-0">
-            <div class="header-logo pr-0 pl-0 d-lg-block d-none">
-                <span class="logo-desktop-holder"></span>
+            <a class="js-offcanvas-trigger mobile-menu-trigger d-lg-none d-flex justify-content-center align-content-center mr-3" data-offcanvas-trigger="mobile_menu" href="#mobile_menu">
+                <span class="mdi mdi-menu"></span>
+            </a>
+            <div class="header-logo pr-0 pl-0 mx-lg-0 mx-auto d-inline-flex align-items-center">
                 @await Component.InvokeAsync("Logo")
             </div>
-            <nav class="navbar navbar-expand-md mainNav d-none d-lg-flex w-100 mb-1 px-3">
-                <div class="collapse navbar-collapse container" id="collapsing-navbar-2">
-                    <div class="d-none" id="menu_standing"></div>
-                    <ul class="nav navbar-nav">
-                        @await Component.InvokeAsync("TopMenu")
-                    </ul>
-                </div>
-            </nav>
-        </div>
-    </div>
-    <!-- Modal -->
-    <div class="modal fade" id="searchModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-
+            <div class="formSearch ml-lg-auto ml-2 pl-lg-3 pl-0 d-inline-flex align-items-end">
+                @await Component.InvokeAsync("SearchBox")
             </div>
+            <a class="js-offcanvas-trigger user-panel-trigger d-flex justify-content-center align-content-center ml-lg-3 ml-2" data-offcanvas-trigger="user_panel" href="#user_panel">
+                <span class="mdi mdi-account-outline"></span>
+            </a>
+            @await Component.InvokeAsync("ShoppingCartLinks")
         </div>
     </div>
+    <nav class="navbar mainNav navbar-expand-sm offcanvas-desktop">
+        <div class="navbar-collapse container">
+            <ul class="navbar-nav">
+                @await Component.InvokeAsync("TopMenu")
+            </ul>
+        </div>
+    </nav>
 </header>

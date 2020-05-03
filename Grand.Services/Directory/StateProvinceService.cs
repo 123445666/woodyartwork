@@ -3,9 +3,13 @@ using Grand.Core.Data;
 using Grand.Core.Domain.Directory;
 using Grand.Services.Events;
 using Grand.Services.Localization;
+using MediatR;
+using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Directory
 {
@@ -15,6 +19,10 @@ namespace Grand.Services.Directory
     public partial class StateProvinceService : IStateProvinceService
     {
         #region Constants
+
+        /// {0} : state ID
+        /// </remarks>
+        private const string STATEPROVINCES_BY_KEY = "Grand.stateprovince.{0}";
 
         /// {0} : country ID
         /// {1} : language ID
@@ -31,7 +39,7 @@ namespace Grand.Services.Directory
         #region Fields
 
         private readonly IRepository<StateProvince> _stateProvinceRepository;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
         private readonly ICacheManager _cacheManager;
 
         #endregion
@@ -43,14 +51,14 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="cacheManager">Cache manager</param>
         /// <param name="stateProvinceRepository">State/province repository</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public StateProvinceService(ICacheManager cacheManager,
             IRepository<StateProvince> stateProvinceRepository,
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
             _cacheManager = cacheManager;
             _stateProvinceRepository = stateProvinceRepository;
-            _eventPublisher = eventPublisher;
+            _mediator = mediator;
         }
 
         #endregion
@@ -60,17 +68,17 @@ namespace Grand.Services.Directory
         /// Deletes a state/province
         /// </summary>
         /// <param name="stateProvince">The state/province</param>
-        public virtual void DeleteStateProvince(StateProvince stateProvince)
+        public virtual async Task DeleteStateProvince(StateProvince stateProvince)
         {
             if (stateProvince == null)
                 throw new ArgumentNullException("stateProvince");
-            
-            _stateProvinceRepository.Delete(stateProvince);
 
-            _cacheManager.RemoveByPattern(STATEPROVINCES_PATTERN_KEY);
+            await _stateProvinceRepository.DeleteAsync(stateProvince);
+
+            await _cacheManager.RemoveByPrefix(STATEPROVINCES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(stateProvince);
+            await _mediator.EntityDeleted(stateProvince);
         }
 
         /// <summary>
@@ -78,26 +86,14 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="stateProvinceId">The state/province identifier</param>
         /// <returns>State/province</returns>
-        public virtual StateProvince GetStateProvinceById(string stateProvinceId)
+        public virtual async Task<StateProvince> GetStateProvinceById(string stateProvinceId)
         {
-            if (String.IsNullOrEmpty(stateProvinceId))
+            if (string.IsNullOrEmpty(stateProvinceId))
                 return null;
 
-            return _stateProvinceRepository.GetById(stateProvinceId);
-        }
+            var key = string.Format(STATEPROVINCES_BY_KEY, stateProvinceId);
+            return await _cacheManager.GetAsync(key, () => _stateProvinceRepository.GetByIdAsync(stateProvinceId));
 
-        /// <summary>
-        /// Gets a state/province 
-        /// </summary>
-        /// <param name="abbreviation">The state/province abbreviation</param>
-        /// <returns>State/province</returns>
-        public virtual StateProvince GetStateProvinceByAbbreviation(string abbreviation)
-        {
-            var query = from sp in _stateProvinceRepository.Table
-                        where sp.Abbreviation == abbreviation
-                        select sp;
-            var stateProvince = query.FirstOrDefault();
-            return stateProvince;
         }
 
         /// <summary>
@@ -107,17 +103,17 @@ namespace Grand.Services.Directory
         /// <param name="languageId">Language identifier. It's used to sort states by localized names (if specified); pass 0 to skip it</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>States</returns>
-        public virtual IList<StateProvince> GetStateProvincesByCountryId(string countryId, string languageId = "", bool showHidden = false)
+        public virtual async Task<IList<StateProvince>> GetStateProvincesByCountryId(string countryId, string languageId = "", bool showHidden = false)
         {
             string key = string.Format(STATEPROVINCES_ALL_KEY, countryId, languageId, showHidden);
-            return _cacheManager.Get(key, () =>
+            return await _cacheManager.GetAsync(key, async () =>
             {
                 var query = from sp in _stateProvinceRepository.Table
                             orderby sp.DisplayOrder, sp.Name
                             where sp.CountryId == countryId &&
                             (showHidden || sp.Published)
                             select sp;
-                var stateProvinces = query.ToList();
+                var stateProvinces = await query.ToListAsync();
 
                 if (!String.IsNullOrEmpty(languageId))
                 {
@@ -136,48 +132,47 @@ namespace Grand.Services.Directory
         /// </summary>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>State/province collection</returns>
-        public virtual IList<StateProvince> GetStateProvinces(bool showHidden = false)
+        public virtual async Task<IList<StateProvince>> GetStateProvinces(bool showHidden = false)
         {
             var query = from sp in _stateProvinceRepository.Table
                         orderby sp.CountryId, sp.DisplayOrder, sp.Name
-                where showHidden || sp.Published
-                select sp;
-            var stateProvinces = query.ToList();
-            return stateProvinces;
+                        where showHidden || sp.Published
+                        select sp;
+            return await query.ToListAsync();
         }
 
         /// <summary>
         /// Inserts a state/province
         /// </summary>
         /// <param name="stateProvince">State/province</param>
-        public virtual void InsertStateProvince(StateProvince stateProvince)
+        public virtual async Task InsertStateProvince(StateProvince stateProvince)
         {
             if (stateProvince == null)
                 throw new ArgumentNullException("stateProvince");
 
-            _stateProvinceRepository.Insert(stateProvince);
+            await _stateProvinceRepository.InsertAsync(stateProvince);
 
-            _cacheManager.RemoveByPattern(STATEPROVINCES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(STATEPROVINCES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(stateProvince);
+            await _mediator.EntityInserted(stateProvince);
         }
 
         /// <summary>
         /// Updates a state/province
         /// </summary>
         /// <param name="stateProvince">State/province</param>
-        public virtual void UpdateStateProvince(StateProvince stateProvince)
+        public virtual async Task UpdateStateProvince(StateProvince stateProvince)
         {
             if (stateProvince == null)
                 throw new ArgumentNullException("stateProvince");
 
-            _stateProvinceRepository.Update(stateProvince);
+            await _stateProvinceRepository.UpdateAsync(stateProvince);
 
-            _cacheManager.RemoveByPattern(STATEPROVINCES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(STATEPROVINCES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(stateProvince);
+            await _mediator.EntityUpdated(stateProvince);
         }
 
         #endregion

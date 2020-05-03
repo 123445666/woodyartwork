@@ -1,29 +1,25 @@
-﻿using Grand.Core.Domain.Tasks;
-using Grand.Services.Logging;
+﻿using Grand.Services.Logging;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Tasks
 {
     /// <summary>
     /// Represents a task to clear [Log] table
     /// </summary>
-    public partial class ClearLogScheduleTask : ScheduleTask, IScheduleTask
+    public partial class ClearLogScheduleTask : IScheduleTask
     {
         private readonly ILogger _logger;
-        private readonly object _lock = new object();
         public ClearLogScheduleTask(ILogger logger)
         {
-            this._logger = logger;
+            _logger = logger;
         }
 
         /// <summary>
         /// Executes a task
         /// </summary>
-        public void Execute()
+        public async Task Execute()
         {
-            lock (_lock)
-            {
-                _logger.ClearLog();
-            }
+            await _logger.ClearLog();
         }
     }
 }

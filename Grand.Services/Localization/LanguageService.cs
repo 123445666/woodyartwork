@@ -4,10 +4,13 @@ using Grand.Core.Domain.Localization;
 using Grand.Services.Configuration;
 using Grand.Services.Events;
 using Grand.Services.Stores;
+using MediatR;
+using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Localization
 {
@@ -46,7 +49,7 @@ namespace Grand.Services.Localization
         private readonly ICacheManager _cacheManager;
         private readonly ISettingService _settingService;
         private readonly LocalizationSettings _localizationSettings;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         #endregion
 
@@ -60,20 +63,20 @@ namespace Grand.Services.Localization
         /// <param name="storeMappingService">Store mapping service</param>
         /// <param name="settingService">Setting service</param>
         /// <param name="localizationSettings">Localization settings</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public LanguageService(ICacheManager cacheManager,
             IRepository<Language> languageRepository,
             IStoreMappingService storeMappingService,
             ISettingService settingService,
             LocalizationSettings localizationSettings,
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
-            this._cacheManager = cacheManager;
-            this._languageRepository = languageRepository;
-            this._storeMappingService = storeMappingService;
-            this._settingService = settingService;
-            this._localizationSettings = localizationSettings;
-            this._eventPublisher = eventPublisher;
+            _cacheManager = cacheManager;
+            _languageRepository = languageRepository;
+            _storeMappingService = storeMappingService;
+            _settingService = settingService;
+            _localizationSettings = localizationSettings;
+            _mediator = mediator;
         }
 
         #endregion
@@ -84,7 +87,7 @@ namespace Grand.Services.Localization
         /// Deletes a language
         /// </summary>
         /// <param name="language">Language</param>
-        public virtual void DeleteLanguage(Language language)
+        public virtual async Task DeleteLanguage(Language language)
         {
             if (language == null)
                 throw new ArgumentNullException("language");
@@ -92,24 +95,24 @@ namespace Grand.Services.Localization
             //update default admin area language (if required)
             if (_localizationSettings.DefaultAdminLanguageId == language.Id)
             {
-                foreach (var activeLanguage in GetAllLanguages())
+                foreach (var activeLanguage in await GetAllLanguages())
                 {
                     if (activeLanguage.Id != language.Id)
                     {
                         _localizationSettings.DefaultAdminLanguageId = activeLanguage.Id;
-                        _settingService.SaveSetting(_localizationSettings);
+                        await _settingService.SaveSetting(_localizationSettings);
                         break;
                     }
                 }
             }
             
-            _languageRepository.Delete(language);
+            await _languageRepository.DeleteAsync(language);
 
             //cache
-            _cacheManager.RemoveByPattern(LANGUAGES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(LANGUAGES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(language);
+            await _mediator.EntityDeleted(language);
         }
 
         /// <summary>
@@ -118,21 +121,21 @@ namespace Grand.Services.Localization
         /// <param name="storeId">Load records allowed only in a specified store; pass "" to load all records</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Languages</returns>
-        public virtual IList<Language> GetAllLanguages(bool showHidden = false, string storeId = "")
+        public virtual async Task<IList<Language>> GetAllLanguages(bool showHidden = false, string storeId = "")
         {
             string key = string.Format(LANGUAGES_ALL_KEY, showHidden);
-            var languages = _cacheManager.Get(key, () =>
+            var languages = await _cacheManager.GetAsync(key, () =>
             {
                 var query = _languageRepository.Table;
 
                 if (!showHidden)
                     query = query.Where(l => l.Published);
                 query = query.OrderBy(l => l.DisplayOrder);
-                return query.ToList();
+                return query.ToListAsync();
             });
 
             //store mapping
-            if (!String.IsNullOrWhiteSpace(storeId))
+            if (!string.IsNullOrWhiteSpace(storeId))
             {
                 languages = languages
                     .Where(l => _storeMappingService.Authorize(l, storeId))
@@ -146,47 +149,47 @@ namespace Grand.Services.Localization
         /// </summary>
         /// <param name="languageId">Language identifier</param>
         /// <returns>Language</returns>
-        public virtual Language GetLanguageById(string languageId)
+        public virtual Task<Language> GetLanguageById(string languageId)
         {
             string key = string.Format(LANGUAGES_BY_ID_KEY, languageId);
-            return _cacheManager.Get(key, () => _languageRepository.GetById(languageId));
+            return _cacheManager.GetAsync(key, () => _languageRepository.GetByIdAsync(languageId));
         }
 
         /// <summary>
         /// Inserts a language
         /// </summary>
         /// <param name="language">Language</param>
-        public virtual void InsertLanguage(Language language)
+        public virtual async Task InsertLanguage(Language language)
         {
             if (language == null)
                 throw new ArgumentNullException("language");
 
-            _languageRepository.Insert(language);
+            await _languageRepository.InsertAsync(language);
 
             //cache
-            _cacheManager.RemoveByPattern(LANGUAGES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(LANGUAGES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(language);
+            await _mediator.EntityInserted(language);
         }
 
         /// <summary>
         /// Updates a language
         /// </summary>
         /// <param name="language">Language</param>
-        public virtual void UpdateLanguage(Language language)
+        public virtual async Task UpdateLanguage(Language language)
         {
             if (language == null)
                 throw new ArgumentNullException("language");
             
             //update language
-            _languageRepository.Update(language);
+            await _languageRepository.UpdateAsync(language);
 
             //cache
-            _cacheManager.RemoveByPattern(LANGUAGES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(LANGUAGES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(language);
+            await _mediator.EntityUpdated(language);
         }
 
         #endregion

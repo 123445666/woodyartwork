@@ -6,25 +6,20 @@ using Grand.Framework.Components;
 using Grand.Services.Common;
 using Grand.Services.Customers;
 using Grand.Services.Directory;
-using Grand.Services.Forums;
 using Grand.Services.Helpers;
 using Grand.Services.Localization;
-using Grand.Services.Logging;
 using Grand.Services.Media;
 using Grand.Web.Models.Profile;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Threading.Tasks;
 
 namespace Grand.Web.ViewComponents
 {
     public class ProfileInfoViewComponent : BaseViewComponent
     {
-        private readonly IForumService _forumService;
         private readonly ICustomerService _customerService;
-        private readonly ICustomerActivityService _customerActivityService;
-        private readonly ILocalizationService _localizationService;
         private readonly IWorkContext _workContext;
-        private readonly IStoreContext _storeContext;
         private readonly IDateTimeHelper _dateTimeHelper;
         private readonly ForumSettings _forumSettings;
         private readonly CustomerSettings _customerSettings;
@@ -32,31 +27,25 @@ namespace Grand.Web.ViewComponents
         private readonly MediaSettings _mediaSettings;
         private readonly ICountryService _countryService;
 
-        public ProfileInfoViewComponent(IForumService forumService,
-            ICustomerService customerService, ICustomerActivityService customerActivityService,
-            ILocalizationService localizationService, IWorkContext workContext,
-            IStoreContext storeContext, IDateTimeHelper dateTimeHelper,
+        public ProfileInfoViewComponent(ICustomerService customerService, 
+            IWorkContext workContext, IDateTimeHelper dateTimeHelper,
             ForumSettings forumSettings, CustomerSettings customerSettings,
             IPictureService pictureService, MediaSettings mediaSettings,
             ICountryService countryService)
         {
-            this._forumService = forumService;
-            this._customerService = customerService;
-            this._customerActivityService = customerActivityService;
-            this._localizationService = localizationService;
-            this._workContext = workContext;
-            this._storeContext = storeContext;
-            this._dateTimeHelper = dateTimeHelper;
-            this._forumSettings = forumSettings;
-            this._customerSettings = customerSettings;
-            this._pictureService = pictureService;
-            this._mediaSettings = mediaSettings;
-            this._countryService = countryService;
+            _customerService = customerService;
+            _workContext = workContext;
+            _dateTimeHelper = dateTimeHelper;
+            _forumSettings = forumSettings;
+            _customerSettings = customerSettings;
+            _pictureService = pictureService;
+            _mediaSettings = mediaSettings;
+            _countryService = countryService;
         }
 
-        public IViewComponentResult Invoke(string customerProfileId)
+        public async Task<IViewComponentResult> InvokeAsync(string customerProfileId)
         {
-            var customer = _customerService.GetCustomerById(customerProfileId);
+            var customer = await _customerService.GetCustomerById(customerProfileId);
             if (customer == null)
             {
                 return Content("");
@@ -66,8 +55,8 @@ namespace Grand.Web.ViewComponents
             var avatarUrl = "";
             if (_customerSettings.AllowCustomersToUploadAvatars)
             {
-                avatarUrl = _pictureService.GetPictureUrl(
-                 customer.GetAttribute<string>(SystemCustomerAttributeNames.AvatarPictureId),
+                avatarUrl = await _pictureService.GetPictureUrl(
+                 customer.GetAttributeFromEntity<string>(SystemCustomerAttributeNames.AvatarPictureId),
                  _mediaSettings.AvatarPictureSize,
                  _customerSettings.DefaultAvatarEnabled,
                  defaultPictureType: PictureType.Avatar);
@@ -80,11 +69,11 @@ namespace Grand.Web.ViewComponents
             {
                 locationEnabled = true;
 
-                var countryId = customer.GetAttribute<string>(SystemCustomerAttributeNames.CountryId);
-                var country = _countryService.GetCountryById(countryId);
+                var countryId = customer.GetAttributeFromEntity<string>(SystemCustomerAttributeNames.CountryId);
+                var country = await _countryService.GetCountryById(countryId);
                 if (country != null)
                 {
-                    location = country.GetLocalized(x => x.Name);
+                    location = country.GetLocalized(x => x.Name, _workContext.WorkingLanguage.Id);
                 }
                 else
                 {
@@ -101,7 +90,7 @@ namespace Grand.Web.ViewComponents
             if (_forumSettings.ForumsEnabled && _forumSettings.ShowCustomersPostCount)
             {
                 totalPostsEnabled = true;
-                totalPosts = customer.GetAttribute<int>(SystemCustomerAttributeNames.ForumPostCount);
+                totalPosts = customer.GetAttributeFromEntity<int>(SystemCustomerAttributeNames.ForumPostCount);
             }
 
             //registration date
@@ -119,7 +108,7 @@ namespace Grand.Web.ViewComponents
             string dateOfBirth = string.Empty;
             if (_customerSettings.DateOfBirthEnabled)
             {
-                var dob = customer.GetAttribute<DateTime?>(SystemCustomerAttributeNames.DateOfBirth);
+                var dob = customer.GetAttributeFromEntity<DateTime?>(SystemCustomerAttributeNames.DateOfBirth);
                 if (dob.HasValue)
                 {
                     dateOfBirthEnabled = true;

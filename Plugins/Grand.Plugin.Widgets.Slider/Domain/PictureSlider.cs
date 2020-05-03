@@ -17,6 +17,7 @@ namespace Grand.Plugin.Widgets.Slider.Domain
         public string Description { get; set; }
         public string Link { get; set; }
         public int DisplayOrder { get; set; }
+        public bool FullWidth { get; set; }
         public bool Published { get; set; }
         public int SliderTypeId { get; set; }
         public string ObjectEntry { get; set; }
@@ -24,11 +25,11 @@ namespace Grand.Plugin.Widgets.Slider.Domain
         {
             get
             {
-                return (SliderType)this.SliderTypeId;
+                return (SliderType)SliderTypeId;
             }
             set
             {
-                this.SliderTypeId = (int)value;
+                SliderTypeId = (int)value;
             }
 
         }

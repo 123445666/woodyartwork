@@ -2,15 +2,17 @@
 @inject AdminAreaSettings adminAreaSettings
 @if (!String.IsNullOrEmpty(Model.Id))
 {
-    <div class="panel panel-default">
-        <div class="panel-body">
-            <div id="products-grid"></div>
-        </div>
-        <div class="panel-footer">
-            <input type="submit" id="btnAddNewProduct" value="@T("Admin.Catalog.Manufacturers.Products.AddNew")" onclick="javascript:OpenWindow('@(Url.Action("ProductAddPopup", "Manufacturer", new { manufacturerId = Model.Id, btnId = "btnRefreshProducts", formId = "manufacturer-form" }))', 800, 800, true); return false;" class="k-button" />
-            <input type="submit" id="btnRefreshProducts" style="display: none" />
-        </div>
+<div class="panel panel-default">
+    <vc:admin-widget widget-zone="manufacturer_details_products_top" additional-data="Model" />
+    <div class="panel-body">
+        <div id="products-grid"></div>
     </div>
+    <div class="panel-footer">
+        <button type="submit" id="btnAddNewProduct" onclick="javascript:OpenWindow('@(Url.Action("ProductAddPopup", "Manufacturer", new { manufacturerId = Model.Id, btnId = "btnRefreshProducts", formId = "manufacturer-form" }))', 800, 800, true); return false;" class="k-button"><i class="fa fa-plus"></i>&nbsp;@T("Admin.Catalog.Manufacturers.Products.AddNew")</button>
+        <input type="submit" id="btnRefreshProducts" style="display: none" />
+    </div>
+    <vc:admin-widget widget-zone="manufacturer_details_products_bottom" additional-data="Model" />
+</div>
     <script>
         $(document).ready(function () {
             $("#products-grid").kendoGrid({
@@ -78,7 +80,7 @@
                     editable: false,
                     type: "string",
                     title: "@T("Admin.Catalog.Manufacturers.Products.Fields.Product")",
-                    template: '<a href="@Url.Content("~/Admin/Product/Edit/")#=ProductId#">#=ProductName#</a>'
+                    template: '<a href="@Url.Content("~/Admin/Product/Edit/")#=ProductId#">#=kendo.htmlEncode(ProductName)#</a>'
                 }, {
                     field: "IsFeaturedProduct",
                     title: "@T("Admin.Catalog.Manufacturers.Products.Fields.IsFeaturedProduct")",
@@ -94,7 +96,7 @@
                     headerAttributes: { style: "text-align:center" },
                     attributes: { style: "text-align:center" },
                     format: "{0:0}",
-                    width: 80
+                    width: 120
                 }, {
                     command: [{
                         name: "edit",

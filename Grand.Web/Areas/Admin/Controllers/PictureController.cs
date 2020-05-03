@@ -1,12 +1,15 @@
-﻿using Grand.Framework.Security;
+﻿using Grand.Framework.Security.Authorization;
 using Grand.Services.Media;
+using Grand.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.Files)]
     public partial class PictureController : BaseAdminController
     {
         private readonly IPictureService _pictureService;
@@ -18,10 +21,11 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         [HttpPost]
         //do not validate request token (XSRF)
-        [AdminAntiForgery(true)]
-        public virtual IActionResult AsyncUpload()
+        [IgnoreAntiforgeryToken]
+        public virtual async Task<IActionResult> AsyncUpload()
         {
-            var httpPostedFile = Request.Form.Files.FirstOrDefault();
+            var form = await HttpContext.Request.ReadFormAsync();
+            var httpPostedFile = form.Files.FirstOrDefault();
             if (httpPostedFile == null)
             {
                 return Json(new
@@ -36,8 +40,8 @@ namespace Grand.Web.Areas.Admin.Controllers
 
             var qqFileNameParameter = "qqfilename";
             var fileName = httpPostedFile.FileName;
-            if (String.IsNullOrEmpty(fileName) && Request.Form.ContainsKey(qqFileNameParameter))
-                fileName = Request.Form[qqFileNameParameter].ToString();
+            if (String.IsNullOrEmpty(fileName) && form.ContainsKey(qqFileNameParameter))
+                fileName = form[qqFileNameParameter].ToString();
             //remove path (passed in IE)
             fileName = Path.GetFileName(fileName);
 
@@ -80,14 +84,14 @@ namespace Grand.Web.Areas.Admin.Controllers
                 }
             }
 
-            var picture = _pictureService.InsertPicture(fileBinary, contentType, null);
+            var picture = await _pictureService.InsertPicture(fileBinary, contentType, null);
             //when returning JSON the mime-type must be set to text/plain
             //otherwise some browsers will pop-up a "Save As" dialog.
             return Json(new
             {
                 success = true,
                 pictureId = picture.Id,
-                imageUrl = _pictureService.GetPictureUrl(picture, 100)
+                imageUrl = await _pictureService.GetPictureUrl(picture, 100)
             });
         }
     }

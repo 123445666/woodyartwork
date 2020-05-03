@@ -2,39 +2,47 @@
 using Grand.Core.Domain.Orders;
 using Grand.Framework.Components;
 using Grand.Services.Orders;
+using Grand.Web.Features.Models.ShoppingCart;
 using Grand.Web.Models.ShoppingCart;
-using Grand.Web.Services;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.ViewComponents
 {
     public class OrderSummaryViewComponent : BaseViewComponent
     {
-        private readonly IShoppingCartViewModelService _shoppingCartViewModelService;
-        private readonly IWorkContext _workContext;
+        private readonly IMediator _mediator;
+        private readonly IShoppingCartService _shoppingCartService;
         private readonly IStoreContext _storeContext;
-        public OrderSummaryViewComponent(IShoppingCartViewModelService shoppingCartViewModelService, IWorkContext workContext, IStoreContext storeContext)
+        private readonly IWorkContext _workContext;
+        public OrderSummaryViewComponent(IMediator mediator, IShoppingCartService shoppingCartService, IStoreContext storeContext, IWorkContext workContext)
         {
-            this._shoppingCartViewModelService = shoppingCartViewModelService;
-            this._workContext = workContext;
-            this._storeContext = storeContext;
+            _mediator = mediator;
+            _shoppingCartService = shoppingCartService;
+            _storeContext = storeContext;
+            _workContext = workContext;
         }
 
-        public IViewComponentResult Invoke(bool? prepareAndDisplayOrderReviewData, ShoppingCartModel overriddenModel)
+        public async Task<IViewComponentResult> InvokeAsync(bool? prepareAndDisplayOrderReviewData, ShoppingCartModel overriddenModel)
         {
             //use already prepared (shared) model
             if (overriddenModel != null)
                 return View(overriddenModel);
 
-            var cart = _workContext.CurrentCustomer.ShoppingCartItems
-                .Where(sci => sci.ShoppingCartType == ShoppingCartType.ShoppingCart || sci.ShoppingCartType == ShoppingCartType.Auctions)
-                .LimitPerStore(_storeContext.CurrentStore.Id)
-                .ToList();
-            var model = new ShoppingCartModel();
-            _shoppingCartViewModelService.PrepareShoppingCart(model, cart,
-                isEditable: false,
-                prepareAndDisplayOrderReviewData: prepareAndDisplayOrderReviewData.GetValueOrDefault());
+            var cart = _shoppingCartService.GetShoppingCart(_storeContext.CurrentStore.Id, ShoppingCartType.ShoppingCart, ShoppingCartType.Auctions);
+
+            var model = await _mediator.Send(new GetShoppingCart() {
+                Cart = cart,
+                IsEditable = false,
+                PrepareAndDisplayOrderReviewData = prepareAndDisplayOrderReviewData.GetValueOrDefault(),
+                Customer = _workContext.CurrentCustomer,
+                Currency = _workContext.WorkingCurrency,
+                Language = _workContext.WorkingLanguage,
+                Store = _storeContext.CurrentStore,
+                TaxDisplayType = _workContext.TaxDisplayType
+            });
+
             return View(model);
 
         }

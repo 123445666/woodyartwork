@@ -1,11 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <Copyright>Copyright © UNIT-SOFT Sp. z o.o.</Copyright>
     <Company>UNIT-SOFT Sp. z o.o.</Company>
     <Authors>UNIT-SOFT Sp. z o.o.</Authors>
     <PackageProjectUrl>https://grandnode.com/</PackageProjectUrl>
+    <TieredCompilation>true</TieredCompilation>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -18,24 +19,30 @@
     <OutDir>$(OutputPath)</OutDir>
   </PropertyGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <RemoveDir Directories="..\..\Grand.Web\Plugins\DiscountRequirements.Standard\refs" />
+  </Target>
+
   <ItemGroup>
     <ProjectReference Include="..\..\Grand.Core\Grand.Core.csproj">
       <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Grand.Data\Grand.Data.csproj">
-      <Private>false</Private>
+      <ExcludeAssets></ExcludeAssets>
+      <IncludeAssets></IncludeAssets>
+      <PrivateAssets></PrivateAssets>
     </ProjectReference>
     <ProjectReference Include="..\..\Grand.Framework\Grand.Framework.csproj">
       <Private>false</Private>
+      <ExcludeAssets></ExcludeAssets>
+      <PrivateAssets></PrivateAssets>
+      <IncludeAssets></IncludeAssets>
     </ProjectReference>
     <ProjectReference Include="..\..\Grand.Services\Grand.Services.csproj">
       <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Grand.Web\Grand.Web.csproj">
-      <Private>false</Private>
+      <ExcludeAssets></ExcludeAssets>
+      <IncludeAssets></IncludeAssets>
+      <PrivateAssets></PrivateAssets>
     </ProjectReference>
   </ItemGroup>
-
   <ItemGroup>
     <None Update="Description.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -62,6 +69,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Views\HasOneProduct\ProductAddPopup.cshtml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Views\ShoppingCartAmount\Configure.cshtml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Views\_ViewImports.cshtml">

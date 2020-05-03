@@ -6,21 +6,22 @@
     //page title
     ViewBag.Title = T("Admin.VendorReviews").Text;
 }
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
                 <div class="caption">
                     <i class="fa fa-cubes"></i>
                     @T("Admin.VendorReviews")
                 </div>
                 <div class="actions btn-group btn-group-devided">
-                    <input type="button" id="approve-selected" class="btn default" value="@T("Admin.VendorReviews.ApproveSelected")" />
-                    <input type="button" id="disapprove-selected" class="btn default" value="@T("Admin.VendorReviews.DisapproveSelected")" />
+                    <button type="button" id="approve-selected" class="k-button"><span class="k-icon k-i-check-outline"></span>&nbsp;@T("Admin.VendorReviews.ApproveSelected")</button>
+                    <button type="button" id="disapprove-selected" class="k-button"><span class="k-icon k-i-close-outline"></span>&nbsp;@T("Admin.VendorReviews.DisapproveSelected")</button>
+                    <vc:admin-widget widget-zone="vendor_review_list_buttons" additional-data="Model" />
                 </div>
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div class="form-horizontal">
                     <div class="form-body">
                         <div class="form-group">
@@ -55,7 +56,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="portlet-body">
+                    <div class="x_content">
                         <div id="vendorreviews-grid"></div>
                     </div>
                 </div>
@@ -100,10 +101,10 @@ $(document).ready(function () {
         dataBound: onDataBound,
         columns: [{
             field: "Ids",
-            headerTemplate: "<label class='mt-checkbox mt-checkbox-outline'><input id='mastercheckbox' type='checkbox'/><span></span></label>",
+            headerTemplate: "<label class='mt-checkbox mt-checkbox-outline control control-checkbox'><input id='mastercheckbox' type='checkbox'/> <div class='control__indicator'></div></label>",
             headerAttributes: { style: "text-align:center" },
             attributes: { style: "text-align:center" },
-            template: "<label class='mt-checkbox mt-checkbox-outline'><input type='checkbox' value='#=Ids#' class='checkboxGroups'/><span></span></label>",
+            template: "<label class='mt-checkbox mt-checkbox-outline control control-checkbox'><input type='checkbox' value='#=Ids#' class='checkboxGroups'/> <div class='control__indicator'></div></label>",
             width: 50
         },
         {
@@ -120,7 +121,7 @@ $(document).ready(function () {
             field: "Title",
             title: "@T("Admin.VendorReviews.Fields.Title")",
             width: 200,
-            template: '<a class="k-link" href="Edit/#=Id#?VendorId=#=VendorId#">#=Title#</a>',
+            template: '<a class="k-link" href="Edit/#=Id#?VendorId=#=VendorId#">#=kendo.htmlEncode(Title)#</a>',
         }, {
             field: "Rating",
             title: "@T("Admin.VendorReviews.Fields.Rating")",
@@ -246,10 +247,10 @@ $(document).ready(function () {
 
                 function additionalData() {
                     var data = {
-                        CreatedOnFrom: $('@Model.CreatedOnFrom').val(),
-                        CreatedOnTo: $('@Model.CreatedOnTo').val(),
-                        SearchText: $('@Model.SearchText').val(),
-                        SearchVendorId: $('@Model.SearchVendorId').val()
+                        CreatedOnFrom: $('#@Html.FieldIdFor(model => model.CreatedOnFrom)').val(),
+                        CreatedOnTo: $('#@Html.FieldIdFor(model => model.CreatedOnTo)').val(),
+                        SearchText: $('#@Html.FieldIdFor(model => model.SearchText)').val(),
+                        SearchVendorId: $('#@Html.FieldIdFor(model => model.SearchVendorId)').val()
                     };
                     addAntiForgeryToken(data);
                     return data;

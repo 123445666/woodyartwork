@@ -2,11 +2,11 @@
     //page title
     ViewBag.Title = T("Admin.Customers.CustomerTags").Text;
 }
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
+        <div class="x_panel light form-fit">
+            <div class="x_title">
                 <div class="caption">
                     <i class="fa fa-tags"></i>
                     @T("Admin.Customers.CustomerTags")
@@ -15,7 +15,7 @@
                     <a href="@Url.Action("Create")" class="btn green"><i class="fa fa-plus"></i><span class="hidden-xs"> @T("Admin.Common.AddNew") </span></a>
                 </div>
             </div>
-            <div class="portlet-body form">
+            <div class="x_content form">
                 <div id="customertags-grid"></div>
             </div>
         </div>
@@ -62,7 +62,7 @@
                 field: "Name",
                 title: "@T("Admin.Customers.CustomerTags.Fields.Name")",
                 width: 300,
-                template: '<a class="k-link" href="Edit/#=Id#">#=Name#</a>'
+                template: '<a class="k-link" href="Edit/#=Id#">#=kendo.htmlEncode(Name)#</a>'
             },
             {
                 field: "Count",

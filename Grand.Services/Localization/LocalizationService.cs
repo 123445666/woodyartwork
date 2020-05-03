@@ -4,12 +4,15 @@ using Grand.Core.Data;
 using Grand.Core.Domain.Localization;
 using Grand.Services.Events;
 using Grand.Services.Logging;
+using MediatR;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Xml;
 
 namespace Grand.Services.Localization
@@ -41,6 +44,8 @@ namespace Grand.Services.Localization
         /// </summary>
         private const string LOCALSTRINGRESOURCES_PATTERN_KEY = "Grand.lsr.";
 
+        private Dictionary<string, LocaleStringResource> _alllocaleStringResource = null;
+
         #endregion
 
         #region Fields
@@ -48,10 +53,9 @@ namespace Grand.Services.Localization
         private readonly IRepository<LocaleStringResource> _lsrRepository;
         private readonly IWorkContext _workContext;
         private readonly ILogger _logger;
-        private readonly ILanguageService _languageService;
         private readonly ICacheManager _cacheManager;
         private readonly LocalizationSettings _localizationSettings;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         #endregion
 
@@ -64,22 +68,19 @@ namespace Grand.Services.Localization
         /// <param name="logger">Logger</param>
         /// <param name="workContext">Work context</param>
         /// <param name="lsrRepository">Locale string resource repository</param>
-        /// <param name="languageService">Language service</param>
         /// <param name="localizationSettings">Localization settings</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public LocalizationService(ICacheManager cacheManager,
             ILogger logger, IWorkContext workContext,
             IRepository<LocaleStringResource> lsrRepository,
-            ILanguageService languageService,
-            LocalizationSettings localizationSettings, IEventPublisher eventPublisher)
+            LocalizationSettings localizationSettings, IMediator mediator)
         {
-            this._cacheManager = cacheManager;
-            this._logger = logger;
-            this._workContext = workContext;
-            this._lsrRepository = lsrRepository;
-            this._languageService = languageService;
-            this._localizationSettings = localizationSettings;
-            this._eventPublisher = eventPublisher;
+            _cacheManager = cacheManager;
+            _logger = logger;
+            _workContext = workContext;
+            _lsrRepository = lsrRepository;
+            _localizationSettings = localizationSettings;
+            _mediator = mediator;
         }
 
         #endregion
@@ -90,18 +91,18 @@ namespace Grand.Services.Localization
         /// Deletes a locale string resource
         /// </summary>
         /// <param name="localeStringResource">Locale string resource</param>
-        public virtual void DeleteLocaleStringResource(LocaleStringResource localeStringResource)
+        public virtual async Task DeleteLocaleStringResource(LocaleStringResource localeStringResource)
         {
             if (localeStringResource == null)
                 throw new ArgumentNullException("localeStringResource");
 
-            _lsrRepository.Delete(localeStringResource);
+            await _lsrRepository.DeleteAsync(localeStringResource);
 
             //cache
-            _cacheManager.RemoveByPattern(LOCALSTRINGRESOURCES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(LOCALSTRINGRESOURCES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(localeStringResource);
+            await _mediator.EntityDeleted(localeStringResource);
         }
 
         /// <summary>
@@ -109,25 +110,9 @@ namespace Grand.Services.Localization
         /// </summary>
         /// <param name="localeStringResourceId">Locale string resource identifier</param>
         /// <returns>Locale string resource</returns>
-        public virtual LocaleStringResource GetLocaleStringResourceById(string localeStringResourceId)
+        public virtual Task<LocaleStringResource> GetLocaleStringResourceById(string localeStringResourceId)
         {
-            if (String.IsNullOrEmpty(localeStringResourceId))
-                return null;
-
-            return _lsrRepository.GetById(localeStringResourceId);
-        }
-
-        /// <summary>
-        /// Gets a locale string resource
-        /// </summary>
-        /// <param name="resourceName">A string representing a resource name</param>
-        /// <returns>Locale string resource</returns>
-        public virtual LocaleStringResource GetLocaleStringResourceByName(string resourceName)
-        {
-            if (_workContext.WorkingLanguage != null)
-                return GetLocaleStringResourceByName(resourceName, _workContext.WorkingLanguage.Id);
-
-            return null;
+            return _lsrRepository.GetByIdAsync(localeStringResourceId);
         }
 
         /// <summary>
@@ -137,14 +122,14 @@ namespace Grand.Services.Localization
         /// <param name="languageId">Language identifier</param>
         /// <param name="logIfNotFound">A value indicating whether to log error if locale string resource is not found</param>
         /// <returns>Locale string resource</returns>
-        public virtual LocaleStringResource GetLocaleStringResourceByName(string resourceName, string languageId,
+        public virtual Task<LocaleStringResource> GetLocaleStringResourceByName(string resourceName, string languageId,
             bool logIfNotFound = true)
         {
             var query = from lsr in _lsrRepository.Table
                         orderby lsr.ResourceName
                         where lsr.LanguageId == languageId && lsr.ResourceName == resourceName
                         select lsr;
-            var localeStringResource = query.FirstOrDefault();
+            var localeStringResource = query.FirstOrDefaultAsync();
 
             if (localeStringResource == null && logIfNotFound)
                 _logger.Warning(string.Format("Resource string ({0}) not found. Language ID = {1}", resourceName, languageId));
@@ -166,38 +151,38 @@ namespace Grand.Services.Localization
         /// Inserts a locale string resource
         /// </summary>
         /// <param name="localeStringResource">Locale string resource</param>
-        public virtual void InsertLocaleStringResource(LocaleStringResource localeStringResource)
+        public virtual async Task InsertLocaleStringResource(LocaleStringResource localeStringResource)
         {
             if (localeStringResource == null)
                 throw new ArgumentNullException("localeStringResource");
 
             localeStringResource.ResourceName = localeStringResource.ResourceName.ToLowerInvariant();
-            _lsrRepository.Insert(localeStringResource);
+            await _lsrRepository.InsertAsync(localeStringResource);
 
             //cache
-            _cacheManager.RemoveByPattern(LOCALSTRINGRESOURCES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(LOCALSTRINGRESOURCES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(localeStringResource);
+            await _mediator.EntityInserted(localeStringResource);
         }
 
         /// <summary>
         /// Updates the locale string resource
         /// </summary>
         /// <param name="localeStringResource">Locale string resource</param>
-        public virtual void UpdateLocaleStringResource(LocaleStringResource localeStringResource)
+        public virtual async Task UpdateLocaleStringResource(LocaleStringResource localeStringResource)
         {
             if (localeStringResource == null)
                 throw new ArgumentNullException("localeStringResource");
 
             localeStringResource.ResourceName = localeStringResource.ResourceName.ToLowerInvariant();
-            _lsrRepository.Update(localeStringResource);
+            await _lsrRepository.UpdateAsync(localeStringResource);
 
             //cache
-            _cacheManager.RemoveByPattern(LOCALSTRINGRESOURCES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(LOCALSTRINGRESOURCES_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(localeStringResource);
+            await _mediator.EntityUpdated(localeStringResource);
         }
 
         /// <summary>
@@ -232,25 +217,33 @@ namespace Grand.Services.Localization
             if (_localizationSettings.LoadAllLocaleRecordsOnStartup)
             {
                 //load all records (cached)
-                string key = string.Format(LOCALSTRINGRESOURCES_ALL_KEY, languageId);
-                var resources = _cacheManager.Get(key, () =>
+                if (_alllocaleStringResource != null)
                 {
-                    var dictionary = new Dictionary<string, LocaleStringResource>();
-                    var locales = GetAllResources(languageId);
-                    foreach (var locale in locales)
+                    if (_alllocaleStringResource.ContainsKey(resourceKey.ToLowerInvariant()))
+                        result = _alllocaleStringResource[resourceKey.ToLowerInvariant()].ResourceValue;
+                }
+                else
+                {
+                    string key = string.Format(LOCALSTRINGRESOURCES_ALL_KEY, languageId);
+                    _alllocaleStringResource = _cacheManager.Get(key, () =>
                     {
-                        var resourceName = locale.ResourceName.ToLowerInvariant();
-                        if (!dictionary.ContainsKey(resourceName))
-                            dictionary.Add(resourceName.ToLowerInvariant(), locale);
-                        else
+                        var dictionary = new Dictionary<string, LocaleStringResource>();
+                        var locales = GetAllResources(languageId);
+                        foreach (var locale in locales)
                         {
-                            _lsrRepository.Delete(locale);
+                            var resourceName = locale.ResourceName.ToLowerInvariant();
+                            if (!dictionary.ContainsKey(resourceName))
+                                dictionary.Add(resourceName.ToLowerInvariant(), locale);
+                            else
+                            {
+                                _lsrRepository.Delete(locale);
+                            }
                         }
-                    }
-                    return dictionary;
-                });
-                if (resources.ContainsKey(resourceKey.ToLowerInvariant()))
-                    result = resources[resourceKey.ToLowerInvariant()].ResourceValue;
+                        return dictionary;
+                    });
+                    if (_alllocaleStringResource.ContainsKey(resourceKey.ToLowerInvariant()))
+                        result = _alllocaleStringResource[resourceKey.ToLowerInvariant()].ResourceValue;
+                }
             }
             else
             {
@@ -267,12 +260,12 @@ namespace Grand.Services.Localization
                 if (lsr != null)
                     result = lsr;
             }
-            if (String.IsNullOrEmpty(result))
+            if (string.IsNullOrEmpty(result))
             {
                 if (logIfNotFound)
                     _logger.Warning(string.Format("Resource string ({0}) is not found. Language ID = {1}", resourceKey, languageId));
 
-                if (!String.IsNullOrEmpty(defaultValue))
+                if (!string.IsNullOrEmpty(defaultValue))
                 {
                     result = defaultValue;
                 }
@@ -290,7 +283,7 @@ namespace Grand.Services.Localization
         /// </summary>
         /// <param name="language">Language</param>
         /// <returns>Result in XML format</returns>
-        public virtual string ExportResourcesToXml(Language language)
+        public virtual async Task<string> ExportResourcesToXml(Language language)
         {
             if (language == null)
                 throw new ArgumentNullException("language");
@@ -298,14 +291,15 @@ namespace Grand.Services.Localization
 
             var xwSettings = new XmlWriterSettings
             {
-                ConformanceLevel = ConformanceLevel.Auto
+                ConformanceLevel = ConformanceLevel.Auto,
+                Async = true
             };
 
             using (var stringWriter = new StringWriter(sb))
             using (var xmlWriter = XmlWriter.Create(stringWriter, xwSettings))
             {
 
-                xmlWriter.WriteStartDocument();
+                await xmlWriter.WriteStartDocumentAsync();
                 xmlWriter.WriteStartElement("Language");
                 xmlWriter.WriteAttributeString("Name", language.Name);
 
@@ -320,7 +314,7 @@ namespace Grand.Services.Localization
 
                 xmlWriter.WriteEndElement();
                 xmlWriter.WriteEndDocument();
-                xmlWriter.Flush();
+                await xmlWriter.FlushAsync();
                 return stringWriter.ToString();
             }
         }
@@ -330,7 +324,7 @@ namespace Grand.Services.Localization
         /// </summary>
         /// <param name="language">Language</param>
         /// <param name="xml">XML</param>
-        public virtual void ImportResourcesFromXml(Language language, string xml)
+        public virtual async Task ImportResourcesFromXml(Language language, string xml)
         {
             if (language == null)
                 throw new ArgumentNullException("language");
@@ -356,15 +350,15 @@ namespace Grand.Services.Localization
 
                 //do not use "Insert"/"Update" methods because they clear cache
                 //let's bulk insert
-                var resource = (from l in _lsrRepository.Table
+                var resource = await (from l in _lsrRepository.Table
                                 where l.ResourceName.ToLowerInvariant() == name.ToLowerInvariant() && l.LanguageId == language.Id
-                                select l).FirstOrDefault();
+                                select l).FirstOrDefaultAsync();
 
                 if (resource != null)
                 {
                     resource.ResourceName = resource.ResourceName.ToLowerInvariant();
                     resource.ResourceValue = value;
-                    _lsrRepository.Update(resource);
+                    await _lsrRepository.UpdateAsync(resource);
                 }
                 else
                 {
@@ -376,12 +370,12 @@ namespace Grand.Services.Localization
                             ResourceName = name.ToLowerInvariant(),
                             ResourceValue = value
                         });
-                    _lsrRepository.Insert(lsr);
+                    await _lsrRepository.InsertAsync(lsr);
                 }
             }
 
             //clear cache
-            _cacheManager.RemoveByPattern(LOCALSTRINGRESOURCES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(LOCALSTRINGRESOURCES_PATTERN_KEY);
         }
 
         /// <summary>
@@ -389,14 +383,14 @@ namespace Grand.Services.Localization
         /// </summary>
         /// <param name="language">Language</param>
         /// <param name="xml">XML</param>
-        public virtual void ImportResourcesFromXmlInstall(Language language, string xml)
+        public virtual async Task ImportResourcesFromXmlInstall(Language language, string xml)
         {
             if (language == null)
                 throw new ArgumentNullException("language");
 
             if (String.IsNullOrEmpty(xml))
                 return;
-            //stored procedures aren't supported
+
             var xmlDoc = new XmlDocument();
             xmlDoc.LoadXml(xml);
 
@@ -409,7 +403,7 @@ namespace Grand.Services.Localization
                 if (valueNode != null)
                     value = valueNode.InnerText;
 
-                if (String.IsNullOrEmpty(name))
+                if (string.IsNullOrEmpty(name))
                     continue;
 
                 var lsr = (
@@ -419,11 +413,11 @@ namespace Grand.Services.Localization
                         ResourceName = name.ToLowerInvariant(),
                         ResourceValue = value
                     });
-                _lsrRepository.Insert(lsr);
+                await _lsrRepository.InsertAsync(lsr);
             }
 
             //clear cache
-            _cacheManager.RemoveByPattern(LOCALSTRINGRESOURCES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(LOCALSTRINGRESOURCES_PATTERN_KEY);
         }
 
         #endregion

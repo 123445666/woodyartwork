@@ -1,8 +1,10 @@
+using Grand.Core;
 using Grand.Core.Domain.Catalog;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Catalog
 {
@@ -19,7 +21,7 @@ namespace Grand.Services.Catalog
         private const string COMPARE_PRODUCTS_COOKIE_NAME = "Grand.CompareProducts";
 
         #endregion
-        
+
         #region Fields
 
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -42,10 +44,9 @@ namespace Grand.Services.Catalog
             var comparedProductIdsCookie = string.Join(",", comparedProductIds);
 
             //create cookie options 
-            var cookieExpires = 24 * 10; //TODO make configurable
             var cookieOptions = new CookieOptions
             {
-                Expires = DateTime.Now.AddHours(cookieExpires),
+                Expires = DateTime.UtcNow.AddHours(CommonHelper.CookieAuthExpires),
                 HttpOnly = true
             };
 
@@ -64,9 +65,9 @@ namespace Grand.Services.Catalog
         public CompareProductsService(IHttpContextAccessor httpContextAccessor, IProductService productService,
             CatalogSettings catalogSettings)
         {
-            this._httpContextAccessor = httpContextAccessor;
-            this._productService = productService;
-            this._catalogSettings = catalogSettings;
+            _httpContextAccessor = httpContextAccessor;
+            _productService = productService;
+            _catalogSettings = catalogSettings;
         }
 
         #endregion
@@ -114,13 +115,13 @@ namespace Grand.Services.Catalog
         /// Gets a "compare products" list
         /// </summary>
         /// <returns>"Compare products" list</returns>
-        public virtual IList<Product> GetComparedProducts()
+        public virtual async Task<IList<Product>> GetComparedProducts()
         {
             var products = new List<Product>();
             var productIds = GetComparedProductIds();
             foreach (string productId in productIds)
             {
-                var product = _productService.GetProductById(productId);
+                var product = await _productService.GetProductById(productId);
                 if (product != null && product.Published)
                     products.Add(product);
             }
@@ -156,7 +157,7 @@ namespace Grand.Services.Catalog
         /// <param name="productId">Product identifier</param>
         public virtual void AddProductToCompareList(string productId)
         {
-            
+
             if (_httpContextAccessor.HttpContext == null || _httpContextAccessor.HttpContext.Response == null)
                 return;
 

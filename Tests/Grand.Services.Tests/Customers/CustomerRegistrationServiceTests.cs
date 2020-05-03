@@ -1,19 +1,22 @@
-﻿using Grand.Core.Caching;
-using Grand.Core.Data;
+﻿using Grand.Core.Data;
 using Grand.Core.Domain.Common;
 using Grand.Core.Domain.Customers;
 using Grand.Core.Domain.Forums;
 using Grand.Core.Domain.Orders;
 using Grand.Core.Domain.Security;
+using Grand.Core.Tests.Caching;
 using Grand.Services.Common;
-using Grand.Services.Events;
 using Grand.Services.Localization;
 using Grand.Services.Messages;
 using Grand.Services.Orders;
 using Grand.Services.Security;
 using Grand.Services.Stores;
+using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Customers.Tests
 {
@@ -38,12 +41,12 @@ namespace Grand.Services.Customers.Tests
         private IRewardPointsService _rewardPointsService;
         private CustomerSettings _customerSettings;
         private INewsLetterSubscriptionService _newsLetterSubscriptionService;
-        private IEventPublisher _eventPublisher;
+        private IMediator _eventPublisher;
         private IStoreService _storeService;
         private RewardPointsSettings _rewardPointsSettings;
         private SecuritySettings _securitySettings;
         private CommonSettings _commonSettings;
-
+        private IServiceProvider _serviceProvider;
         //this method just help to get rid of repetitive code below
         private void AddCustomerToRegisteredRole(Customer customer)
         {
@@ -124,8 +127,8 @@ namespace Grand.Services.Customers.Tests
 
             //trying to recreate
 
-            var eventPublisher = new Mock<IEventPublisher>();
-            eventPublisher.Setup(x => x.Publish(new object()));
+            var eventPublisher = new Mock<IMediator>();
+            //eventPublisher.Setup(x => x.PublishAsync(new object()));
             _eventPublisher = eventPublisher.Object;
 
             _storeService = new Mock<IStoreService>().Object;
@@ -151,12 +154,11 @@ namespace Grand.Services.Customers.Tests
             _localizationService = new Mock<ILocalizationService>().Object;
             _rewardPointsService = new Mock<IRewardPointsService>().Object;
             _customerRoleProductRepo = new Mock<IRepository<CustomerRoleProduct>>().Object;
-
+            _serviceProvider = new Mock<IServiceProvider>().Object;
             _customerSettings = new CustomerSettings();
             _commonSettings = new CommonSettings();
-            _customerService = new CustomerService(new GrandNullCache(), _customerRepo, _customerRoleRepo, _customerProductRepo, _customerProductPriceRepo,
-                _customerHistoryRepo, _customerRoleProductRepo, _customerNoteRepo, _orderRepo, _forumPostRepo, _forumTopicRepo, null, null, _genericAttributeService, null,
-                _eventPublisher, _customerSettings, _commonSettings);
+            _customerService = new CustomerService(new TestMemoryCacheManager(new Mock<IMemoryCache>().Object, _eventPublisher), _customerRepo, _customerRoleRepo, 
+                _customerHistoryRepo, _customerRoleProductRepo, _customerNoteRepo, null, _eventPublisher);
 
             _customerRegistrationService = new CustomerRegistrationService(
                 _customerService,
@@ -171,15 +173,15 @@ namespace Grand.Services.Customers.Tests
         }
 
         [TestMethod()]
-        public void Ensure_only_registered_customers_can_login()
+        public async Task Ensure_only_registered_customers_can_login()
         {
             Assert.AreEqual(
                 CustomerLoginResults.Successful,
-                _customerRegistrationService.ValidateCustomer("registered@test.com", "password"));
+                await _customerRegistrationService.ValidateCustomer("registered@test.com", "password"));
 
             Assert.AreEqual(
                 CustomerLoginResults.NotRegistered,
-                _customerRegistrationService.ValidateCustomer("notregistered@test.com", "password"));
+                await _customerRegistrationService.ValidateCustomer("notregistered@test.com", "password"));
         }
     }
 }

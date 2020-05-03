@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Grand.Core.Configuration
 {
     /// <summary>
@@ -5,6 +7,10 @@ namespace Grand.Core.Configuration
     /// </summary>
     public partial class GrandConfig 
     {
+        public GrandConfig()
+        {
+            SupportedCultures = new List<string>();
+        }
         /// <summary>
         /// Indicates whether we should ignore startup tasks
         /// </summary>
@@ -16,25 +22,35 @@ namespace Grand.Core.Configuration
         public bool ClearPluginShadowDirectoryOnStartup { get; set; }
 
         /// <summary>
-        /// Path to database with user agent strings
+        /// Gets or sets a value indicating whether copy dll plugin files to /Plugins/bin on application startup
         /// </summary>
-        public string UserAgentStringsPath { get; set; }
+        public bool PluginShadowCopy { get; set; }
 
         /// <summary>
-        /// Indicates whether we should use Redis server for caching (instead of default in-memory caching)
+        /// Enable the Publish/Subscribe messaging with redis to manage memory cache on every server
         /// </summary>
-        public bool RedisCachingEnabled { get; set; }
-        /// <summary>
-        /// Redis connection string. Used when Redis caching is enabled
-        /// </summary>
-        public string RedisCachingConnectionString { get; set; }
-
+        public bool RedisPubSubEnabled { get; set; }
 
         /// <summary>
-        /// A value indicating whether the site is run on multiple instances (e.g. web farm, Windows Azure with multiple instances, etc).
-        /// Do not enable it if you run on Azure but use one instance only
+        /// Redis connection string. Used when Redis Publish/Subscribe is enabled
         /// </summary>
-        public bool MultipleInstancesEnabled { get; set; }
+        public string RedisPubSubConnectionString { get; set; }
+
+        /// <summary>
+        /// Messages sent by other clients to these channels will be pushed by Redis to all the subscribed clients. It must me the same value on every server
+        /// </summary>
+        public string RedisPubSubChannel { get; set; }
+
+        /// <summary>
+        /// Indicates whether we should use Redis server for persist keys - required in farm scenario
+        /// </summary>
+        public bool PersistKeysToRedis { get; set; }
+
+        /// <summary>
+        /// Redis connection string. Used when PersistKeysToRedis is enabled
+        /// </summary>
+        public string PersistKeysToRedisUrl { get; set; }
+
 
         /// <summary>
         /// A value indicating whether the site is run on Windows Azure Web Apps
@@ -71,6 +87,11 @@ namespace Grand.Core.Configuration
         public string AmazonBucketName { get; set; }
 
         /// <summary>
+        /// Amazon Domain name for cloudfront distribution
+        /// </summary>
+        public string AmazonDistributionDomainName { get; set; }
+
+        /// <summary>
         /// Amazon Region 
         /// http://docs.amazonwebservices.com/AmazonS3/latest/BucketConfiguration.html#LocationSelection
         /// </summary>
@@ -80,16 +101,37 @@ namespace Grand.Core.Configuration
         /// A list of plugins ignored during installation
         /// </summary>
         public string PluginsIgnoredDuringInstallation { get; set; }
-
+      
         /// <summary>
         /// Enable scripting C# applications to execute code.
         /// </summary>
         public bool UseRoslynScripts { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating for default cache time in minutes
+        /// </summary>
+        public int DefaultCacheTimeMinutes { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating for cookie expires in hours - default 24 * 365 = 8760
+        /// </summary>
+        public int CookieAuthExpires { get; set; }
+
+        /// <summary>
+        /// Enable minimal Progressive Web App.
+        /// </summary>
+        public bool EnableProgressiveWebApp { get; set; }
+        public int ServiceWorkerStrategy { get; set; }
+
+        /// <summary>
         /// Gets or sets a value of "Cache-Control" header value for static content
         /// </summary>
         public string StaticFilesCacheControl { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value of "Cookie SecurePolicy Always"
+        /// </summary>
+        public bool CookieSecurePolicyAlways { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to display the full error in production environment.
@@ -101,6 +143,16 @@ namespace Grand.Core.Configuration
         /// Gets or sets a value indicating whether we compress response
         /// </summary>
         public bool UseResponseCompression { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether use the default security headers for your application
+        /// </summary>
+        public bool UseDefaultSecurityHeaders { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to enable html minification
+        /// </summary>
+        public bool UseHtmlMinification { get; set; }
 
         public bool UseSessionStateTempDataProvider { get; set; }
         /// <summary>
@@ -125,6 +177,13 @@ namespace Grand.Core.Configuration
 
         public int HttpsRedirectionRedirect { get; set; }
         public int? HttpsRedirectionHttpsPort { get; set; }
+
+        /// <summary>
+        /// Localization middleware
+        /// </summary>
+        public bool UseRequestLocalization { get; set; }
+        public string DefaultRequestCulture { get; set; }
+        public IList<string> SupportedCultures { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether ignore InstallUrlMiddleware

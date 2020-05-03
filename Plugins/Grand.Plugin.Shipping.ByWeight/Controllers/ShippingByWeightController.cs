@@ -1,8 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Grand.Core.Domain.Directory;
+﻿using Grand.Core.Domain.Directory;
+using Grand.Framework.Controllers;
+using Grand.Framework.Kendoui;
+using Grand.Framework.Mvc;
+using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Plugin.Shipping.ByWeight.Domain;
 using Grand.Plugin.Shipping.ByWeight.Models;
 using Grand.Plugin.Shipping.ByWeight.Services;
@@ -12,18 +13,18 @@ using Grand.Services.Localization;
 using Grand.Services.Security;
 using Grand.Services.Shipping;
 using Grand.Services.Stores;
-using Grand.Framework.Controllers;
 using Microsoft.AspNetCore.Mvc;
-using Grand.Framework.Mvc.Filters;
-using Grand.Framework.Security;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Grand.Framework.Kendoui;
-using Grand.Framework.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace Grand.Plugin.Shipping.ByWeight.Controllers
 {
     [AuthorizeAdmin]
     [Area("Admin")]
+    [PermissionAuthorize(PermissionSystemName.ShippingSettings)]
     public class ShippingByWeightController : BaseShippingController
     {
         private readonly IShippingService _shippingService;
@@ -34,8 +35,6 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
         private readonly IShippingByWeightService _shippingByWeightService;
         private readonly ISettingService _settingService;
         private readonly ILocalizationService _localizationService;
-        private readonly IPermissionService _permissionService;
-
         private readonly ICurrencyService _currencyService;
         private readonly CurrencySettings _currencySettings;
         private readonly IMeasureService _measureService;
@@ -49,25 +48,23 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
             IShippingByWeightService shippingByWeightService,
             ISettingService settingService,
             ILocalizationService localizationService,
-            IPermissionService permissionService,
             ICurrencyService currencyService,
             CurrencySettings currencySettings,
             IMeasureService measureService,
             MeasureSettings measureSettings)
         {
-            this._shippingService = shippingService;
-            this._storeService = storeService;
-            this._countryService = countryService;
-            this._stateProvinceService = stateProvinceService;
-            this._shippingByWeightSettings = shippingByWeightSettings;
-            this._shippingByWeightService = shippingByWeightService;
-            this._settingService = settingService;
-            this._localizationService = localizationService;
-            this._permissionService = permissionService;
-            this._currencyService = currencyService;
-            this._currencySettings = currencySettings;
-            this._measureService = measureService;
-            this._measureSettings = measureSettings;
+            _shippingService = shippingService;
+            _storeService = storeService;
+            _countryService = countryService;
+            _stateProvinceService = stateProvinceService;
+            _shippingByWeightSettings = shippingByWeightSettings;
+            _shippingByWeightService = shippingByWeightService;
+            _settingService = settingService;
+            _localizationService = localizationService;
+            _currencyService = currencyService;
+            _currencySettings = currencySettings;
+            _measureService = measureService;
+            _measureSettings = measureSettings;
         }
         public IActionResult Configure()
         {
@@ -79,29 +76,28 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult SaveGeneralSettings(ShippingByWeightListModel model)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> SaveGeneralSettings(ShippingByWeightListModel model)
         {
             //save settings
             _shippingByWeightSettings.LimitMethodsToCreated = model.LimitMethodsToCreated;
-            _settingService.SaveSetting(_shippingByWeightSettings);
+            await _settingService.SaveSetting(_shippingByWeightSettings);
 
             return Json(new { Result = true });
         }
 
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult RatesList(DataSourceRequest command)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> RatesList(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return Content("Access denied");
+            var records = await _shippingByWeightService.GetAll(command.Page - 1, command.PageSize);
 
-            var records = _shippingByWeightService.GetAll(command.Page - 1, command.PageSize);
-            var sbwModel = records.Select(x =>
+            var sbwModel = new List<ShippingByWeightModel>();
+            foreach (var x in records)
             {
-                var m = new ShippingByWeightModel
-                {
+
+                var m = new ShippingByWeightModel {
                     Id = x.Id,
                     StoreId = x.StoreId,
                     WarehouseId = x.WarehouseId,
@@ -115,19 +111,19 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
                     LowerWeightLimit = x.LowerWeightLimit,
                 };
                 //shipping method
-                var shippingMethod = _shippingService.GetShippingMethodById(x.ShippingMethodId);
+                var shippingMethod = await _shippingService.GetShippingMethodById(x.ShippingMethodId);
                 m.ShippingMethodName = (shippingMethod != null) ? shippingMethod.Name : "Unavailable";
                 //store
-                var store = _storeService.GetStoreById(x.StoreId);
-                m.StoreName = (store != null) ? store.Name : "*";
+                var store = await _storeService.GetStoreById(x.StoreId);
+                m.StoreName = (store != null) ? store.Shortcut : "*";
                 //warehouse
-                var warehouse = _shippingService.GetWarehouseById(x.WarehouseId);
+                var warehouse = await _shippingService.GetWarehouseById(x.WarehouseId);
                 m.WarehouseName = (warehouse != null) ? warehouse.Name : "*";
                 //country
-                var c = _countryService.GetCountryById(x.CountryId);
+                var c = await _countryService.GetCountryById(x.CountryId);
                 m.CountryName = (c != null) ? c.Name : "*";
                 //state
-                var s = _stateProvinceService.GetStateProvinceById(x.StateProvinceId);
+                var s = await _stateProvinceService.GetStateProvinceById(x.StateProvinceId);
                 m.StateProvinceName = (s != null) ? s.Name : "*";
                 //zip
                 m.Zip = (!String.IsNullOrEmpty(x.Zip)) ? x.Zip : "*";
@@ -149,11 +145,9 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
                 htmlSb.Append("</div>");
                 m.DataHtml = htmlSb.ToString();
 
-                return m;
-            })
-                .ToList();
-            var gridModel = new DataSourceResult
-            {
+                sbwModel.Add(m);
+            }
+            var gridModel = new DataSourceResult {
                 Data = sbwModel,
                 Total = records.TotalCount
             };
@@ -162,47 +156,41 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult RateDelete(string id)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> RateDelete(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return Content("Access denied");
-
-            var sbw = _shippingByWeightService.GetById(id);
+            var sbw = await _shippingByWeightService.GetById(id);
             if (sbw != null)
-                _shippingByWeightService.DeleteShippingByWeightRecord(sbw);
+                await _shippingByWeightService.DeleteShippingByWeightRecord(sbw);
 
             return new NullJsonResult();
         }
 
-        public IActionResult AddPopup()
+        public async Task<IActionResult> AddPopup()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return Content("Access denied");
-
             var model = new ShippingByWeightModel();
-            model.PrimaryStoreCurrencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode;
-            model.BaseWeightIn = _measureService.GetMeasureWeightById(_measureSettings.BaseWeightId).Name;
+            model.PrimaryStoreCurrencyCode = (await _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId)).CurrencyCode;
+            model.BaseWeightIn = (await _measureService.GetMeasureWeightById(_measureSettings.BaseWeightId)).Name;
             model.To = 1000000;
 
-            var shippingMethods = _shippingService.GetAllShippingMethods();
+            var shippingMethods = await _shippingService.GetAllShippingMethods();
             if (shippingMethods.Count == 0)
                 return Content("No shipping methods can be loaded");
 
             //stores
             model.AvailableStores.Add(new SelectListItem { Text = "*", Value = " " });
-            foreach (var store in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = store.Name, Value = store.Id.ToString() });
+            foreach (var store in await _storeService.GetAllStores())
+                model.AvailableStores.Add(new SelectListItem { Text = store.Shortcut, Value = store.Id.ToString() });
             //warehouses
             model.AvailableWarehouses.Add(new SelectListItem { Text = "*", Value = " " });
-            foreach (var warehouses in _shippingService.GetAllWarehouses())
+            foreach (var warehouses in await _shippingService.GetAllWarehouses())
                 model.AvailableWarehouses.Add(new SelectListItem { Text = warehouses.Name, Value = warehouses.Id.ToString() });
             //shipping methods
             foreach (var sm in shippingMethods)
                 model.AvailableShippingMethods.Add(new SelectListItem { Text = sm.Name, Value = sm.Id.ToString() });
             //countries
             model.AvailableCountries.Add(new SelectListItem { Text = "*", Value = " " });
-            var countries = _countryService.GetAllCountries(showHidden: true);
+            var countries = await _countryService.GetAllCountries(showHidden: true);
             foreach (var c in countries)
                 model.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
             //states
@@ -210,15 +198,12 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
 
             return View("~/Plugins/Shipping.ByWeight/Views/AddPopup.cshtml", model);
         }
-        [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult AddPopup(ShippingByWeightModel model)
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return Content("Access denied");
 
-            var sbw = new ShippingByWeightRecord
-            {
+        [HttpPost]
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> AddPopup(ShippingByWeightModel model)
+        {
+            var sbw = new ShippingByWeightRecord {
                 StoreId = model.StoreId,
                 WarehouseId = model.WarehouseId,
                 CountryId = model.CountryId,
@@ -232,7 +217,7 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
                 PercentageRateOfSubtotal = model.PercentageRateOfSubtotal,
                 LowerWeightLimit = model.LowerWeightLimit
             };
-            _shippingByWeightService.InsertShippingByWeightRecord(sbw);
+            await _shippingByWeightService.InsertShippingByWeightRecord(sbw);
 
             ViewBag.RefreshPage = true;
 
@@ -240,18 +225,14 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
         }
 
         //edit
-        public IActionResult EditPopup(string id)
+        public async Task<IActionResult> EditPopup(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return Content("Access denied");
-
-            var sbw = _shippingByWeightService.GetById(id);
+            var sbw = await _shippingByWeightService.GetById(id);
             if (sbw == null)
                 //No record found with the specified id
                 return RedirectToAction("Configure");
 
-            var model = new ShippingByWeightModel
-            {
+            var model = new ShippingByWeightModel {
                 Id = sbw.Id,
                 StoreId = sbw.StoreId,
                 WarehouseId = sbw.WarehouseId,
@@ -265,37 +246,37 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
                 PercentageRateOfSubtotal = sbw.PercentageRateOfSubtotal,
                 RatePerWeightUnit = sbw.RatePerWeightUnit,
                 LowerWeightLimit = sbw.LowerWeightLimit,
-                PrimaryStoreCurrencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId).CurrencyCode,
-                BaseWeightIn = _measureService.GetMeasureWeightById(_measureSettings.BaseWeightId).Name
+                PrimaryStoreCurrencyCode = (await _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId)).CurrencyCode,
+                BaseWeightIn = (await _measureService.GetMeasureWeightById(_measureSettings.BaseWeightId)).Name
             };
 
-            var shippingMethods = _shippingService.GetAllShippingMethods();
+            var shippingMethods = await _shippingService.GetAllShippingMethods();
             if (shippingMethods.Count == 0)
                 return Content("No shipping methods can be loaded");
 
-            var selectedStore = _storeService.GetStoreById(sbw.StoreId);
-            var selectedWarehouse = _shippingService.GetWarehouseById(sbw.WarehouseId);
-            var selectedShippingMethod = _shippingService.GetShippingMethodById(sbw.ShippingMethodId);
-            var selectedCountry = _countryService.GetCountryById(sbw.CountryId);
-            var selectedState = _stateProvinceService.GetStateProvinceById(sbw.StateProvinceId);
+            var selectedStore = await _storeService.GetStoreById(sbw.StoreId);
+            var selectedWarehouse = await _shippingService.GetWarehouseById(sbw.WarehouseId);
+            var selectedShippingMethod = await _shippingService.GetShippingMethodById(sbw.ShippingMethodId);
+            var selectedCountry = await _countryService.GetCountryById(sbw.CountryId);
+            var selectedState = await _stateProvinceService.GetStateProvinceById(sbw.StateProvinceId);
             //stores
             model.AvailableStores.Add(new SelectListItem { Text = "*", Value = "" });
-            foreach (var store in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = store.Name, Value = store.Id.ToString(), Selected = (selectedStore != null && store.Id == selectedStore.Id) });
+            foreach (var store in await _storeService.GetAllStores())
+                model.AvailableStores.Add(new SelectListItem { Text = store.Shortcut, Value = store.Id.ToString(), Selected = (selectedStore != null && store.Id == selectedStore.Id) });
             //warehouses
             model.AvailableWarehouses.Add(new SelectListItem { Text = "*", Value = "" });
-            foreach (var warehouse in _shippingService.GetAllWarehouses())
+            foreach (var warehouse in await _shippingService.GetAllWarehouses())
                 model.AvailableWarehouses.Add(new SelectListItem { Text = warehouse.Name, Value = warehouse.Id.ToString(), Selected = (selectedWarehouse != null && warehouse.Id == selectedWarehouse.Id) });
             //shipping methods
             foreach (var sm in shippingMethods)
                 model.AvailableShippingMethods.Add(new SelectListItem { Text = sm.Name, Value = sm.Id.ToString(), Selected = (selectedShippingMethod != null && sm.Id == selectedShippingMethod.Id) });
             //countries
             model.AvailableCountries.Add(new SelectListItem { Text = "*", Value = "" });
-            var countries = _countryService.GetAllCountries(showHidden: true);
+            var countries = await _countryService.GetAllCountries(showHidden: true);
             foreach (var c in countries)
                 model.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (selectedCountry != null && c.Id == selectedCountry.Id) });
             //states
-            var states = selectedCountry != null ? _stateProvinceService.GetStateProvincesByCountryId(selectedCountry.Id, showHidden: true).ToList() : new List<StateProvince>();
+            var states = selectedCountry != null ? await _stateProvinceService.GetStateProvincesByCountryId(selectedCountry.Id, showHidden: true) : new List<StateProvince>();
             model.AvailableStates.Add(new SelectListItem { Text = "*", Value = "" });
             foreach (var s in states)
                 model.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (selectedState != null && s.Id == selectedState.Id) });
@@ -303,13 +284,10 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
             return View("~/Plugins/Shipping.ByWeight/Views/EditPopup.cshtml", model);
         }
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult EditPopup(ShippingByWeightModel model)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> EditPopup(ShippingByWeightModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return Content("Access denied");
-
-            var sbw = _shippingByWeightService.GetById(model.Id);
+            var sbw = await _shippingByWeightService.GetById(model.Id);
             if (sbw == null)
                 //No record found with the specified id
                 return RedirectToAction("Configure");
@@ -326,13 +304,11 @@ namespace Grand.Plugin.Shipping.ByWeight.Controllers
             sbw.RatePerWeightUnit = model.RatePerWeightUnit;
             sbw.PercentageRateOfSubtotal = model.PercentageRateOfSubtotal;
             sbw.LowerWeightLimit = model.LowerWeightLimit;
-            _shippingByWeightService.UpdateShippingByWeightRecord(sbw);
+            await _shippingByWeightService.UpdateShippingByWeightRecord(sbw);
 
             ViewBag.RefreshPage = true;
 
             return View("~/Plugins/Shipping.ByWeight/Views/EditPopup.cshtml", model);
         }
-
-
     }
 }

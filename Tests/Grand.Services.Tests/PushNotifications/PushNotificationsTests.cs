@@ -8,6 +8,8 @@ using Moq;
 using Grand.Services.Logging;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
+using MediatR;
 
 namespace Grand.Services.Tests.PushNotifications
 {
@@ -17,7 +19,7 @@ namespace Grand.Services.Tests.PushNotifications
         private IRepository<PushRegistration> _registrationRepository;
         private IRepository<PushMessage> _messageRepository;
         private IPushNotificationsService _pushNotificationsService;
-        private IEventPublisher _eventPublisher;
+        private IMediator _eventPublisher;
         private PushNotificationsSettings _pushNotificationsSettings;
         private ILocalizationService _localizationService;
         private ILogger _logger;
@@ -28,8 +30,8 @@ namespace Grand.Services.Tests.PushNotifications
             _registrationRepository = new MongoDBRepositoryTest<PushRegistration>();
             _messageRepository = new MongoDBRepositoryTest<PushMessage>();
 
-            var eventPublisher = new Mock<IEventPublisher>();
-            eventPublisher.Setup(x => x.Publish(new object()));
+            var eventPublisher = new Mock<IMediator>();
+            //eventPublisher.Setup(x => x.PublishAsync(new object()));
             _eventPublisher = eventPublisher.Object;
 
             var pushNotificationsSettings = new Mock<PushNotificationsSettings>();
@@ -62,13 +64,13 @@ namespace Grand.Services.Tests.PushNotifications
         }
 
         [TestMethod()]
-        public void CanInsertRegistration()
+        public async Task CanInsertRegistration()
         {
             ClearPushRegistrations();
 
             DateTime date = DateTime.UtcNow;
 
-            _pushNotificationsService.InsertPushReceiver(new PushRegistration
+            await _pushNotificationsService.InsertPushReceiver(new PushRegistration
             {
                 Allowed = true,
                 CustomerId = "CanInsertRegistrationCustomerId",
@@ -86,13 +88,13 @@ namespace Grand.Services.Tests.PushNotifications
         }
 
         [TestMethod()]
-        public void CanInsertMessage()
+        public async Task CanInsertMessage()
         {
             ClearPushMessages();
 
             DateTime date = DateTime.UtcNow;
 
-            _pushNotificationsService.InsertPushMessage(new PushMessage
+            await _pushNotificationsService.InsertPushMessage(new PushMessage
             {
                 NumberOfReceivers = 1,
                 SentOn = date,
@@ -109,28 +111,28 @@ namespace Grand.Services.Tests.PushNotifications
         }
 
         [TestMethod()]
-        public void CanDeleteRegistration()
+        public async Task CanDeleteRegistration()
         {
             ClearPushRegistrations();
 
             var toDelete = new PushRegistration();
-            _pushNotificationsService.InsertPushReceiver(toDelete);
+            await _pushNotificationsService.InsertPushReceiver(toDelete);
 
             Assert.AreEqual(1, _registrationRepository.Table.Count());
-            _pushNotificationsService.DeletePushReceiver(toDelete);
+            await _pushNotificationsService.DeletePushReceiver(toDelete);
             Assert.AreEqual(0, _registrationRepository.Table.Count());
         }
 
         [TestMethod()]
-        public void CanUpdateRegistration()
+        public async Task CanUpdateRegistration()
         {
             ClearPushRegistrations();
 
             var registration = new PushRegistration() { Token = "CanUpdateRegistrationToken" };
-            _pushNotificationsService.InsertPushReceiver(registration);
+            await _pushNotificationsService.InsertPushReceiver(registration);
 
             registration.Token = "CanUpdateRegistrationToken1";
-            _pushNotificationsService.UpdatePushReceiver(registration);
+            await _pushNotificationsService.UpdatePushReceiver(registration);
 
             var found = _registrationRepository.Table.Where(x => x.Token == "CanUpdateRegistrationToken1");
 
@@ -138,31 +140,31 @@ namespace Grand.Services.Tests.PushNotifications
         }
 
         [TestMethod()]
-        public void CanGetRegistration()
+        public async Task CanGetRegistration()
         {
             ClearPushRegistrations();
 
             var registration = new PushRegistration { Token = "CanGetRegistration" };
-            _pushNotificationsService.InsertPushReceiver(registration);
+            await _pushNotificationsService.InsertPushReceiver(registration);
 
             var actual = _registrationRepository.Table.Where(x => x.Token == "CanGetRegistration").First();
-            var found = _pushNotificationsService.GetPushReceiver(actual.Id);
+            var found = await _pushNotificationsService.GetPushReceiver(actual.Id);
 
             Assert.AreEqual(actual.Token, found.Token);
             Assert.AreEqual(actual.Id, found.Id);
         }
 
         [TestMethod()]
-        public void CanGetMessages()
+        public async Task CanGetMessages()
         {
             ClearPushMessages();
 
             var message1 = new PushMessage { Text = "CanGetMessages1" };
             var message2 = new PushMessage { Text = "CanGetMessages2" };
-            _pushNotificationsService.InsertPushMessage(message1);
-            _pushNotificationsService.InsertPushMessage(message2);
+            await _pushNotificationsService.InsertPushMessage(message1);
+            await _pushNotificationsService.InsertPushMessage(message2);
 
-            var found = _pushNotificationsService.GetPushMessages();
+            var found = await _pushNotificationsService.GetPushMessages();
 
             Assert.AreEqual(2, found.Count);
             Assert.AreEqual(true, found.Any(x => x.Text == "CanGetMessages1"));
@@ -170,16 +172,16 @@ namespace Grand.Services.Tests.PushNotifications
         }
 
         [TestMethod()]
-        public void CanGetReceivers()
+        public async Task CanGetReceivers()
         {
             ClearPushRegistrations();
 
             var receiver1 = new PushRegistration { Token = "CanGetReceivers1", Allowed = true };
             var receiver2 = new PushRegistration { Token = "CanGetReceivers2", Allowed = true };
-            _pushNotificationsService.InsertPushReceiver(receiver1);
-            _pushNotificationsService.InsertPushReceiver(receiver2);
+            await _pushNotificationsService.InsertPushReceiver(receiver1);
+            await _pushNotificationsService.InsertPushReceiver(receiver2);
 
-            var found = _pushNotificationsService.GetPushReceivers();
+            var found = await _pushNotificationsService.GetPushReceivers();
 
             Assert.AreEqual(2, found.Count);
             Assert.AreEqual(true, found.Any(x => x.Token == "CanGetReceivers1"));
@@ -187,7 +189,7 @@ namespace Grand.Services.Tests.PushNotifications
         }
 
         [TestMethod()]
-        public void CanGetAllowedAndDeniedReceivers()
+        public async Task CanGetAllowedAndDeniedReceivers()
         {
             ClearPushRegistrations();
 
@@ -195,19 +197,19 @@ namespace Grand.Services.Tests.PushNotifications
             var receiver2 = new PushRegistration { Allowed = true };
             var receiver3 = new PushRegistration { Allowed = false };
 
-            _pushNotificationsService.InsertPushReceiver(receiver1);
-            _pushNotificationsService.InsertPushReceiver(receiver2);
-            _pushNotificationsService.InsertPushReceiver(receiver3);
+            await _pushNotificationsService.InsertPushReceiver(receiver1);
+            await _pushNotificationsService.InsertPushReceiver(receiver2);
+            await _pushNotificationsService.InsertPushReceiver(receiver3);
 
-            var allowed = _pushNotificationsService.GetAllowedReceivers();
-            var denied = _pushNotificationsService.GetDeniedReceivers();
+            var allowed = await _pushNotificationsService.GetAllowedReceivers();
+            var denied = await _pushNotificationsService.GetDeniedReceivers();
 
             Assert.AreEqual(2, allowed);
             Assert.AreEqual(1, denied);
         }
 
         [TestMethod()]
-        public void CanGetPushReceiverByCustomerId()
+        public async Task CanGetPushReceiverByCustomerId()
         {
             ClearPushRegistrations();
 
@@ -223,10 +225,10 @@ namespace Grand.Services.Tests.PushNotifications
                 Token = "CanGetPushReceiverByCustomerIdToken2"
             };
 
-            _pushNotificationsService.InsertPushReceiver(receiver1);
-            _pushNotificationsService.InsertPushReceiver(receiver2);
+            await _pushNotificationsService.InsertPushReceiver(receiver1);
+            await _pushNotificationsService.InsertPushReceiver(receiver2);
 
-            var found = _pushNotificationsService.GetPushReceiverByCustomerId("CanGetPushReceiverByCustomerId1");
+            var found = await _pushNotificationsService.GetPushReceiverByCustomerId("CanGetPushReceiverByCustomerId1");
 
             Assert.AreEqual("CanGetPushReceiverByCustomerIdToken1", found.Token);
         }

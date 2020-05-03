@@ -1,10 +1,8 @@
 using Grand.Core;
 using Grand.Core.Domain.Customers;
-using Grand.Core.Domain.Directory;
 using Grand.Core.Domain.Orders;
 using Grand.Core.Domain.Payments;
 using Grand.Core.Domain.Shipping;
-using Grand.Core.Infrastructure;
 using Grand.Core.Plugins;
 using Grand.Services.Catalog;
 using Grand.Services.Common;
@@ -13,6 +11,7 @@ using Grand.Services.Directory;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Payments
 {
@@ -26,6 +25,7 @@ namespace Grand.Services.Payments
         private readonly PaymentSettings _paymentSettings;
         private readonly IPluginFinder _pluginFinder;
         private readonly ISettingService _settingService;
+        private readonly ICurrencyService _currencyService;
         private readonly ShoppingCartSettings _shoppingCartSettings;
         #endregion
 
@@ -38,15 +38,17 @@ namespace Grand.Services.Payments
         /// <param name="pluginFinder">Plugin finder</param>
         /// <param name="settingService">Setting service</param>
         /// <param name="shoppingCartSettings">Shopping cart settings</param>
-        public PaymentService(PaymentSettings paymentSettings, 
+        public PaymentService(PaymentSettings paymentSettings,
             IPluginFinder pluginFinder,
             ISettingService settingService,
+            ICurrencyService currencyService,
             ShoppingCartSettings shoppingCartSettings)
         {
-            this._paymentSettings = paymentSettings;
-            this._pluginFinder = pluginFinder;
-            this._settingService = settingService;
-            this._shoppingCartSettings = shoppingCartSettings;
+            _paymentSettings = paymentSettings;
+            _pluginFinder = pluginFinder;
+            _settingService = settingService;
+            _currencyService = currencyService;
+            _shoppingCartSettings = shoppingCartSettings;
         }
 
         #endregion
@@ -60,16 +62,16 @@ namespace Grand.Services.Payments
         /// <param name="storeId">Load records allowed only in a specified store; pass "" to load all records</param>
         /// <param name="filterByCountryId">Load records allowed only in a specified country; pass "" to load all records</param>
         /// <returns>Payment methods</returns>
-        public virtual IList<IPaymentMethod> LoadActivePaymentMethods(Customer filterByCustomer = null, string storeId = "", string filterByCountryId = "")
+        public virtual async Task<IList<IPaymentMethod>> LoadActivePaymentMethods(Customer filterByCustomer = null, string storeId = "", string filterByCountryId = "")
         {
             var pm = LoadAllPaymentMethods(storeId, filterByCountryId)
                    .Where(provider => _paymentSettings.ActivePaymentMethodSystemNames.Contains(provider.PluginDescriptor.SystemName, StringComparer.OrdinalIgnoreCase))
                    .ToList();
 
-            if(filterByCustomer!=null)
+            if (filterByCustomer != null)
             {
 
-                var selectedShippingOption = filterByCustomer.GetAttribute<ShippingOption>(
+                var selectedShippingOption = filterByCustomer.GetAttributeFromEntity<ShippingOption>(
                        SystemCustomerAttributeNames.SelectedShippingOption, storeId);
 
                 for (int i = pm.Count - 1; i >= 0; i--)
@@ -94,8 +96,7 @@ namespace Grand.Services.Payments
                 }
 
             }
-
-            return pm;
+            return await Task.FromResult(pm);
         }
 
         /// <summary>
@@ -107,7 +108,7 @@ namespace Grand.Services.Payments
         {
             var descriptor = _pluginFinder.GetPluginDescriptorBySystemName<IPaymentMethod>(systemName);
             if (descriptor != null)
-                return descriptor.Instance<IPaymentMethod>();
+                return descriptor.Instance<IPaymentMethod>(_pluginFinder.ServiceProvider);
 
             return null;
         }
@@ -192,13 +193,13 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="paymentMethod">Payment method</param>
         /// <param name="countryIds">A list of country identifiers</param>
-        public virtual void SaveRestictedCountryIds(IPaymentMethod paymentMethod, List<string> countryIds)
+        public virtual async Task SaveRestictedCountryIds(IPaymentMethod paymentMethod, List<string> countryIds)
         {
             if (paymentMethod == null)
                 throw new ArgumentNullException("paymentMethod");
 
             var settingKey = string.Format("PaymentMethodRestictions.{0}", paymentMethod.PluginDescriptor.SystemName);
-            _settingService.SetSetting(settingKey, countryIds);
+            await _settingService.SetSetting(settingKey, countryIds);
         }
 
         /// <summary>
@@ -206,13 +207,13 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="paymentMethod">Payment method</param>
         /// <param name="countryIds">A list of country identifiers</param>
-        public virtual void SaveRestictedRoleIds(IPaymentMethod paymentMethod, List<string> roleIds)
+        public virtual async Task SaveRestictedRoleIds(IPaymentMethod paymentMethod, List<string> roleIds)
         {
             if (paymentMethod == null)
                 throw new ArgumentNullException("paymentMethod");
 
             var settingKey = string.Format("PaymentMethodRestictionsRole.{0}", paymentMethod.PluginDescriptor.SystemName);
-            _settingService.SetSetting(settingKey, roleIds);
+            await _settingService.SetSetting(settingKey, roleIds);
         }
 
         /// <summary>
@@ -220,13 +221,13 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="paymentMethod">Payment method</param>
         /// <param name="shippingIds">A list of country identifiers</param>
-        public virtual void SaveRestictedShippingIds(IPaymentMethod paymentMethod, List<string> shippingIds)
+        public virtual async Task SaveRestictedShippingIds(IPaymentMethod paymentMethod, List<string> shippingIds)
         {
             if (paymentMethod == null)
                 throw new ArgumentNullException("paymentMethod");
 
             var settingKey = string.Format("PaymentMethodRestictionsShipping.{0}", paymentMethod.PluginDescriptor.SystemName);
-            _settingService.SetSetting(settingKey, shippingIds);
+            await _settingService.SetSetting(settingKey, shippingIds);
         }
 
         /// <summary>
@@ -234,7 +235,7 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
         /// <returns>Process payment result</returns>
-        public virtual ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
+        public virtual async Task<ProcessPaymentResult> ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
             if (processPaymentRequest.OrderTotal == decimal.Zero)
             {
@@ -254,14 +255,14 @@ namespace Grand.Services.Payments
             var paymentMethod = LoadPaymentMethodBySystemName(processPaymentRequest.PaymentMethodSystemName);
             if (paymentMethod == null)
                 throw new GrandException("Payment method couldn't be loaded");
-            return paymentMethod.ProcessPayment(processPaymentRequest);
+            return await paymentMethod.ProcessPayment(processPaymentRequest);
         }
 
         /// <summary>
         /// Post process payment (used by payment gateways that require redirecting to a third-party URL)
         /// </summary>
         /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        public virtual void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
+        public virtual async Task PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
         {
             //already paid or order.OrderTotal == decimal.Zero
             if (postProcessPaymentRequest.Order.PaymentStatus == PaymentStatus.Paid)
@@ -270,7 +271,7 @@ namespace Grand.Services.Payments
             var paymentMethod = LoadPaymentMethodBySystemName(postProcessPaymentRequest.Order.PaymentMethodSystemName);
             if (paymentMethod == null)
                 throw new GrandException("Payment method couldn't be loaded");
-            paymentMethod.PostProcessPayment(postProcessPaymentRequest);
+            await paymentMethod.PostProcessPayment(postProcessPaymentRequest);
         }
 
         /// <summary>
@@ -278,7 +279,7 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="order">Order</param>
         /// <returns>Result</returns>
-        public virtual bool CanRePostProcessPayment(Order order)
+        public virtual async Task<bool> CanRePostProcessPayment(Order order)
         {
             if (order == null)
                 throw new ArgumentNullException("order");
@@ -302,7 +303,7 @@ namespace Grand.Services.Payments
             if (order.PaymentStatus != PaymentStatus.Pending)
                 return false;  //payment status should be Pending
 
-            return paymentMethod.CanRePostProcessPayment(order);
+            return await paymentMethod.CanRePostProcessPayment(order);
         }
 
 
@@ -313,7 +314,7 @@ namespace Grand.Services.Payments
         /// <param name="cart">Shoping cart</param>
         /// <param name="paymentMethodSystemName">Payment method system name</param>
         /// <returns>Additional handling fee</returns>
-        public virtual decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart, string paymentMethodSystemName)
+        public virtual async Task<decimal> GetAdditionalHandlingFee(IList<ShoppingCartItem> cart, string paymentMethodSystemName)
         {
             if (String.IsNullOrEmpty(paymentMethodSystemName))
                 return decimal.Zero;
@@ -322,12 +323,12 @@ namespace Grand.Services.Payments
             if (paymentMethod == null)
                 return decimal.Zero;
 
-            decimal result = paymentMethod.GetAdditionalHandlingFee(cart);
+            decimal result = await paymentMethod.GetAdditionalHandlingFee(cart);
             if (result < decimal.Zero)
                 result = decimal.Zero;
             if (_shoppingCartSettings.RoundPricesDuringCalculation)
             {
-                var currency = EngineContext.Current.Resolve<ICurrencyService>().GetCurrencyById(EngineContext.Current.Resolve<CurrencySettings>().PrimaryExchangeRateCurrencyId);
+                var currency = await _currencyService.GetPrimaryExchangeRateCurrency();
                 result = RoundingHelper.RoundPrice(result, currency);
             }
             return result;
@@ -340,12 +341,12 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="paymentMethodSystemName">Payment method system name</param>
         /// <returns>A value indicating whether capture is supported</returns>
-        public virtual bool SupportCapture(string paymentMethodSystemName)
+        public virtual async Task<bool> SupportCapture(string paymentMethodSystemName)
         {
             var paymentMethod = LoadPaymentMethodBySystemName(paymentMethodSystemName);
             if (paymentMethod == null)
                 return false;
-            return paymentMethod.SupportCapture;
+            return await paymentMethod.SupportCapture();
         }
 
         /// <summary>
@@ -353,12 +354,12 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="capturePaymentRequest">Capture payment request</param>
         /// <returns>Capture payment result</returns>
-        public virtual CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
+        public virtual async Task<CapturePaymentResult> Capture(CapturePaymentRequest capturePaymentRequest)
         {
             var paymentMethod = LoadPaymentMethodBySystemName(capturePaymentRequest.Order.PaymentMethodSystemName);
             if (paymentMethod == null)
                 throw new GrandException("Payment method couldn't be loaded");
-            return paymentMethod.Capture(capturePaymentRequest);
+            return await paymentMethod.Capture(capturePaymentRequest);
         }
 
 
@@ -368,12 +369,12 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="paymentMethodSystemName">Payment method system name</param>
         /// <returns>A value indicating whether partial refund is supported</returns>
-        public virtual bool SupportPartiallyRefund(string paymentMethodSystemName)
+        public virtual async Task<bool> SupportPartiallyRefund(string paymentMethodSystemName)
         {
             var paymentMethod = LoadPaymentMethodBySystemName(paymentMethodSystemName);
             if (paymentMethod == null)
                 return false;
-            return paymentMethod.SupportPartiallyRefund;
+            return await paymentMethod.SupportPartiallyRefund();
         }
 
         /// <summary>
@@ -381,12 +382,12 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="paymentMethodSystemName">Payment method system name</param>
         /// <returns>A value indicating whether refund is supported</returns>
-        public virtual bool SupportRefund(string paymentMethodSystemName)
+        public virtual async Task<bool> SupportRefund(string paymentMethodSystemName)
         {
             var paymentMethod = LoadPaymentMethodBySystemName(paymentMethodSystemName);
             if (paymentMethod == null)
                 return false;
-            return paymentMethod.SupportRefund;
+            return await paymentMethod.SupportRefund();
         }
 
         /// <summary>
@@ -394,14 +395,14 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="refundPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public virtual RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
+        public virtual async Task<RefundPaymentResult> Refund(RefundPaymentRequest refundPaymentRequest)
         {
             var paymentMethod = LoadPaymentMethodBySystemName(refundPaymentRequest.Order.PaymentMethodSystemName);
             if (paymentMethod == null)
                 throw new GrandException("Payment method couldn't be loaded");
-            return paymentMethod.Refund(refundPaymentRequest);
+            return await paymentMethod.Refund(refundPaymentRequest);
         }
-        
+
 
 
         /// <summary>
@@ -409,12 +410,12 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="paymentMethodSystemName">Payment method system name</param>
         /// <returns>A value indicating whether void is supported</returns>
-        public virtual bool SupportVoid(string paymentMethodSystemName)
+        public virtual async Task<bool> SupportVoid(string paymentMethodSystemName)
         {
             var paymentMethod = LoadPaymentMethodBySystemName(paymentMethodSystemName);
             if (paymentMethod == null)
                 return false;
-            return paymentMethod.SupportVoid;
+            return await paymentMethod.SupportVoid();
         }
 
         /// <summary>
@@ -422,12 +423,12 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="voidPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public virtual VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
+        public virtual async Task<VoidPaymentResult> Void(VoidPaymentRequest voidPaymentRequest)
         {
             var paymentMethod = LoadPaymentMethodBySystemName(voidPaymentRequest.Order.PaymentMethodSystemName);
             if (paymentMethod == null)
                 throw new GrandException("Payment method couldn't be loaded");
-            return paymentMethod.Void(voidPaymentRequest);
+            return await paymentMethod.Void(voidPaymentRequest);
         }
 
 
@@ -450,7 +451,7 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
         /// <returns>Process payment result</returns>
-        public virtual ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
+        public virtual async Task<ProcessPaymentResult> ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
         {
             if (processPaymentRequest.OrderTotal == decimal.Zero)
             {
@@ -464,7 +465,7 @@ namespace Grand.Services.Payments
             var paymentMethod = LoadPaymentMethodBySystemName(processPaymentRequest.PaymentMethodSystemName);
             if (paymentMethod == null)
                 throw new GrandException("Payment method couldn't be loaded");
-            return paymentMethod.ProcessRecurringPayment(processPaymentRequest);
+            return await paymentMethod.ProcessRecurringPayment(processPaymentRequest);
         }
 
         /// <summary>
@@ -472,7 +473,7 @@ namespace Grand.Services.Payments
         /// </summary>
         /// <param name="cancelPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public virtual CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
+        public virtual async Task<CancelRecurringPaymentResult> CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
             if (cancelPaymentRequest.Order.OrderTotal == decimal.Zero)
                 return new CancelRecurringPaymentResult();
@@ -480,7 +481,7 @@ namespace Grand.Services.Payments
             var paymentMethod = LoadPaymentMethodBySystemName(cancelPaymentRequest.Order.PaymentMethodSystemName);
             if (paymentMethod == null)
                 throw new GrandException("Payment method couldn't be loaded");
-            return paymentMethod.CancelRecurringPayment(cancelPaymentRequest);
+            return await paymentMethod.CancelRecurringPayment(cancelPaymentRequest);
         }
 
 
@@ -519,7 +520,7 @@ namespace Grand.Services.Payments
             }
             return maskedChars + last4;
         }
-        
+
         #endregion
     }
 }

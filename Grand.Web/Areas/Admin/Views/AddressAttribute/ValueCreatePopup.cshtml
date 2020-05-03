@@ -7,11 +7,11 @@
       asp-route-addressAttributeId="@Context.Request.Query["addressAttributeId"]"
       asp-route-btnId="@Context.Request.Query["btnId"]"
       asp-route-formId="@Context.Request.Query["formId"]">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-list-alt"></i>
                         @T("Admin.Address.AddressAttributes.Values.AddNew")
@@ -20,8 +20,9 @@
                         <button class="btn btn-success" type="submit" name="save"><i class="fa fa-check"></i> @T("Admin.Common.Save") </button>
                     </div>
                 </div>
-                <div class="portlet-body form">
-                    @Html.Partial("_CreateOrUpdateValue", Model)
+                <vc:admin-widget widget-zone="address_attribute_value_details_buttons" additional-data="null" />
+                <div class="x_content form">
+                    <partial name="_CreateOrUpdateValue" model="Model" />
                 </div>
             </div>
         </div>

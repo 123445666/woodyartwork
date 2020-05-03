@@ -2,8 +2,10 @@ using Grand.Core;
 using Grand.Core.Domain.Common;
 using Grand.Core.Domain.Customers;
 using Grand.Core.Domain.Orders;
+using Grand.Core.Domain.Stores;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Customers
 {
@@ -21,6 +23,7 @@ namespace Grand.Services.Customers
         /// <param name="createdToUtc">Created date to (UTC); null to load all records</param>
         /// <param name="affiliateId">Affiliate identifier</param>
         /// <param name="vendorId">Vendor identifier</param>
+        /// <param name="storeId">Store identifier</param>
         /// <param name="customerRoleIds">A list of customer role identifiers to filter by (at least one match); pass null or empty list in order to load all customers; </param>
         /// <param name="email">Email; null to load all customers</param>
         /// <param name="username">Username; null to load all customers</param>
@@ -36,20 +39,20 @@ namespace Grand.Services.Customers
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Customers</returns>
-        IPagedList<Customer> GetAllCustomers(DateTime? createdFromUtc = null,
-            DateTime? createdToUtc = null, string affiliateId = "", string vendorId = "",
+        Task<IPagedList<Customer>> GetAllCustomers(DateTime? createdFromUtc = null,
+            DateTime? createdToUtc = null, string affiliateId = "", string vendorId = "", string storeId = "",
             string[] customerRoleIds = null, string[] customerTagIds = null, string email = null, string username = null,
             string firstName = null, string lastName = null,
             string company = null, string phone = null, string zipPostalCode = null,
             bool loadOnlyWithShoppingCart = false, ShoppingCartType? sct = null,
             int pageIndex = 0, int pageSize = int.MaxValue); //Int32.MaxValue
-        
+
         /// <summary>
         /// Gets all customers by customer format (including deleted ones)
         /// </summary>
         /// <param name="passwordFormat">Password format</param>
         /// <returns>Customers</returns>
-        IList<Customer> GetAllCustomersByPasswordFormat(PasswordFormat passwordFormat);
+        Task<IList<Customer>> GetAllCustomersByPasswordFormat(PasswordFormat passwordFormat);
 
         /// <summary>
         /// Gets online customers
@@ -59,94 +62,94 @@ namespace Grand.Services.Customers
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Customers</returns>
-        IPagedList<Customer> GetOnlineCustomers(DateTime lastActivityFromUtc,
-            string[] customerRoleIds, int pageIndex = 0, int pageSize = int.MaxValue);
+        Task<IPagedList<Customer>> GetOnlineCustomers(DateTime lastActivityFromUtc,
+            string[] customerRoleIds, int pageIndex = 0, int pageSize = int.MaxValue, string storeId = "");
 
-        int GetCountOnlineShoppingCart(DateTime lastActivityFromUtc);
+        Task<int> GetCountOnlineShoppingCart(DateTime lastActivityFromUtc, string storeId);
 
         /// <summary>
         /// Delete a customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void DeleteCustomer(Customer customer);
+        Task DeleteCustomer(Customer customer);
 
         /// <summary>
         /// Gets a customer
         /// </summary>
         /// <param name="customerId">Customer identifier</param>
         /// <returns>A customer</returns>
-        Customer GetCustomerById(string customerId);
+        Task<Customer> GetCustomerById(string customerId);
 
         /// <summary>
         /// Get customers by identifiers
         /// </summary>
         /// <param name="customerIds">Customer identifiers</param>
         /// <returns>Customers</returns>
-        IList<Customer> GetCustomersByIds(string[] customerIds);
+        Task<IList<Customer>> GetCustomersByIds(string[] customerIds);
 
         /// <summary>
         /// Gets a customer by GUID
         /// </summary>
         /// <param name="customerGuid">Customer GUID</param>
         /// <returns>A customer</returns>
-        Customer GetCustomerByGuid(Guid customerGuid);
+        Task<Customer> GetCustomerByGuid(Guid customerGuid);
 
         /// <summary>
         /// Get customer by email
         /// </summary>
         /// <param name="email">Email</param>
         /// <returns>Customer</returns>
-        Customer GetCustomerByEmail(string email);
-        
+        Task<Customer> GetCustomerByEmail(string email);
+
         /// <summary>
         /// Get customer by system role
         /// </summary>
         /// <param name="systemName">System name</param>
         /// <returns>Customer</returns>
-        Customer GetCustomerBySystemName(string systemName);
+        Task<Customer> GetCustomerBySystemName(string systemName);
 
         /// <summary>
         /// Get customer by username
         /// </summary>
         /// <param name="username">Username</param>
         /// <returns>Customer</returns>
-        Customer GetCustomerByUsername(string username);
+        Task<Customer> GetCustomerByUsername(string username);
 
         /// <summary>
         /// Insert a guest customer
         /// </summary>
         /// <returns>Customer</returns>
-        Customer InsertGuestCustomer(string urlreferrer = "");
+        Task<Customer> InsertGuestCustomer(Store store, string urlreferrer = "");
 
         /// <summary>
         /// Insert a customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void InsertCustomer(Customer customer);
+        Task InsertCustomer(Customer customer);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomer(Customer customer);
+        Task UpdateCustomer(Customer customer);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerLastActivityDate(Customer customer);
+        Task UpdateCustomerLastActivityDate(Customer customer);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerVendor(Customer customer);
+        Task UpdateCustomerVendor(Customer customer);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerPassword(Customer customer);
+        Task UpdateCustomerPassword(Customer customer);
 
 
         /// <summary>
@@ -154,58 +157,58 @@ namespace Grand.Services.Customers
         /// </summary>
         /// <param name="customerId"></param>
         /// <param name="freeShipping"></param>
-        void UpdateFreeShipping(string customerId, bool freeShipping);
+        Task UpdateFreeShipping(string customerId, bool freeShipping);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateAffiliate(Customer customer);
+        Task UpdateAffiliate(Customer customer);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateActive(Customer customer);
+        Task UpdateActive(Customer customer);
 
         /// <summary>
         /// Update the customer
         /// </summary>
         /// <param name="customer"></param>
-        void UpdateContributions(Customer customer);
+        Task UpdateContributions(Customer customer);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerLastLoginDate(Customer customer);
+        Task UpdateCustomerLastLoginDate(Customer customer);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerLastIpAddress(Customer customer);
+        Task UpdateCustomerLastIpAddress(Customer customer);
 
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerLastPurchaseDate(string customerId, DateTime date);
+        Task UpdateCustomerLastPurchaseDate(string customerId, DateTime date);
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerLastUpdateCartDate(string customerId, DateTime? date);
+        Task UpdateCustomerLastUpdateCartDate(string customerId, DateTime? date);
         /// <summary>
         /// Updates the customer
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerLastUpdateWishList(string customerId, DateTime date);
+        Task UpdateCustomerLastUpdateWishList(string customerId, DateTime date);
         /// <summary>
         /// Updates the customer in admin panel
         /// </summary>
         /// <param name="customer">Customer</param>
-        void UpdateCustomerinAdminPanel(Customer customer);
+        Task UpdateCustomerinAdminPanel(Customer customer);
 
         /// <summary>
         /// Reset data required for checkout
@@ -217,19 +220,11 @@ namespace Grand.Services.Customers
         /// <param name="clearRewardPoints">A value indicating whether to clear "Use reward points" flag</param>
         /// <param name="clearShippingMethod">A value indicating whether to clear selected shipping method</param>
         /// <param name="clearPaymentMethod">A value indicating whether to clear selected payment method</param>
-        void ResetCheckoutData(Customer customer, string storeId,
+        Task ResetCheckoutData(Customer customer, string storeId,
             bool clearCouponCodes = false, bool clearCheckoutAttributes = false,
             bool clearRewardPoints = true, bool clearShippingMethod = true,
             bool clearPaymentMethod = true);
-
-        /// <summary>
-        /// Update Customer Reminder History
-        /// </summary>
-        /// <param name="customerId"></param>
-        /// <param name="orderId"></param>
-        void UpdateCustomerReminderHistory(string customerId, string orderId);
-
-
+        
         /// <summary>
         /// Delete guest customer records
         /// </summary>
@@ -237,7 +232,7 @@ namespace Grand.Services.Customers
         /// <param name="createdToUtc">Created date to (UTC); null to load all records</param>
         /// <param name="onlyWithoutShoppingCart">A value indicating whether to delete customers only without shopping cart</param>
         /// <returns>Number of deleted customers</returns>
-        int DeleteGuestCustomers(DateTime? createdFromUtc, DateTime? createdToUtc, bool onlyWithoutShoppingCart);
+        Task<int> DeleteGuestCustomers(DateTime? createdFromUtc, DateTime? createdToUtc, bool onlyWithoutShoppingCart);
 
         #endregion
 
@@ -249,13 +244,13 @@ namespace Grand.Services.Customers
         /// <param name="customerId">Customer identifier; pass null to load all records</param>
         /// <param name="passwordsToReturn">Number of returning passwords; pass null to load all records</param>
         /// <returns>List of customer passwords</returns>
-        IList<CustomerHistoryPassword> GetPasswords(string customerId, int passwordsToReturn);
+        Task<IList<CustomerHistoryPassword>> GetPasswords(string customerId, int passwordsToReturn);
 
         /// <summary>
         /// Insert a customer history password
         /// </summary>
         /// <param name="customer">Customer</param>
-        void InsertCustomerPassword(Customer customer);
+        Task InsertCustomerPassword(Customer customer);
 
 
         #endregion
@@ -266,47 +261,48 @@ namespace Grand.Services.Customers
         /// Inserts a customer role
         /// </summary>
         /// <param name="customerRole">Customer role</param>
-        void InsertCustomerRole(CustomerRole customerRole);
+        Task InsertCustomerRole(CustomerRole customerRole);
 
         /// <summary>
         /// Updates the customer role
         /// </summary>
         /// <param name="customerRole">Customer role</param>
-        void UpdateCustomerRole(CustomerRole customerRole);
+        Task UpdateCustomerRole(CustomerRole customerRole);
 
         /// <summary>
         /// Delete a customer role
         /// </summary>
         /// <param name="customerRole">Customer role</param>
-        void DeleteCustomerRole(CustomerRole customerRole);
+        Task DeleteCustomerRole(CustomerRole customerRole);
 
         /// <summary>
         /// Gets a customer role
         /// </summary>
         /// <param name="customerRoleId">Customer role identifier</param>
         /// <returns>Customer role</returns>
-        CustomerRole GetCustomerRoleById(string customerRoleId);
+        Task<CustomerRole> GetCustomerRoleById(string customerRoleId);
 
         /// <summary>
         /// Gets a customer role
         /// </summary>
         /// <param name="systemName">Customer role system name</param>
         /// <returns>Customer role</returns>
-        CustomerRole GetCustomerRoleBySystemName(string systemName);
+        Task<CustomerRole> GetCustomerRoleBySystemName(string systemName);
 
         /// <summary>
         /// Gets all customer roles
         /// </summary>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Customer roles</returns>
-        IList<CustomerRole> GetAllCustomerRoles(bool showHidden = false);
+        Task<IPagedList<CustomerRole>> GetAllCustomerRoles(int pageIndex = 0,
+            int pageSize = int.MaxValue, bool showHidden = false);
 
         /// <summary>
         /// Gets customer roles products for customer role
         /// </summary>
         /// <param name="customerRoleId">Customer role id</param>
         /// <returns>Customer role products</returns>
-        IList<CustomerRoleProduct> GetCustomerRoleProducts(string customerRoleId);
+        Task<IList<CustomerRoleProduct>> GetCustomerRoleProducts(string customerRoleId);
 
         /// <summary>
         /// Gets customer roles products for customer role
@@ -314,147 +310,60 @@ namespace Grand.Services.Customers
         /// <param name="customerRoleId">Customer role id</param>
         /// <param name="productId">Product id</param>
         /// <returns>Customer role product</returns>
-        CustomerRoleProduct GetCustomerRoleProduct(string customerRoleId, string productId);
+        Task<CustomerRoleProduct> GetCustomerRoleProduct(string customerRoleId, string productId);
 
         /// <summary>
         /// Gets customer roles product
         /// </summary>
         /// <param name="Id">id</param>
         /// <returns>Customer role product</returns>
-        CustomerRoleProduct GetCustomerRoleProductById(string id);
-
+        Task<CustomerRoleProduct> GetCustomerRoleProductById(string id);
 
         /// <summary>
         /// Inserts a customer role product
         /// </summary>
         /// <param name="customerRoleProduct">Customer role product</param>
-        void InsertCustomerRoleProduct(CustomerRoleProduct customerRoleProduct);
+        Task InsertCustomerRoleProduct(CustomerRoleProduct customerRoleProduct);
 
         /// <summary>
         /// Updates the customer role product
         /// </summary>
         /// <param name="customerRoleProduct">Customer role product</param>
-        void UpdateCustomerRoleProduct(CustomerRoleProduct customerRoleProduct);
+        Task UpdateCustomerRoleProduct(CustomerRoleProduct customerRoleProduct);
 
         /// <summary>
         /// Delete a customer role product
         /// </summary>
         /// <param name="customerRoleProduct">Customer role product</param>
-        void DeleteCustomerRoleProduct(CustomerRoleProduct customerRoleProduct);
-
+        Task DeleteCustomerRoleProduct(CustomerRoleProduct customerRoleProduct);
 
         #endregion
 
         #region Customer Role in Customer
 
-        void InsertCustomerRoleInCustomer(CustomerRole customerRole);
+        Task InsertCustomerRoleInCustomer(CustomerRole customerRole);
 
-        void DeleteCustomerRoleInCustomer(CustomerRole customerRole);
-        
+        Task DeleteCustomerRoleInCustomer(CustomerRole customerRole);
+
         #endregion
 
         #region Customer address
 
-        void DeleteAddress(Address address);
-        void InsertAddress(Address address);
-        void UpdateAddress(Address address);
-        void UpdateBillingAddress(Address address);
-        void UpdateShippingAddress(Address address);
-        void RemoveShippingAddress(string customerId);
+        Task DeleteAddress(Address address);
+        Task InsertAddress(Address address);
+        Task UpdateAddress(Address address);
+        Task UpdateBillingAddress(Address address);
+        Task UpdateShippingAddress(Address address);
+        Task RemoveShippingAddress(string customerId);
 
         #endregion
 
         #region Shopping cart 
 
-        void ClearShoppingCartItem(string customerId, string storeId, ShoppingCartType shoppingCartType);
-        void DeleteShoppingCartItem(string customerId, ShoppingCartItem shoppingCartItem);
-        void InsertShoppingCartItem(string customerId, ShoppingCartItem shoppingCartItem);
-        void UpdateShoppingCartItem(string customerId, ShoppingCartItem shoppingCartItem);
-        #endregion
-
-        #region Customer Product Price
-
-        /// <summary>
-        /// Gets a customer product price
-        /// </summary>
-        /// <param name="id">Identifier</param>
-        /// <returns>Customer product price</returns>
-        CustomerProductPrice GetCustomerProductPriceById(string id);
-
-        /// <summary>
-        /// Gets a price
-        /// </summary>
-        /// <param name="customerId">Customer Identifier</param>
-        /// <param name="productId">Product Identifier</param>
-        /// <returns>Customer product price</returns>
-        decimal? GetPriceByCustomerProduct(string customerId, string productId);
-
-        /// <summary>
-        /// Gets a customer product 
-        /// </summary>
-        /// <param name="id">Identifier</param>
-        /// <returns>Customer product</returns>
-        CustomerProduct GetCustomerProduct(string id);
-
-        /// <summary>
-        /// Gets a customer product 
-        /// </summary>
-        /// <param name="customerId">Customer Identifier</param>
-        /// <param name="productId">Product Identifier</param>
-        /// <returns>Customer product</returns>
-        CustomerProduct GetCustomerProduct(string customerId, string productId);
-
-        /// <summary>
-        /// Inserts a customer product price
-        /// </summary>
-        /// <param name="customerProductPrice">Customer product price</param>
-        void InsertCustomerProductPrice(CustomerProductPrice customerProductPrice);
-
-        /// <summary>
-        /// Updates the customer product price
-        /// </summary>
-        /// <param name="customerProductPrice">Customer product price</param>
-        void UpdateCustomerProductPrice(CustomerProductPrice customerProductPrice);
-
-        /// <summary>
-        /// Delete a customer product price
-        /// </summary>
-        /// <param name="customerProductPrice">Customer product price</param>
-        void DeleteCustomerProductPrice(CustomerProductPrice customerProductPrice);
-
-
-
-        /// <summary>
-        /// Gets products price for customer
-        /// </summary>
-        /// <param name="customerId">Customer id</param>
-        /// <returns>Customer products price</returns>
-        IPagedList<CustomerProductPrice> GetProductsPriceByCustomer(string customerId, int pageIndex = 0, int pageSize = int.MaxValue);
-
-        #endregion
-
-        #region Customer product
-
-        /// <summary>
-        /// Inserts a customer product 
-        /// </summary>
-        /// <param name="customerProduct">Customer product</param>
-        void InsertCustomerProduct(CustomerProduct customerProduct);
-
-        /// <summary>
-        /// Updates the customer product
-        /// </summary>
-        /// <param name="customerProduct">Customer product </param>
-        void UpdateCustomerProduct(CustomerProduct customerProduct);
-
-        /// <summary>
-        /// Delete a customer product 
-        /// </summary>
-        /// <param name="customerProduct">Customer product </param>
-        void DeleteCustomerProduct(CustomerProduct customerProduct);
-
-        IPagedList<CustomerProduct> GetProductsByCustomer(string customerId, int pageIndex = 0, int pageSize = int.MaxValue);
-
+        Task ClearShoppingCartItem(string customerId, IList<ShoppingCartItem> cart);
+        Task DeleteShoppingCartItem(string customerId, ShoppingCartItem shoppingCartItem);
+        Task InsertShoppingCartItem(string customerId, ShoppingCartItem shoppingCartItem);
+        Task UpdateShoppingCartItem(string customerId, ShoppingCartItem shoppingCartItem);
         #endregion
 
         #region Customer note
@@ -464,19 +373,19 @@ namespace Grand.Services.Customers
         /// </summary>
         /// <param name="id">Note identifier</param>
         /// <returns>CustomerNote</returns>
-        CustomerNote GetCustomerNote(string id);
+        Task<CustomerNote> GetCustomerNote(string id);
 
         /// <summary>
         /// Deletes an customer note
         /// </summary>
         /// <param name="customerNote">The customer note</param>
-        void DeleteCustomerNote(CustomerNote customerNote);
+        Task DeleteCustomerNote(CustomerNote customerNote);
 
         /// <summary>
         /// Insert an customer note
         /// </summary>
         /// <param name="customerNote">The customer note</param>
-        void InsertCustomerNote(CustomerNote customerNote);
+        Task InsertCustomerNote(CustomerNote customerNote);
 
         /// <summary>
         /// Get notes for customer
@@ -484,7 +393,7 @@ namespace Grand.Services.Customers
         /// <param name="customerId">Customer identifier</param>
         /// <param name="displaytocustomer">Display to customer</param>
         /// <returns>OrderNote</returns>
-        IList<CustomerNote> GetCustomerNotes(string customerId, bool? displaytocustomer = null);
+        Task<IList<CustomerNote>> GetCustomerNotes(string customerId, bool? displaytocustomer = null);
 
         #endregion
     }

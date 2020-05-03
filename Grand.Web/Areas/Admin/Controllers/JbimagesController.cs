@@ -1,11 +1,12 @@
 ﻿using Grand.Core;
-using Grand.Framework.Security;
+using Grand.Core.Domain.Media;
 using Grand.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
@@ -13,36 +14,41 @@ namespace Grand.Web.Areas.Admin.Controllers
     /// Controller used by jbimages (JustBoil.me) plugin (TimyMCE)
     /// </summary>
     //do not validate request token (XSRF)
-    [AdminAntiForgery(true)]
+    [IgnoreAntiforgeryToken]
     public partial class JbimagesController : BaseAdminController
     {
         private readonly IPermissionService _permissionService;
+        private readonly MediaSettings _mediaSettings;
 
-        public JbimagesController(IPermissionService permissionService)
+        public JbimagesController(IPermissionService permissionService, MediaSettings mediaSettings)
         {
             this._permissionService = permissionService;
+            this._mediaSettings = mediaSettings;
         }
 
         [NonAction]
         protected virtual IList<string> GetAllowedFileTypes()
         {
-            return new List<string> {".gif", ".jpg", ".jpeg", ".png", ".bmp"};
+            if (string.IsNullOrEmpty(_mediaSettings.AllowedFileTypes))
+                return new List<string> { ".gif", ".jpg", ".jpeg", ".png", ".bmp", ".webp" };
+            else
+                return _mediaSettings.AllowedFileTypes.Split(',');
         }
 
         [HttpPost]
-        public virtual IActionResult Upload()
+        public virtual async Task<IActionResult> Upload()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.HtmlEditorManagePictures))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.HtmlEditorManagePictures))
             {
                 ViewData["resultCode"] = "failed";
                 ViewData["result"] = "No access to this functionality";
                 return View();
             }
-
-            if (Request.Form.Files.Count == 0)
+            var form = await HttpContext.Request.ReadFormAsync();
+            if (form.Files.Count == 0)
                 throw new Exception("No file uploaded");
 
-            var uploadFile = Request.Form.Files.FirstOrDefault();
+            var uploadFile = form.Files.FirstOrDefault();
             if (uploadFile == null)
             {
                 ViewData["resultCode"] = "failed";

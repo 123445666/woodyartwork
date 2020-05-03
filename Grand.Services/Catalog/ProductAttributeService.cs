@@ -3,11 +3,13 @@ using Grand.Core.Caching;
 using Grand.Core.Data;
 using Grand.Core.Domain.Catalog;
 using Grand.Services.Events;
+using MediatR;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Catalog
 {
@@ -33,41 +35,6 @@ namespace Grand.Services.Catalog
         /// {0} : product attribute ID
         /// </remarks>
         private const string PRODUCTATTRIBUTES_BY_ID_KEY = "Grand.productattribute.id-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : product ID
-        /// </remarks>
-        private const string PRODUCTATTRIBUTEMAPPINGS_ALL_KEY = "Grand.productattributemapping.all-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : product attribute mapping ID
-        /// </remarks>
-        private const string PRODUCTATTRIBUTEMAPPINGS_BY_ID_KEY = "Grand.productattributemapping.id-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : product attribute mapping ID
-        /// </remarks>
-        private const string PRODUCTATTRIBUTEVALUES_ALL_KEY = "Grand.productattributevalue.all-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : product attribute value ID
-        /// </remarks>
-        private const string PRODUCTATTRIBUTEVALUES_BY_ID_KEY = "Grand.productattributevalue.id-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : product ID
-        /// </remarks>
-        private const string PRODUCTATTRIBUTECOMBINATIONS_ALL_KEY = "Grand.productattributecombination.all-{0}";
         /// <summary>
         /// Key pattern to clear cache
         /// </summary>
@@ -104,7 +71,7 @@ namespace Grand.Services.Catalog
 
         private readonly IRepository<ProductAttribute> _productAttributeRepository;
         private readonly IRepository<Product> _productRepository;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
         private readonly ICacheManager _cacheManager;
 
 
@@ -118,16 +85,16 @@ namespace Grand.Services.Catalog
         /// <param name="cacheManager">Cache manager</param>
         /// <param name="productAttributeRepository">Product attribute repository</param>
         /// <param name="productAttributeCombinationRepository">Product attribute combination repository</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="mediator">Mediator</param>
         public ProductAttributeService(ICacheManager cacheManager,
-            IRepository<ProductAttribute> productAttributeRepository,            
+            IRepository<ProductAttribute> productAttributeRepository,
             IRepository<Product> productRepository,
-            IEventPublisher eventPublisher)
+            IMediator mediator)
         {
-            this._cacheManager = cacheManager;
-            this._productAttributeRepository = productAttributeRepository;
-            this._productRepository = productRepository;
-            this._eventPublisher = eventPublisher;
+            _cacheManager = cacheManager;
+            _productAttributeRepository = productAttributeRepository;
+            _productRepository = productRepository;
+            _mediator = mediator;
         }
 
         #endregion
@@ -140,27 +107,25 @@ namespace Grand.Services.Catalog
         /// Deletes a product attribute
         /// </summary>
         /// <param name="productAttribute">Product attribute</param>
-        public virtual void DeleteProductAttribute(ProductAttribute productAttribute)
+        public virtual async Task DeleteProductAttribute(ProductAttribute productAttribute)
         {
             if (productAttribute == null)
                 throw new ArgumentNullException("productAttribute");
 
             var builder = Builders<Product>.Update;
             var updatefilter = builder.PullFilter(x => x.ProductAttributeMappings, y => y.ProductAttributeId == productAttribute.Id);
-            var result = _productRepository.Collection.UpdateManyAsync(new BsonDocument(), updatefilter).Result;
-
-            _productAttributeRepository.Delete(productAttribute);
+            await _productRepository.Collection.UpdateManyAsync(new BsonDocument(), updatefilter);
+            await _productAttributeRepository.DeleteAsync(productAttribute);
 
             //cache
-
-            _cacheManager.RemoveByPattern(PRODUCTS_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTES_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTEMAPPINGS_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTEVALUES_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTECOMBINATIONS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTEMAPPINGS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTEVALUES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTECOMBINATIONS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityDeleted(productAttribute);
+            await _mediator.EntityDeleted(productAttribute);
         }
 
         /// <summary>
@@ -169,16 +134,15 @@ namespace Grand.Services.Catalog
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Product attributes</returns>
-        public virtual IPagedList<ProductAttribute> GetAllProductAttributes(int pageIndex = 0, int pageSize = int.MaxValue)
+        public virtual async Task<IPagedList<ProductAttribute>> GetAllProductAttributes(int pageIndex = 0, int pageSize = int.MaxValue)
         {
             string key = string.Format(PRODUCTATTRIBUTES_ALL_KEY, pageIndex, pageSize);
-            return _cacheManager.Get(key, () =>
+            return await _cacheManager.GetAsync(key, () =>
             {
                 var query = from pa in _productAttributeRepository.Table
                             orderby pa.Name
                             select pa;
-                var productAttributes = new PagedList<ProductAttribute>(query, pageIndex, pageSize);
-                return productAttributes;
+                return Task.FromResult(new PagedList<ProductAttribute>(query, pageIndex, pageSize));
             });
         }
 
@@ -187,52 +151,52 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="productAttributeId">Product attribute identifier</param>
         /// <returns>Product attribute </returns>
-        public virtual ProductAttribute GetProductAttributeById(string productAttributeId)
+        public virtual Task<ProductAttribute> GetProductAttributeById(string productAttributeId)
         {
             string key = string.Format(PRODUCTATTRIBUTES_BY_ID_KEY, productAttributeId);
-            return _cacheManager.Get(key, () => _productAttributeRepository.GetById(productAttributeId));
+            return _cacheManager.GetAsync(key, () => _productAttributeRepository.GetByIdAsync(productAttributeId));
         }
 
         /// <summary>
         /// Inserts a product attribute
         /// </summary>
         /// <param name="productAttribute">Product attribute</param>
-        public virtual void InsertProductAttribute(ProductAttribute productAttribute)
+        public virtual async Task InsertProductAttribute(ProductAttribute productAttribute)
         {
             if (productAttribute == null)
                 throw new ArgumentNullException("productAttribute");
 
-            _productAttributeRepository.Insert(productAttribute);
+            await _productAttributeRepository.InsertAsync(productAttribute);
 
             //cache
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTES_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTEMAPPINGS_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTEVALUES_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTECOMBINATIONS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTEMAPPINGS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTEVALUES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTECOMBINATIONS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityInserted(productAttribute);
+            await _mediator.EntityInserted(productAttribute);
         }
 
         /// <summary>
         /// Updates the product attribute
         /// </summary>
         /// <param name="productAttribute">Product attribute</param>
-        public virtual void UpdateProductAttribute(ProductAttribute productAttribute)
+        public virtual async Task UpdateProductAttribute(ProductAttribute productAttribute)
         {
             if (productAttribute == null)
                 throw new ArgumentNullException("productAttribute");
 
-            _productAttributeRepository.Update(productAttribute);
+            await _productAttributeRepository.UpdateAsync(productAttribute);
 
             //cache
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTES_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTEMAPPINGS_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTEVALUES_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(PRODUCTATTRIBUTECOMBINATIONS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTEMAPPINGS_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTEVALUES_PATTERN_KEY);
+            await _cacheManager.RemoveByPrefix(PRODUCTATTRIBUTECOMBINATIONS_PATTERN_KEY);
 
             //event notification
-            _eventPublisher.EntityUpdated(productAttribute);
+            await _mediator.EntityUpdated(productAttribute);
         }
 
         #endregion
@@ -243,58 +207,60 @@ namespace Grand.Services.Catalog
         /// Deletes a product attribute mapping
         /// </summary>
         /// <param name="productAttributeMapping">Product attribute mapping</param>
-        public virtual void DeleteProductAttributeMapping(ProductAttributeMapping productAttributeMapping)
+        public virtual async Task DeleteProductAttributeMapping(ProductAttributeMapping productAttributeMapping)
         {
             if (productAttributeMapping == null)
                 throw new ArgumentNullException("productAttributeMapping");
 
             var updatebuilder = Builders<Product>.Update;
-            var update = updatebuilder.PullFilter(p => p.ProductAttributeMappings, y=>y.Id == productAttributeMapping.Id);
-            _productRepository.Collection.UpdateManyAsync(new BsonDocument("_id", productAttributeMapping.ProductId), update);
+            var update = updatebuilder.PullFilter(p => p.ProductAttributeMappings, y => y.Id == productAttributeMapping.Id);
+            await _productRepository.Collection.UpdateManyAsync(new BsonDocument("_id", productAttributeMapping.ProductId), update);
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, productAttributeMapping.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productAttributeMapping.ProductId));
 
             //event notification
-            _eventPublisher.EntityDeleted(productAttributeMapping);
+            await _mediator.EntityDeleted(productAttributeMapping);
         }
 
         /// <summary>
         /// Inserts a product attribute mapping
         /// </summary>
         /// <param name="productAttributeMapping">The product attribute mapping</param>
-        public virtual void InsertProductAttributeMapping(ProductAttributeMapping productAttributeMapping)
+        public virtual async Task InsertProductAttributeMapping(ProductAttributeMapping productAttributeMapping)
         {
             if (productAttributeMapping == null)
                 throw new ArgumentNullException("productAttributeMapping");
 
             var updatebuilder = Builders<Product>.Update;
             var update = updatebuilder.AddToSet(p => p.ProductAttributeMappings, productAttributeMapping);
-            _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", productAttributeMapping.ProductId), update);
+            await _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", productAttributeMapping.ProductId), update);
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, productAttributeMapping.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productAttributeMapping.ProductId));
 
             //event notification
-            _eventPublisher.EntityInserted(productAttributeMapping);
+            await _mediator.EntityInserted(productAttributeMapping);
         }
 
         /// <summary>
         /// Updates the product attribute mapping
         /// </summary>
         /// <param name="productAttributeMapping">The product attribute mapping</param>
-        public virtual void UpdateProductAttributeMapping(ProductAttributeMapping productAttributeMapping)
+        /// <param name="values">Update values</param>
+        public virtual async Task UpdateProductAttributeMapping(ProductAttributeMapping productAttributeMapping, bool values = false)
         {
             if (productAttributeMapping == null)
                 throw new ArgumentNullException("productAttributeMapping");
 
             var builder = Builders<Product>.Filter;
             var filter = builder.Eq(x => x.Id, productAttributeMapping.ProductId);
-            filter = filter & builder.ElemMatch(x => x.ProductAttributeMappings, y => y.Id == productAttributeMapping.Id);
+            filter &= builder.ElemMatch(x => x.ProductAttributeMappings, y => y.Id == productAttributeMapping.Id);
             var update = Builders<Product>.Update
                 .Set(x => x.ProductAttributeMappings.ElementAt(-1).ProductAttributeId, productAttributeMapping.ProductAttributeId)
                 .Set(x => x.ProductAttributeMappings.ElementAt(-1).TextPrompt, productAttributeMapping.TextPrompt)
                 .Set(x => x.ProductAttributeMappings.ElementAt(-1).IsRequired, productAttributeMapping.IsRequired)
+                .Set(x => x.ProductAttributeMappings.ElementAt(-1).ShowOnCatalogPage, productAttributeMapping.ShowOnCatalogPage)
                 .Set(x => x.ProductAttributeMappings.ElementAt(-1).AttributeControlTypeId, productAttributeMapping.AttributeControlTypeId)
                 .Set(x => x.ProductAttributeMappings.ElementAt(-1).DisplayOrder, productAttributeMapping.DisplayOrder)
                 .Set(x => x.ProductAttributeMappings.ElementAt(-1).ValidationMinLength, productAttributeMapping.ValidationMinLength)
@@ -304,13 +270,18 @@ namespace Grand.Services.Catalog
                 .Set(x => x.ProductAttributeMappings.ElementAt(-1).DefaultValue, productAttributeMapping.DefaultValue)
                 .Set(x => x.ProductAttributeMappings.ElementAt(-1).ConditionAttributeXml, productAttributeMapping.ConditionAttributeXml);
 
-            var result = _productRepository.Collection.UpdateManyAsync(filter, update).Result;
+            if (values)
+            {
+                update = update.Set(x => x.ProductAttributeMappings.ElementAt(-1).ProductAttributeValues, productAttributeMapping.ProductAttributeValues);
+            }
+
+            await _productRepository.Collection.UpdateManyAsync(filter, update);
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, productAttributeMapping.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productAttributeMapping.ProductId));
 
             //event notification
-            _eventPublisher.EntityUpdated(productAttributeMapping);
+            await _mediator.EntityUpdated(productAttributeMapping);
         }
 
         #endregion
@@ -321,15 +292,15 @@ namespace Grand.Services.Catalog
         /// Deletes a product attribute value
         /// </summary>
         /// <param name="productAttributeValue">Product attribute value</param>
-        public virtual void DeleteProductAttributeValue(ProductAttributeValue productAttributeValue)
+        public virtual async Task DeleteProductAttributeValue(ProductAttributeValue productAttributeValue)
         {
             if (productAttributeValue == null)
                 throw new ArgumentNullException("productAttributeValue");
 
-           var filter = Builders<Product>.Filter.And(Builders<Product>.Filter.Eq(x => x.Id, productAttributeValue.ProductId),
-           Builders<Product>.Filter.ElemMatch(x => x.ProductAttributeMappings, x => x.Id == productAttributeValue.ProductAttributeMappingId));
+            var filter = Builders<Product>.Filter.And(Builders<Product>.Filter.Eq(x => x.Id, productAttributeValue.ProductId),
+            Builders<Product>.Filter.ElemMatch(x => x.ProductAttributeMappings, x => x.Id == productAttributeValue.ProductAttributeMappingId));
 
-            var p = _productRepository.GetById(productAttributeValue.ProductId);
+            var p = await _productRepository.GetByIdAsync(productAttributeValue.ProductId);
             if (p != null)
             {
                 var pavs = p.ProductAttributeMappings.Where(x => x.Id == productAttributeValue.ProductAttributeMappingId).FirstOrDefault();
@@ -340,17 +311,16 @@ namespace Grand.Services.Catalog
                     {
                         pavs.ProductAttributeValues.Remove(pav);
                         var update = Builders<Product>.Update.Set("ProductAttributeMappings.$", pavs);
-                        var result = _productRepository.Collection.UpdateOneAsync(filter, update).Result;
-
+                        await _productRepository.Collection.UpdateOneAsync(filter, update);
                     }
                 }
             }
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, productAttributeValue.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productAttributeValue.ProductId));
 
             //event notification
-            _eventPublisher.EntityDeleted(productAttributeValue);
+            await _mediator.EntityDeleted(productAttributeValue);
         }
 
 
@@ -358,7 +328,7 @@ namespace Grand.Services.Catalog
         /// Inserts a product attribute value
         /// </summary>
         /// <param name="productAttributeValue">The product attribute value</param>
-        public virtual void InsertProductAttributeValue(ProductAttributeValue productAttributeValue)
+        public virtual async Task InsertProductAttributeValue(ProductAttributeValue productAttributeValue)
         {
             if (productAttributeValue == null)
                 throw new ArgumentNullException("productAttributeValue");
@@ -370,20 +340,20 @@ namespace Grand.Services.Catalog
             var filter = builder.Eq(x => x.Id, productAttributeValue.ProductId);
             filter = filter & builder.Where(x => x.ProductAttributeMappings.Any(y => y.Id == productAttributeValue.ProductAttributeMappingId));
 
-            var result = _productRepository.Collection.UpdateOneAsync(filter, update).Result;
+            await _productRepository.Collection.UpdateOneAsync(filter, update);
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, productAttributeValue.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productAttributeValue.ProductId));
 
             //event notification
-            _eventPublisher.EntityInserted(productAttributeValue);
+            await _mediator.EntityInserted(productAttributeValue);
         }
 
         /// <summary>
         /// Updates the product attribute value
         /// </summary>
         /// <param name="productAttributeValue">The product attribute value</param>
-        public virtual void UpdateProductAttributeValue(ProductAttributeValue productAttributeValue)
+        public virtual async Task UpdateProductAttributeValue(ProductAttributeValue productAttributeValue)
         {
             if (productAttributeValue == null)
                 throw new ArgumentNullException("productAttributeValue");
@@ -392,14 +362,14 @@ namespace Grand.Services.Catalog
             var filter = Builders<Product>.Filter.And(Builders<Product>.Filter.Eq(x => x.Id, productAttributeValue.ProductId),
             Builders<Product>.Filter.ElemMatch(x => x.ProductAttributeMappings, x => x.Id == productAttributeValue.ProductAttributeMappingId));
 
-            var p = _productRepository.GetById(productAttributeValue.ProductId);
-            if (p!= null)
+            var p = await _productRepository.GetByIdAsync(productAttributeValue.ProductId);
+            if (p != null)
             {
                 var pavs = p.ProductAttributeMappings.Where(x => x.Id == productAttributeValue.ProductAttributeMappingId).FirstOrDefault();
-                if(pavs!=null)
+                if (pavs != null)
                 {
                     var pav = pavs.ProductAttributeValues.Where(x => x.Id == productAttributeValue.Id).FirstOrDefault();
-                    if(pav!=null)
+                    if (pav != null)
                     {
                         pav.AttributeValueTypeId = productAttributeValue.AttributeValueTypeId;
                         pav.AssociatedProductId = productAttributeValue.AssociatedProductId;
@@ -418,17 +388,16 @@ namespace Grand.Services.Catalog
                         pav.Locales = productAttributeValue.Locales;
 
                         var update = Builders<Product>.Update.Set("ProductAttributeMappings.$", pavs);
-                        var result = _productRepository.Collection.UpdateOneAsync(filter, update).Result;
-
+                        await _productRepository.Collection.UpdateOneAsync(filter, update);
                     }
                 }
             }
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, productAttributeValue.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, productAttributeValue.ProductId));
 
             //event notification
-            _eventPublisher.EntityUpdated(productAttributeValue);
+            await _mediator.EntityUpdated(productAttributeValue);
         }
 
         #endregion
@@ -440,17 +409,18 @@ namespace Grand.Services.Catalog
         /// </summary>
         /// <param name="productAttributeId">The product attribute identifier</param>
         /// <returns>Product attribute mapping collection</returns>
-        public virtual IList<PredefinedProductAttributeValue> GetPredefinedProductAttributeValues(string productAttributeId)
+        public virtual async Task<IList<PredefinedProductAttributeValue>> GetPredefinedProductAttributeValues(string productAttributeId)
         {
-            var query = from ppa in _productAttributeRepository.Table
-                        where ppa.Id == productAttributeId
-                        from ppav in ppa.PredefinedProductAttributeValues
-                        select ppav;
-            var values = query.OrderBy(x=> x.DisplayOrder).ToList();
-            return values;
+            var builder = Builders<ProductAttribute>.Filter;
+            var filter = FilterDefinition<ProductAttribute>.Empty;
+            filter = filter & builder.Where(x => x.Id == productAttributeId);
+            var pa = await _productAttributeRepository.Collection
+                .Find(filter).FirstOrDefaultAsync();
+
+            return pa.PredefinedProductAttributeValues.OrderBy(x => x.DisplayOrder).ToList();
         }
 
-        
+
         #endregion
 
         #region Product attribute combinations
@@ -459,47 +429,47 @@ namespace Grand.Services.Catalog
         /// Deletes a product attribute combination
         /// </summary>
         /// <param name="combination">Product attribute combination</param>
-        public virtual void DeleteProductAttributeCombination(ProductAttributeCombination combination)
+        public virtual async Task DeleteProductAttributeCombination(ProductAttributeCombination combination)
         {
             if (combination == null)
                 throw new ArgumentNullException("combination");
 
             var updatebuilder = Builders<Product>.Update;
             var update = updatebuilder.Pull(p => p.ProductAttributeCombinations, combination);
-            _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", combination.ProductId), update);
+            await _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", combination.ProductId), update);
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, combination.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, combination.ProductId));
 
             //event notification
-            _eventPublisher.EntityDeleted(combination);
+            await _mediator.EntityDeleted(combination);
         }
 
         /// <summary>
         /// Inserts a product attribute combination
         /// </summary>
         /// <param name="combination">Product attribute combination</param>
-        public virtual void InsertProductAttributeCombination(ProductAttributeCombination combination)
+        public virtual async Task InsertProductAttributeCombination(ProductAttributeCombination combination)
         {
             if (combination == null)
                 throw new ArgumentNullException("combination");
 
             var updatebuilder = Builders<Product>.Update;
             var update = updatebuilder.AddToSet(p => p.ProductAttributeCombinations, combination);
-            _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", combination.ProductId), update);
+            await _productRepository.Collection.UpdateOneAsync(new BsonDocument("_id", combination.ProductId), update);
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, combination.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, combination.ProductId));
 
             //event notification
-            _eventPublisher.EntityInserted(combination);
+            await _mediator.EntityInserted(combination);
         }
 
         /// <summary>
         /// Updates a product attribute combination
         /// </summary>
         /// <param name="combination">Product attribute combination</param>
-        public virtual void UpdateProductAttributeCombination(ProductAttributeCombination combination)
+        public virtual async Task UpdateProductAttributeCombination(ProductAttributeCombination combination)
         {
             if (combination == null)
                 throw new ArgumentNullException("combination");
@@ -520,13 +490,13 @@ namespace Grand.Services.Catalog
                 .Set("ProductAttributeCombinations.$.PictureId", combination.PictureId)
                 .Set("ProductAttributeCombinations.$.TierPrices", combination.TierPrices);
 
-            var result = _productRepository.Collection.UpdateManyAsync(filter, update).Result;
+            await _productRepository.Collection.UpdateManyAsync(filter, update);
 
             //cache
-            _cacheManager.RemoveByPattern(string.Format(PRODUCTS_BY_ID_KEY, combination.ProductId));
+            await _cacheManager.RemoveAsync(string.Format(PRODUCTS_BY_ID_KEY, combination.ProductId));
 
             //event notification
-            _eventPublisher.EntityUpdated(combination);
+            await _mediator.EntityUpdated(combination);
         }
 
         #endregion

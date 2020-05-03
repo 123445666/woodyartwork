@@ -1,20 +1,22 @@
 ﻿using FluentValidation.Attributes;
 using Grand.Framework.Localization;
+using Grand.Framework.Mapping;
 using Grand.Framework.Mvc.ModelBinding;
 using Grand.Framework.Mvc.Models;
-using Grand.Web.Areas.Admin.Models.Stores;
 using Grand.Web.Areas.Admin.Validators.Directory;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace Grand.Web.Areas.Admin.Models.Directory
 {
     [Validator(typeof(CurrencyValidator))]
-    public partial class CurrencyModel : BaseGrandEntityModel, ILocalizedModel<CurrencyLocalizedModel>
+    public partial class CurrencyModel : BaseGrandEntityModel, ILocalizedModel<CurrencyLocalizedModel>, IStoreMappingModel
     {
         public CurrencyModel()
         {
             Locales = new List<CurrencyLocalizedModel>();
+            AvailableStores = new List<StoreModel>();
         }
         [GrandResourceDisplayName("Admin.Configuration.Currencies.Fields.Name")]
         
@@ -28,6 +30,7 @@ namespace Grand.Web.Areas.Admin.Models.Directory
         
         public string DisplayLocale { get; set; }
 
+        [UIHint("DecimalN4")]
         [GrandResourceDisplayName("Admin.Configuration.Currencies.Fields.Rate")]
         public decimal Rate { get; set; }
 

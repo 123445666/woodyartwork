@@ -1,11 +1,12 @@
 ﻿using Grand.Core;
 using Grand.Core.Domain.Directory;
-using Grand.Core.Domain.Localization;
 using Grand.Core.Domain.Shipping;
 using Grand.Core.Plugins;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Mvc.Models;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Common;
 using Grand.Services.Configuration;
 using Grand.Services.Customers;
@@ -23,9 +24,11 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.ShippingSettings)]
     public partial class ShippingController : BaseAdminController
     {
         #region Fields
@@ -37,13 +40,11 @@ namespace Grand.Web.Areas.Admin.Controllers
         private readonly ICountryService _countryService;
         private readonly IStateProvinceService _stateProvinceService;
         private readonly ILocalizationService _localizationService;
-        private readonly IPermissionService _permissionService;
         private readonly ILanguageService _languageService;
         private readonly IPluginFinder _pluginFinder;
         private readonly IWebHelper _webHelper;
         private readonly IStoreService _storeService;
         private readonly ICustomerService _customerService;
-
 
         #endregion
 
@@ -56,7 +57,6 @@ namespace Grand.Web.Areas.Admin.Controllers
             ICountryService countryService,
             IStateProvinceService stateProvinceService,
             ILocalizationService localizationService,
-            IPermissionService permissionService,
             ILanguageService languageService,
             IPluginFinder pluginFinder,
             IWebHelper webHelper,
@@ -70,76 +70,87 @@ namespace Grand.Web.Areas.Admin.Controllers
             this._countryService = countryService;
             this._stateProvinceService = stateProvinceService;
             this._localizationService = localizationService;
-            this._permissionService = permissionService;
             this._languageService = languageService;
             this._pluginFinder = pluginFinder;
             this._webHelper = webHelper;
             this._storeService = storeService;
             this._customerService = customerService;
-
         }
 
         #endregion
 
         #region Utilities
 
-        [NonAction]
-        protected virtual List<LocalizedProperty> UpdateLocales(ShippingMethod shippingMethod, ShippingMethodModel model)
+        protected virtual async Task PrepareAddressWarehouseModel(WarehouseModel model)
         {
-            List<LocalizedProperty> localized = new List<LocalizedProperty>();
-            foreach (var local in model.Locales)
+            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
+            foreach (var c in await _countryService.GetAllCountries(showHidden: true))
+                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (c.Id == model.Address.CountryId) });
+            //states
+            var states = !String.IsNullOrEmpty(model.Address.CountryId) ? await _stateProvinceService.GetStateProvincesByCountryId(model.Address.CountryId, showHidden: true) : new List<StateProvince>();
+            if (states.Count > 0)
             {
-                localized.Add(new LocalizedProperty()
-                {
-                    LanguageId = local.LanguageId,
-                    LocaleKey = "Name",
-                    LocaleValue = local.Name
-                });
-                localized.Add(new LocalizedProperty()
-                {
-                    LanguageId = local.LanguageId,
-                    LocaleKey = "Description",
-                    LocaleValue = local.Description
-                });
-
+                foreach (var s in states)
+                    model.Address.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == model.Address.StateProvinceId) });
             }
-            return localized;
+            else
+                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
+
+            model.Address.CountryEnabled = true;
+            model.Address.StateProvinceEnabled = true;
+            model.Address.CityEnabled = true;
+            model.Address.StreetAddressEnabled = true;
+            model.Address.ZipPostalCodeEnabled = true;
+            model.Address.ZipPostalCodeRequired = true;
+            model.Address.PhoneEnabled = true;
+            model.Address.FaxEnabled = true;
+            model.Address.CompanyEnabled = true;
         }
 
-        [NonAction]
-        protected virtual List<LocalizedProperty> UpdateLocales(DeliveryDate deliveryDate, DeliveryDateModel model)
+        protected virtual async Task PreparePickupPointModel(PickupPointModel model)
         {
-            List<LocalizedProperty> localized = new List<LocalizedProperty>();
-            foreach (var local in model.Locales)
+            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
+            foreach (var c in await _countryService.GetAllCountries(showHidden: true))
+                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (c.Id == model.Address.CountryId) });
+            //states
+            var states = !String.IsNullOrEmpty(model.Address.CountryId) ? await _stateProvinceService.GetStateProvincesByCountryId(model.Address.CountryId, showHidden: true) : new List<StateProvince>();
+            if (states.Count > 0)
             {
-                localized.Add(new LocalizedProperty()
-                {
-                    LanguageId = local.LanguageId,
-                    LocaleKey = "Name",
-                    LocaleValue = local.Name
-                });
+                foreach (var s in states)
+                    model.Address.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == model.Address.StateProvinceId) });
             }
-            return localized;
+            else
+                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
+
+            model.Address.CountryEnabled = true;
+            model.Address.StateProvinceEnabled = true;
+            model.Address.CityEnabled = true;
+            model.Address.StreetAddressEnabled = true;
+            model.Address.ZipPostalCodeEnabled = true;
+            model.Address.ZipPostalCodeRequired = true;
+            model.Address.PhoneEnabled = true;
+            model.Address.FaxEnabled = true;
+            model.Address.CompanyEnabled = true;
+
+            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectStore"), Value = "" });
+            foreach (var c in await _storeService.GetAllStores())
+                model.AvailableStores.Add(new SelectListItem { Text = c.Shortcut, Value = c.Id.ToString() });
+
+            model.AvailableWarehouses.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectWarehouse"), Value = "" });
+            foreach (var c in await _shippingService.GetAllWarehouses())
+                model.AvailableWarehouses.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
+
         }
 
         #endregion
 
         #region Shipping rate computation methods
 
-        public IActionResult Providers()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult Providers() => View();
 
         [HttpPost]
         public IActionResult Providers(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             var shippingProvidersModel = new List<ShippingRateComputationMethodModel>();
             var shippingProviders = _shippingService.LoadAllShippingRateComputationMethods();
             foreach (var shippingProvider in shippingProviders)
@@ -161,11 +172,8 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ProviderUpdate(ShippingRateComputationMethodModel model)
+        public async Task<IActionResult> ProviderUpdate(ShippingRateComputationMethodModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             var srcm = _shippingService.LoadShippingRateComputationMethodBySystemName(model.SystemName);
             if (srcm.IsShippingRateComputationMethodActive(_shippingSettings))
             {
@@ -173,7 +181,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                 {
                     //mark as disabled
                     _shippingSettings.ActiveShippingRateComputationMethodSystemNames.Remove(srcm.PluginDescriptor.SystemName);
-                    _settingService.SaveSetting(_shippingSettings);
+                    await _settingService.SaveSetting(_shippingSettings);
                 }
             }
             else
@@ -182,7 +190,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                 {
                     //mark as active
                     _shippingSettings.ActiveShippingRateComputationMethodSystemNames.Add(srcm.PluginDescriptor.SystemName);
-                    _settingService.SaveSetting(_shippingSettings);
+                    await _settingService.SaveSetting(_shippingSettings);
                 }
             }
             var pluginDescriptor = srcm.PluginDescriptor;
@@ -197,9 +205,6 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         public IActionResult ConfigureProvider(string systemName)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             var srcm = _shippingService.LoadShippingRateComputationMethodBySystemName(systemName);
             if (srcm == null)
                 //No shipping rate computation method found with the specified id
@@ -217,21 +222,12 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Shipping methods
 
-        public IActionResult Methods()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult Methods() => View();
 
         [HttpPost]
-        public IActionResult Methods(DataSourceRequest command)
+        public async Task<IActionResult> Methods(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var shippingMethodsModel = _shippingService.GetAllShippingMethods()
+            var shippingMethodsModel = (await _shippingService.GetAllShippingMethods())
                 .Select(x => x.ToModel())
                 .ToList();
             var gridModel = new DataSourceResult
@@ -244,28 +240,21 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
 
-        public IActionResult CreateMethod()
+        public async Task<IActionResult> CreateMethod()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             var model = new ShippingMethodModel();
             //locales
-            AddLocales(_languageService, model.Locales);
+            await AddLocales(_languageService, model.Locales);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult CreateMethod(ShippingMethodModel model, bool continueEditing)
+        public async Task<IActionResult> CreateMethod(ShippingMethodModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
                 var sm = model.ToEntity();
-                sm.Locales = UpdateLocales(sm, model);
-                _shippingService.InsertShippingMethod(sm);
+                await _shippingService.InsertShippingMethod(sm);
 
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.Methods.Added"));
                 return continueEditing ? RedirectToAction("EditMethod", new { id = sm.Id }) : RedirectToAction("Methods");
@@ -275,19 +264,16 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
-        public IActionResult EditMethod(string id)
+        public async Task<IActionResult> EditMethod(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var sm = _shippingService.GetShippingMethodById(id);
+            var sm = await _shippingService.GetShippingMethodById(id);
             if (sm == null)
                 //No shipping method found with the specified id
                 return RedirectToAction("Methods");
 
             var model = sm.ToModel();
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
                 locale.Name = sm.GetLocalized(x => x.Name, languageId, false, false);
                 locale.Description = sm.GetLocalized(x => x.Description, languageId, false, false);
@@ -297,12 +283,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult EditMethod(ShippingMethodModel model, bool continueEditing)
+        public async Task<IActionResult> EditMethod(ShippingMethodModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var sm = _shippingService.GetShippingMethodById(model.Id);
+            var sm = await _shippingService.GetShippingMethodById(model.Id);
             if (sm == null)
                 //No shipping method found with the specified id
                 return RedirectToAction("Methods");
@@ -310,30 +293,24 @@ namespace Grand.Web.Areas.Admin.Controllers
             if (ModelState.IsValid)
             {
                 sm = model.ToEntity(sm);
-                sm.Locales = UpdateLocales(sm, model);
-                _shippingService.UpdateShippingMethod(sm);
+                await _shippingService.UpdateShippingMethod(sm);
 
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.Methods.Updated"));
                 return continueEditing ? RedirectToAction("EditMethod", new { id = sm.Id }) : RedirectToAction("Methods");
             }
-
-
             //If we got this far, something failed, redisplay form
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult DeleteMethod(string id)
+        public async Task<IActionResult> DeleteMethod(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var sm = _shippingService.GetShippingMethodById(id);
+            var sm = await _shippingService.GetShippingMethodById(id);
             if (sm == null)
                 //No shipping method found with the specified id
                 return RedirectToAction("Methods");
 
-            _shippingService.DeleteShippingMethod(sm);
+            await _shippingService.DeleteShippingMethod(sm);
 
             SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.Methods.Deleted"));
             return RedirectToAction("Methods");
@@ -343,21 +320,12 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Delivery dates
 
-        public IActionResult DeliveryDates()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult DeliveryDates() => View();
 
         [HttpPost]
-        public IActionResult DeliveryDates(DataSourceRequest command)
+        public async Task<IActionResult> DeliveryDates(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var deliveryDatesModel = _shippingService.GetAllDeliveryDates()
+            var deliveryDatesModel = (await _shippingService.GetAllDeliveryDates())
                 .Select(x => x.ToModel())
                 .ToList();
             var gridModel = new DataSourceResult
@@ -369,46 +337,24 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
-
-        public IActionResult CreateDeliveryDate()
+        public async Task<IActionResult> CreateDeliveryDate()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var model = new DeliveryDateModel();
-            model.ColorSquaresRgb = "#000000";
+            var model = new DeliveryDateModel
+            {
+                ColorSquaresRgb = "#000000"
+            };
             //locales
-            AddLocales(_languageService, model.Locales);
+            await AddLocales(_languageService, model.Locales);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult CreateDeliveryDate(DeliveryDateModel model, bool continueEditing)
+        public async Task<IActionResult> CreateDeliveryDate(DeliveryDateModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
                 var deliveryDate = model.ToEntity();
-                deliveryDate.Locales = UpdateLocales(deliveryDate, model);
-
-                //ensure valid color is chosen/entered
-                //TO DO
-                //if (!String.IsNullOrEmpty(model.ColorSquaresRgb))
-                //{
-                //    try
-                //    {
-                //        //ensure color is valid (can be instanciated)
-                //        System.Drawing.ColorTranslator.FromHtml(model.ColorSquaresRgb);
-                //    }
-                //    catch (Exception exc)
-                //    {
-                //        ModelState.AddModelError("", exc.Message);
-                //    }
-                //}
-                _shippingService.InsertDeliveryDate(deliveryDate);
-
+                await _shippingService.InsertDeliveryDate(deliveryDate);
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.DeliveryDates.Added"));
                 return continueEditing ? RedirectToAction("EditDeliveryDate", new { id = deliveryDate.Id }) : RedirectToAction("DeliveryDates");
             }
@@ -417,12 +363,9 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
-        public IActionResult EditDeliveryDate(string id)
+        public async Task<IActionResult> EditDeliveryDate(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var deliveryDate = _shippingService.GetDeliveryDateById(id);
+            var deliveryDate = await _shippingService.GetDeliveryDateById(id);
             if (deliveryDate == null)
                 //No delivery date found with the specified id
                 return RedirectToAction("DeliveryDates");
@@ -435,7 +378,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             }
 
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
                 locale.Name = deliveryDate.GetLocalized(x => x.Name, languageId, false, false);
             });
@@ -444,12 +387,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult EditDeliveryDate(DeliveryDateModel model, bool continueEditing)
+        public async Task<IActionResult> EditDeliveryDate(DeliveryDateModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var deliveryDate = _shippingService.GetDeliveryDateById(model.Id);
+            var deliveryDate = await _shippingService.GetDeliveryDateById(model.Id);
             if (deliveryDate == null)
                 //No delivery date found with the specified id
                 return RedirectToAction("DeliveryDates");
@@ -457,8 +397,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             if (ModelState.IsValid)
             {
                 deliveryDate = model.ToEntity(deliveryDate);
-                deliveryDate.Locales = UpdateLocales(deliveryDate, model);
-                _shippingService.UpdateDeliveryDate(deliveryDate);
+                await _shippingService.UpdateDeliveryDate(deliveryDate);
                 //locales
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.DeliveryDates.Updated"));
                 return continueEditing ? RedirectToAction("EditDeliveryDate", new { id = deliveryDate.Id }) : RedirectToAction("DeliveryDates");
@@ -470,51 +409,34 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult DeleteDeliveryDate(string id)
+        public async Task<IActionResult> DeleteDeliveryDate(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var deliveryDate = _shippingService.GetDeliveryDateById(id);
+            var deliveryDate = await _shippingService.GetDeliveryDateById(id);
             if (deliveryDate == null)
                 //No delivery date found with the specified id
                 return RedirectToAction("DeliveryDates");
+            if (ModelState.IsValid)
+            {
+                await _shippingService.DeleteDeliveryDate(deliveryDate);
 
-            _shippingService.DeleteDeliveryDate(deliveryDate);
-
-            SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.DeliveryDates.Deleted"));
-            return RedirectToAction("DeliveryDates");
+                SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.DeliveryDates.Deleted"));
+                return RedirectToAction("DeliveryDates");
+            }
+            ErrorNotification(ModelState);
+            return RedirectToAction("EditDeliveryDate", new { id = id });
         }
 
         #endregion
 
         #region Warehouses
 
-        public IActionResult Warehouses()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult Warehouses() => View();
 
         [HttpPost]
-        public IActionResult Warehouses(DataSourceRequest command)
+        public async Task<IActionResult> Warehouses(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var warehousesModel = _shippingService.GetAllWarehouses()
-                .Select(x =>
-                            {
-                                var warehouseModel = new WarehouseModel
-                                {
-                                    Id = x.Id,
-                                    Name = x.Name
-                                    //ignore address for list view (performance optimization)
-                                };
-                                return warehouseModel;
-                            })
+            var warehousesModel = (await _shippingService.GetAllWarehouses())
+                .Select(x => x.ToModel())
                 .ToList();
             var gridModel = new DataSourceResult
             {
@@ -524,181 +446,92 @@ namespace Grand.Web.Areas.Admin.Controllers
 
             return Json(gridModel);
         }
-
-
-        public IActionResult CreateWarehouse()
+        public async Task<IActionResult> CreateWarehouse()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             var model = new WarehouseModel();
-            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
-            foreach (var c in _countryService.GetAllCountries(showHidden: true))
-                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-            model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
-            model.Address.CountryEnabled = true;
-            model.Address.StateProvinceEnabled = true;
-            model.Address.CityEnabled = true;
-            model.Address.StreetAddressEnabled = true;
-            model.Address.ZipPostalCodeEnabled = true;
-            model.Address.ZipPostalCodeRequired = true;
-            model.Address.PhoneEnabled = true;
+            await PrepareAddressWarehouseModel(model);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult CreateWarehouse(WarehouseModel model, bool continueEditing)
+        public async Task<IActionResult> CreateWarehouse(WarehouseModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
                 var address = model.Address.ToEntity();
                 address.CreatedOnUtc = DateTime.UtcNow;
-                _addressService.InsertAddressSettings(address);
-                var warehouse = new Warehouse
-                {
-                    Name = model.Name,
-                    AdminComment = model.AdminComment,
-                    AddressId = address.Id
-                };
-
-                _shippingService.InsertWarehouse(warehouse);
+                await _addressService.InsertAddressSettings(address);
+                var warehouse = model.ToEntity();
+                warehouse.AddressId = address.Id;
+                await _shippingService.InsertWarehouse(warehouse);
 
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.Warehouses.Added"));
                 return continueEditing ? RedirectToAction("EditWarehouse", new { id = warehouse.Id }) : RedirectToAction("Warehouses");
             }
 
             //If we got this far, something failed, redisplay form
-            //countries
-            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
-            foreach (var c in _countryService.GetAllCountries(showHidden: true))
-                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (c.Id == model.Address.CountryId) });
-            //states
-            var states = !String.IsNullOrEmpty(model.Address.CountryId) ? _stateProvinceService.GetStateProvincesByCountryId(model.Address.CountryId, showHidden: true).ToList() : new List<StateProvince>();
-            if (states.Count > 0)
-            {
-                foreach (var s in states)
-                    model.Address.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == model.Address.StateProvinceId) });
-            }
-            else
-                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
-
+            await PrepareAddressWarehouseModel(model);
             return View(model);
         }
 
-        public IActionResult EditWarehouse(string id)
+        public async Task<IActionResult> EditWarehouse(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var warehouse = _shippingService.GetWarehouseById(id);
+            var warehouse = await _shippingService.GetWarehouseById(id);
             if (warehouse == null)
                 //No warehouse found with the specified id
                 return RedirectToAction("Warehouses");
 
-            var address = _addressService.GetAddressByIdSettings(warehouse.AddressId);
-            var model = new WarehouseModel
-            {
-                Id = warehouse.Id,
-                Name = warehouse.Name,
-                AdminComment = warehouse.AdminComment
-            };
-
+            var address = await _addressService.GetAddressByIdSettings(warehouse.AddressId);
+            var model = warehouse.ToModel();
             if (address != null)
             {
-                model.Address = address.ToModel();
+                model.Address = await address.ToModel(_countryService, _stateProvinceService);
             }
-            //countries
-            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
-            foreach (var c in _countryService.GetAllCountries(showHidden: true))
-                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (address != null && c.Id == address.CountryId) });
-            //states
-            var states = address != null && !String.IsNullOrEmpty(address.CountryId) ? _stateProvinceService.GetStateProvincesByCountryId(address.CountryId, showHidden: true).ToList() : new List<StateProvince>();
-            if (states.Count > 0)
-            {
-                foreach (var s in states)
-                    model.Address.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == address.StateProvinceId) });
-            }
-            else
-                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
-            model.Address.CountryEnabled = true;
-            model.Address.StateProvinceEnabled = true;
-            model.Address.CityEnabled = true;
-            model.Address.StreetAddressEnabled = true;
-            model.Address.ZipPostalCodeEnabled = true;
-            model.Address.ZipPostalCodeRequired = true;
-            model.Address.PhoneEnabled = true;
+            await PrepareAddressWarehouseModel(model);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult EditWarehouse(WarehouseModel model, bool continueEditing)
+        public async Task<IActionResult> EditWarehouse(WarehouseModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var warehouse = _shippingService.GetWarehouseById(model.Id);
+            var warehouse = await _shippingService.GetWarehouseById(model.Id);
             if (warehouse == null)
                 //No warehouse found with the specified id
                 return RedirectToAction("Warehouses");
 
             if (ModelState.IsValid)
             {
-                var address = _addressService.GetAddressByIdSettings(warehouse.AddressId) ??
+                var address = await _addressService.GetAddressByIdSettings(warehouse.AddressId) ??
                     new Core.Domain.Common.Address
                     {
                         CreatedOnUtc = DateTime.UtcNow,
                     };
                 address = model.Address.ToEntity(address);
                 if (!String.IsNullOrEmpty(address.Id))
-                    _addressService.UpdateAddressSettings(address);
+                    await _addressService.UpdateAddressSettings(address);
                 else
-                    _addressService.InsertAddressSettings(address);
+                    await _addressService.InsertAddressSettings(address);
 
-
-                warehouse.Name = model.Name;
-                warehouse.AdminComment = model.AdminComment;
-                warehouse.AddressId = address.Id;
-
-                _shippingService.UpdateWarehouse(warehouse);
+                warehouse = model.ToEntity(warehouse);
+                await _shippingService.UpdateWarehouse(warehouse);
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.Warehouses.Updated"));
                 return continueEditing ? RedirectToAction("EditWarehouse", new { id = warehouse.Id }) : RedirectToAction("Warehouses");
             }
 
-
             //If we got this far, something failed, redisplay form
-
-            //countries
-            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
-            foreach (var c in _countryService.GetAllCountries(showHidden: true))
-                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (c.Id == model.Address.CountryId) });
-            //states
-            var states = !String.IsNullOrEmpty(model.Address.CountryId) ? _stateProvinceService.GetStateProvincesByCountryId(model.Address.CountryId, showHidden: true).ToList() : new List<StateProvince>();
-            if (states.Count > 0)
-            {
-                foreach (var s in states)
-                    model.Address.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == model.Address.StateProvinceId) });
-            }
-            else
-                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
-
+            await PrepareAddressWarehouseModel(model);
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult DeleteWarehouse(string id)
+        public async Task<IActionResult> DeleteWarehouse(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var warehouse = _shippingService.GetWarehouseById(id);
+            var warehouse = await _shippingService.GetWarehouseById(id);
             if (warehouse == null)
                 //No warehouse found with the specified id
                 return RedirectToAction("Warehouses");
 
-            _shippingService.DeleteWarehouse(warehouse);
+            await _shippingService.DeleteWarehouse(warehouse);
 
             SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.warehouses.Deleted"));
             return RedirectToAction("Warehouses");
@@ -708,31 +541,13 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region PickupPoints
 
-        public IActionResult PickupPoints()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult PickupPoints() => View();
 
         [HttpPost]
-        public IActionResult PickupPoints(DataSourceRequest command)
+        public async Task<IActionResult> PickupPoints(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var pickupPointsModel = _shippingService.GetAllPickupPoints()
-                .Select(x =>
-                {
-                    var pickupPointModel = new PickupPointModel
-                    {
-                        Id = x.Id,
-                        Name = x.Name,
-                        DisplayOrder = x.DisplayOrder
-                    };
-                    return pickupPointModel;
-                })
+            var pickupPointsModel = (await _shippingService.GetAllPickupPoints())
+                .Select(x => x.ToModel())
                 .ToList();
 
             var gridModel = new DataSourceResult
@@ -744,240 +559,97 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
-        public IActionResult CreatePickupPoint()
+        public async Task<IActionResult> CreatePickupPoint()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             var model = new PickupPointModel();
-            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
-            foreach (var c in _countryService.GetAllCountries(showHidden: true))
-                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-            model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
-            model.Address.CountryEnabled = true;
-            model.Address.StateProvinceEnabled = true;
-            model.Address.CityEnabled = true;
-            model.Address.StreetAddressEnabled = true;
-            model.Address.ZipPostalCodeEnabled = true;
-            model.Address.ZipPostalCodeRequired = true;
-            model.Address.PhoneEnabled = true;
-
-            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectStore"), Value = "" });
-            foreach (var c in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-
-            model.AvailableWarehouses.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectWarehouse"), Value = "" });
-            foreach (var c in _shippingService.GetAllWarehouses())
-                model.AvailableWarehouses.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-
+            await PreparePickupPointModel(model);
             return View(model);
         }
 
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult CreatePickupPoint(PickupPointModel model, bool continueEditing)
+        public async Task<IActionResult> CreatePickupPoint(PickupPointModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
                 var address = model.Address.ToEntity();
                 address.CreatedOnUtc = DateTime.UtcNow;
-                _addressService.InsertAddressSettings(address);
-                var pickuppoint = new PickupPoint
-                {
-                    Name = model.Name,
-                    AdminComment = model.AdminComment,
-                    Address = address,
-                    Description = model.Description,
-                    DisplayOrder = model.DisplayOrder,
-                    PickupFee = model.PickupFee,
-                    StoreId = model.StoreId,
-                    WarehouseId = model.WarehouseId
-                };
-
-                _shippingService.InsertPickupPoint(pickuppoint);
+                await _addressService.InsertAddressSettings(address);
+                var pickuppoint = model.ToEntity();
+                pickuppoint.Address = address;
+                await _shippingService.InsertPickupPoint(pickuppoint);
 
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.PickupPoints.Added"));
                 return continueEditing ? RedirectToAction("EditPickupPoint", new { id = pickuppoint.Id }) : RedirectToAction("PickupPoints");
             }
 
             //If we got this far, something failed, redisplay form
-            //countries
-            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
-            foreach (var c in _countryService.GetAllCountries(showHidden: true))
-                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (c.Id == model.Address.CountryId) });
-            //states
-            var states = !String.IsNullOrEmpty(model.Address.CountryId) ? _stateProvinceService.GetStateProvincesByCountryId(model.Address.CountryId, showHidden: true).ToList() : new List<StateProvince>();
-            if (states.Count > 0)
-            {
-                foreach (var s in states)
-                    model.Address.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == model.Address.StateProvinceId) });
-            }
-            else
-                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
-
-            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectStore"), Value = "" });
-            foreach (var c in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-
-            model.AvailableWarehouses.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectWarehouse"), Value = "" });
-            foreach (var c in _shippingService.GetAllWarehouses())
-                model.AvailableWarehouses.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-
-
+            await PreparePickupPointModel(model);
             return View(model);
         }
 
-        public IActionResult EditPickupPoint(string id)
+        public async Task<IActionResult> EditPickupPoint(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var pickuppoint = _shippingService.GetPickupPointById(id);
+            var pickuppoint = await _shippingService.GetPickupPointById(id);
             if (pickuppoint == null)
                 //No pickup pint found with the specified id
                 return RedirectToAction("PickupPoints");
 
-            var model = new PickupPointModel
-            {
-                Id = pickuppoint.Id,
-                Name = pickuppoint.Name,
-                AdminComment = pickuppoint.AdminComment,
-                Description = pickuppoint.Description,
-                DisplayOrder = pickuppoint.DisplayOrder,
-                PickupFee = pickuppoint.PickupFee,
-                StoreId = pickuppoint.StoreId,
-                WarehouseId = pickuppoint.WarehouseId,
-                Address = pickuppoint.Address.ToModel(),
-            };
-
-            //countries
-            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
-            foreach (var c in _countryService.GetAllCountries(showHidden: true))
-                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (pickuppoint.Address != null && c.Id == pickuppoint.Address.CountryId) });
-            //states
-            var states = pickuppoint.Address != null && !String.IsNullOrEmpty(pickuppoint.Address.CountryId) ? _stateProvinceService.GetStateProvincesByCountryId(pickuppoint.Address.CountryId, showHidden: true).ToList() : new List<StateProvince>();
-            if (states.Count > 0)
-            {
-                foreach (var s in states)
-                    model.Address.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == pickuppoint.Address.StateProvinceId) });
-            }
-            else
-                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
-            model.Address.CountryEnabled = true;
-            model.Address.StateProvinceEnabled = true;
-            model.Address.CityEnabled = true;
-            model.Address.StreetAddressEnabled = true;
-            model.Address.ZipPostalCodeEnabled = true;
-            model.Address.ZipPostalCodeRequired = true;
-            model.Address.PhoneEnabled = true;
-
-            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectStore"), Value = "" });
-            foreach (var c in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-
-            model.AvailableWarehouses.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectWarehouse"), Value = "" });
-            foreach (var c in _shippingService.GetAllWarehouses())
-                model.AvailableWarehouses.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
+            var model = pickuppoint.ToModel();
+            model.Address = await pickuppoint.Address.ToModel(_countryService, _stateProvinceService);
+            await PreparePickupPointModel(model);
 
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult EditPickupPoint(PickupPointModel model, bool continueEditing)
+        public async Task<IActionResult> EditPickupPoint(PickupPointModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var pickupPoint = _shippingService.GetPickupPointById(model.Id);
+            var pickupPoint = await _shippingService.GetPickupPointById(model.Id);
             if (pickupPoint == null)
                 //No pickup point found with the specified id
                 return RedirectToAction("PickupPoints");
 
             if (ModelState.IsValid)
             {
-                var address =
-                    new Core.Domain.Common.Address
-                    {
-                        CreatedOnUtc = DateTime.UtcNow,
-                    };
+                var address = new Core.Domain.Common.Address { CreatedOnUtc = DateTime.UtcNow };
                 address = model.Address.ToEntity(address);
-
-                pickupPoint.Name = model.Name;
-                pickupPoint.AdminComment = model.AdminComment;
+                pickupPoint = model.ToEntity(pickupPoint);
                 pickupPoint.Address = address;
-                pickupPoint.Description = model.Description;
-                pickupPoint.DisplayOrder = model.DisplayOrder;
-                pickupPoint.PickupFee = model.PickupFee;
-                pickupPoint.StoreId = model.StoreId;
-                pickupPoint.WarehouseId = model.WarehouseId;
-
-                _shippingService.UpdatePickupPoint(pickupPoint);
+                await _shippingService.UpdatePickupPoint(pickupPoint);
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.PickupPoints.Updated"));
                 return continueEditing ? RedirectToAction("EditPickupPoint", new { id = pickupPoint.Id }) : RedirectToAction("PickupPoints");
             }
-
-
             //If we got this far, something failed, redisplay form
-            //countries
-            model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "" });
-            foreach (var c in _countryService.GetAllCountries(showHidden: true))
-                model.Address.AvailableCountries.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString(), Selected = (c.Id == model.Address.CountryId) });
-            //states
-            var states = !String.IsNullOrEmpty(model.Address.CountryId) ? _stateProvinceService.GetStateProvincesByCountryId(model.Address.CountryId, showHidden: true).ToList() : new List<StateProvince>();
-            if (states.Count > 0)
-            {
-                foreach (var s in states)
-                    model.Address.AvailableStates.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString(), Selected = (s.Id == model.Address.StateProvinceId) });
-            }
-            else
-                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "" });
-
-            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectStore"), Value = "" });
-            foreach (var c in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-
-            model.AvailableWarehouses.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Shipping.PickupPoint.SelectWarehouse"), Value = "" });
-            foreach (var c in _shippingService.GetAllWarehouses())
-                model.AvailableWarehouses.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
-
+            await PreparePickupPointModel(model);
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult DeletePickupPoint(string id)
+        public async Task<IActionResult> DeletePickupPoint(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var pickupPoint = _shippingService.GetPickupPointById(id);
+            var pickupPoint = await _shippingService.GetPickupPointById(id);
             if (pickupPoint == null)
                 //No pickup point found with the specified id
                 return RedirectToAction("PickupPoints");
 
-            _shippingService.DeletePickupPoint(pickupPoint);
+            await _shippingService.DeletePickupPoint(pickupPoint);
 
             SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.PickupPoints.Deleted"));
             return RedirectToAction("PickupPoints");
         }
 
-
         #endregion
 
         #region Restrictions
 
-        public IActionResult Restrictions()
+        public async Task<IActionResult> Restrictions()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
             var model = new ShippingMethodRestrictionModel();
 
-            var countries = _countryService.GetAllCountries(showHidden: true);
-            var shippingMethods = _shippingService.GetAllShippingMethods();
-            var customerRoles = _customerService.GetAllCustomerRoles();
+            var countries = await _countryService.GetAllCountries(showHidden: true);
+            var shippingMethods = await _shippingService.GetAllShippingMethods();
+            var customerRoles = await _customerService.GetAllCustomerRoles();
 
             foreach (var country in countries)
             {
@@ -997,7 +669,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             }
             foreach (var r in customerRoles)
             {
-                model.AvailableCustomerRoles.Add(r.ToModel());
+                model.AvailableCustomerRoles.Add(new CustomerRoleModel() { Id = r.Id, Name = r.Name });
             }
 
             foreach (var country in countries)
@@ -1028,14 +700,11 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         [HttpPost, ActionName("Restrictions")]
         [RequestFormLimits(ValueCountLimit = 2048)]
-        public IActionResult RestrictionSave(IFormCollection form)
+        public async Task<IActionResult> RestrictionSave(IFormCollection form)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedView();
-
-            var countries = _countryService.GetAllCountries(showHidden: true);
-            var shippingMethods = _shippingService.GetAllShippingMethods();
-            var customerRoles = _customerService.GetAllCustomerRoles();
+            var countries = await _countryService.GetAllCountries(showHidden: true);
+            var shippingMethods = await _shippingService.GetAllShippingMethods();
+            var customerRoles = await _customerService.GetAllCustomerRoles();
 
             foreach (var shippingMethod in shippingMethods)
             {
@@ -1055,15 +724,15 @@ namespace Grand.Web.Areas.Admin.Controllers
                         if (shippingMethod.RestrictedCountries.FirstOrDefault(c => c.Id == country.Id) == null)
                         {
                             shippingMethod.RestrictedCountries.Add(country);
-                            _shippingService.UpdateShippingMethod(shippingMethod);
+                            await _shippingService.UpdateShippingMethod(shippingMethod);
                         }
                     }
                     else
                     {
                         if (shippingMethod.RestrictedCountries.FirstOrDefault(c => c.Id == country.Id) != null)
                         {
-                            shippingMethod.RestrictedCountries.Remove(country);
-                            _shippingService.UpdateShippingMethod(shippingMethod);
+                            shippingMethod.RestrictedCountries.Remove(shippingMethod.RestrictedCountries.FirstOrDefault(x=>x.Id ==  country.Id));
+                            await _shippingService.UpdateShippingMethod(shippingMethod);
                         }
                     }
                 }
@@ -1085,7 +754,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                         if (shippingMethod.RestrictedRoles.FirstOrDefault(c => c == role.Id) == null)
                         {
                             shippingMethod.RestrictedRoles.Add(role.Id);
-                            _shippingService.UpdateShippingMethod(shippingMethod);
+                            await _shippingService.UpdateShippingMethod(shippingMethod);
                         }
                     }
                     else
@@ -1093,7 +762,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                         if (shippingMethod.RestrictedRoles.FirstOrDefault(c => c == role.Id) != null)
                         {
                             shippingMethod.RestrictedRoles.Remove(role.Id);
-                            _shippingService.UpdateShippingMethod(shippingMethod);
+                            await _shippingService.UpdateShippingMethod(shippingMethod);
                         }
                     }
                 }
@@ -1101,7 +770,7 @@ namespace Grand.Web.Areas.Admin.Controllers
 
             SuccessNotification(_localizationService.GetResource("Admin.Configuration.Shipping.Restrictions.Updated"));
             //selected tab
-            SaveSelectedTabIndex();
+            await SaveSelectedTabIndex();
 
             return RedirectToAction("Restrictions");
         }

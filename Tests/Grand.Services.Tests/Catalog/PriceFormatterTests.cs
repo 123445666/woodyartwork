@@ -5,9 +5,12 @@ using Grand.Core.Domain.Directory;
 using Grand.Core.Domain.Localization;
 using Grand.Core.Domain.Tax;
 using Grand.Core.Plugins;
+using Grand.Core.Tests.Caching;
 using Grand.Services.Directory;
 using Grand.Services.Localization;
 using Grand.Services.Stores;
+using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MongoDB.Driver;
 using Moq;
@@ -27,11 +30,16 @@ namespace Grand.Services.Catalog.Tests
         private ILocalizationService _localizationService;
         private TaxSettings _taxSettings;
         private IPriceFormatter _priceFormatter;
+        private IServiceProvider _serviceProvider;
+        private IMediator _eventPublisher;
 
         [TestInitialize()]
         public void TestInitialize()
         {
-            var cacheManager = new GrandNullCache();
+            var eventPublisher = new Mock<IMediator>();
+            _eventPublisher = eventPublisher.Object;
+
+            var cacheManager = new TestMemoryCacheManager(new Mock<IMemoryCache>().Object, _eventPublisher);
             tempWorkContext = new Mock<IWorkContext>();
             {
                 _workContext = tempWorkContext.Object;
@@ -72,10 +80,11 @@ namespace Grand.Services.Catalog.Tests
             }
 
             _storeMappingService = new Mock<IStoreMappingService>().Object;
+            _serviceProvider = new Mock<IServiceProvider>().Object;
 
             _currencyRepo = new Mock<IRepository<Currency>>().Object;
 
-            var pluginFinder = new PluginFinder();
+            var pluginFinder = new PluginFinder(_serviceProvider);
             _currencyService = new CurrencyService(
                 cacheManager,
                 _currencyRepo,

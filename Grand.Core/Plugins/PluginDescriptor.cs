@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Grand.Core.Plugins
 {
@@ -13,7 +14,6 @@ namespace Grand.Core.Plugins
             this.SupportedVersions = new List<string>();
             this.LimitedToStores = new List<string>();
         }
-
 
         public PluginDescriptor(Assembly referencedAssembly, FileInfo originalAssemblyFile,
             Type pluginType)
@@ -88,21 +88,16 @@ namespace Grand.Core.Plugins
         /// </summary>
         public virtual bool Installed { get; set; }
 
-        public virtual T Instance<T>() where T : class, IPlugin
+        public virtual T Instance<T>(IServiceProvider serviceProvider) where T : class, IPlugin
         {
             object instance = null;
             try
             {
-                instance = EngineContext.Current.Resolve(PluginType);
+                instance = serviceProvider.GetRequiredService(PluginType);
             }
             catch
             {
-                //try resolve
-            }
-            if (instance == null)
-            {
-                //not resolved
-                instance = EngineContext.Current.ResolveUnregistered(PluginType);
+                throw new GrandException("Plugin has not been registered getRequiredService - dependency");
             }
             var typedInstance = instance as T;
             if (typedInstance != null)
@@ -110,9 +105,9 @@ namespace Grand.Core.Plugins
             return typedInstance;
         }
 
-        public IPlugin Instance()
+        public IPlugin Instance(IServiceProvider serviceProvider)
         {
-            return Instance<IPlugin>();
+            return Instance<IPlugin>(serviceProvider);
         }
 
         public int CompareTo(PluginDescriptor other)

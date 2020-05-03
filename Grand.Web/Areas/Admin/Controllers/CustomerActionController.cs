@@ -1,185 +1,91 @@
-﻿using Grand.Core;
-using Grand.Core.Domain.Catalog;
+﻿using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Customers;
 using Grand.Framework.Controllers;
-using Grand.Framework.Extensions;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Catalog;
 using Grand.Services.Customers;
-using Grand.Services.Helpers;
 using Grand.Services.Localization;
 using Grand.Services.Logging;
-using Grand.Services.Messages;
 using Grand.Services.Security;
 using Grand.Services.Stores;
 using Grand.Services.Vendors;
 using Grand.Web.Areas.Admin.Extensions;
 using Grand.Web.Areas.Admin.Models.Customers;
+using Grand.Web.Areas.Admin.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using Grand.Web.Areas.Admin.Models.Catalog;
+using Grand.Services.Helpers;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.Actions)]
     public partial class CustomerActionController : BaseAdminController
     {
         #region Fields
-
+        private readonly ICustomerActionViewModelService _customerActionViewModelService;
         private readonly ICustomerService _customerService;
         private readonly ICustomerAttributeService _customerAttributeService;
         private readonly ICustomerTagService _customerTagService;
         private readonly ILocalizationService _localizationService;
         private readonly ICustomerActivityService _customerActivityService;
-        private readonly IPermissionService _permissionService;
         private readonly IProductService _productService;
         private readonly ICategoryService _categoryService;
         private readonly IManufacturerService _manufacturerService;
         private readonly IStoreService _storeService;
         private readonly IVendorService _vendorService;
-        private readonly IWorkContext _workContext;
         private readonly ICustomerActionService _customerActionService;
         private readonly IProductAttributeService _productAttributeService;
         private readonly ISpecificationAttributeService _specificationAttributeService;
-        private readonly IBannerService _bannerService;
-        private readonly IInteractiveFormService _interactiveFormService;
-        private readonly IMessageTemplateService _messageTemplateService;
         private readonly IDateTimeHelper _dateTimeHelper;
+
         #endregion
 
         #region Constructors
 
-        public CustomerActionController(ICustomerService customerService,
+        public CustomerActionController(
+            ICustomerActionViewModelService customerActionViewModelService,
+            ICustomerService customerService,
             ICustomerAttributeService customerAttributeService,
             ICustomerTagService customerTagService,
             ILocalizationService localizationService,
             ICustomerActivityService customerActivityService,
-            IPermissionService permissionService,
             IProductService productService,
             ICategoryService categoryService,
             IManufacturerService manufacturerService,
             IStoreService storeService,
             IVendorService vendorService,
-            IWorkContext workContext,
             ICustomerActionService customerActionService,
             IProductAttributeService productAttributeService,
             ISpecificationAttributeService specificationAttributeService,
-            IBannerService bannerService,
-            IInteractiveFormService interactiveFormService,
-            IMessageTemplateService messageTemplateService,
             IDateTimeHelper dateTimeHelper)
         {
-            this._customerService = customerService;
-            this._customerAttributeService = customerAttributeService;
-            this._customerTagService = customerTagService;
-            this._localizationService = localizationService;
-            this._customerActivityService = customerActivityService;
-            this._permissionService = permissionService;
-            this._productService = productService;
-            this._categoryService = categoryService;
-            this._manufacturerService = manufacturerService;
-            this._storeService = storeService;
-            this._vendorService = vendorService;
-            this._workContext = workContext;
-            this._customerActionService = customerActionService;
-            this._productAttributeService = productAttributeService;
-            this._specificationAttributeService = specificationAttributeService;
-            this._bannerService = bannerService;
-            this._interactiveFormService = interactiveFormService;
-            this._messageTemplateService = messageTemplateService;
-            this._dateTimeHelper = dateTimeHelper;
+            _customerActionViewModelService = customerActionViewModelService;
+            _customerService = customerService;
+            _customerAttributeService = customerAttributeService;
+            _customerTagService = customerTagService;
+            _localizationService = localizationService;
+            _customerActivityService = customerActivityService;
+            _productService = productService;
+            _categoryService = categoryService;
+            _manufacturerService = manufacturerService;
+            _storeService = storeService;
+            _vendorService = vendorService;
+            _customerActionService = customerActionService;
+            _productAttributeService = productAttributeService;
+            _specificationAttributeService = specificationAttributeService;
+            _dateTimeHelper = dateTimeHelper;
         }
 
         #endregion
-
         #region Utilities
-
-        [NonAction]
-        protected virtual void PrepareReactObjectModel(CustomerActionModel model)
-        {
-            if (model == null)
-                throw new ArgumentNullException("model");
-
-            var banners = _bannerService.GetAllBanners();
-            foreach (var item in banners)
-            {
-                model.Banners.Add(new SelectListItem
-                {
-                    Text = item.Name,
-                    Value = item.Id.ToString()
-                });
-
-            }
-            var message = _messageTemplateService.GetAllMessageTemplates("");
-            foreach (var item in message)
-            {
-                model.MessageTemplates.Add(new SelectListItem
-                {
-                    Text = item.Name,
-                    Value = item.Id.ToString()
-                });
-            }
-            var customerRole = _customerService.GetAllCustomerRoles();
-            foreach (var item in customerRole)
-            {
-                model.CustomerRoles.Add(new SelectListItem
-                {
-                    Text = item.Name,
-                    Value = item.Id.ToString()
-                });
-            }
-
-            var customerTag = _customerTagService.GetAllCustomerTags();
-            foreach (var item in customerTag)
-            {
-                model.CustomerTags.Add(new SelectListItem
-                {
-                    Text = item.Name,
-                    Value = item.Id.ToString()
-                });
-            }
-
-            foreach (var item in _customerActionService.GetCustomerActionType())
-            {
-                model.ActionType.Add(new SelectListItem()
-                {
-                    Text = item.Name,
-                    Value = item.Id.ToString()
-                });
-            }
-
-            foreach (var item in _interactiveFormService.GetAllForms())
-            {
-                model.InteractiveForms.Add(new SelectListItem()
-                {
-                    Text = item.Name,
-                    Value = item.Id.ToString()
-                });
-
-            }
-
-
-        }
-
-        public class SerializeCustomerActionHistory
-        {
-            public string Email { get; set; }
-            public DateTime CreateDateUtc { get; set; }
-
-        }
-        protected virtual SerializeCustomerActionHistory PrepareHistoryModelForList(CustomerActionHistory history)
-        {
-            var customer = _customerService.GetCustomerById(history.CustomerId);
-            return new SerializeCustomerActionHistory
-            {
-                Email = customer != null ? String.IsNullOrEmpty(customer.Email) ? "(unknown)" : customer.Email : "(unknown)",
-                CreateDateUtc = _dateTimeHelper.ConvertToUserTime(history.CreateDateUtc, DateTimeKind.Utc),
-            };
-        }
-
         protected void CheckValidateModel(CustomerActionModel model)
         {
             if ((model.ReactionType == CustomerReactionTypeEnum.Banner) && String.IsNullOrEmpty(model.BannerId))
@@ -193,121 +99,76 @@ namespace Grand.Web.Areas.Admin.Controllers
             if ((model.ReactionType == CustomerReactionTypeEnum.AssignToCustomerTag) && String.IsNullOrEmpty(model.CustomerTagId))
                 ModelState.AddModelError("error", "Tag is required");
         }
-
         #endregion
-
 
         #region Customer Actions
 
-        public IActionResult Index()
-        {
-            return RedirectToAction("List");
-        }
+        public IActionResult Index() => RedirectToAction("List");
 
-        public IActionResult List()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult List() => View();
 
         [HttpPost]
-        public IActionResult List(DataSourceRequest command)
+        public async Task<IActionResult> List(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customeractions = _customerActionService.GetCustomerActions();
+            var customeractions = await _customerActionService.GetCustomerActions();
+            var actions = await _customerActionService.GetCustomerActionType();
             var gridModel = new DataSourceResult
             {
-                Data = customeractions.Select(x => new { Id = x.Id, Name = x.Name, Active = x.Active, ActionType = _customerActionService.GetCustomerActionTypeById(x.ActionTypeId).Name }),
+                Data = customeractions.Select(x => new { Id = x.Id, Name = x.Name, Active = x.Active, ActionType = actions.FirstOrDefault(y=>y.Id == x.ActionTypeId)?.Name }),
                 Total = customeractions.Count()
             };
             return Json(gridModel);
         }
 
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var model = new CustomerActionModel();
-            model.Active = true;
-            model.StartDateTimeUtc = DateTime.UtcNow;
-            model.EndDateTimeUtc = DateTime.UtcNow.AddMonths(1);
-            model.ReactionTypeId = (int)CustomerReactionTypeEnum.Banner;
-            PrepareReactObjectModel(model);
+            var model = await _customerActionViewModelService.PrepareCustomerActionModel();
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Create(CustomerActionModel model, bool continueEditing)
+        public async Task<IActionResult> Create(CustomerActionModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
             CheckValidateModel(model);
             if (ModelState.IsValid)
             {
-                var customeraction = model.ToEntity();
-                _customerActionService.InsertCustomerAction(customeraction);
-                _customerActivityService.InsertActivity("AddNewCustomerAction", customeraction.Id, _localizationService.GetResource("ActivityLog.AddNewCustomerAction"), customeraction.Name);
-
+                var customeraction = await _customerActionViewModelService.InsertCustomerActionModel(model);
                 SuccessNotification(_localizationService.GetResource("Admin.Customers.CustomerAction.Added"));
                 return continueEditing ? RedirectToAction("Edit", new { id = customeraction.Id }) : RedirectToAction("List");
             }
-            PrepareReactObjectModel(model);
+            await _customerActionViewModelService.PrepareReactObjectModel(model);
             return View(model);
         }
 
-        public IActionResult Edit(string id)
+        public async Task<IActionResult> Edit(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(id);
+            var customerAction = await _customerActionService.GetCustomerActionById(id);
             if (customerAction == null)
                 return RedirectToAction("List");
 
-            var model = customerAction.ToModel();
+            var model = customerAction.ToModel(_dateTimeHelper);
             model.ConditionCount = customerAction.Conditions.Count();
-            PrepareReactObjectModel(model);
-
-
+            await _customerActionViewModelService.PrepareReactObjectModel(model);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Edit(CustomerActionModel model, bool continueEditing)
+        public async Task<IActionResult> Edit(CustomerActionModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
             CheckValidateModel(model);
 
-            var customeraction = _customerActionService.GetCustomerActionById(model.Id);
+            var customeraction = await _customerActionService.GetCustomerActionById(model.Id);
             if (customeraction == null)
                 return RedirectToAction("List");
             try
             {
                 if (ModelState.IsValid)
                 {
-                    if (customeraction.Conditions.Count() > 0)
-                        model.ActionTypeId = customeraction.ActionTypeId;
-                    if (String.IsNullOrEmpty(model.ActionTypeId))
-                        model.ActionTypeId = customeraction.ActionTypeId;
-
-                    customeraction = model.ToEntity(customeraction);
-
-
-                    _customerActionService.UpdateCustomerAction(customeraction);
-
-                    _customerActivityService.InsertActivity("EditCustomerAction", customeraction.Id, _localizationService.GetResource("ActivityLog.EditCustomerAction"), customeraction.Name);
-
+                    customeraction = await _customerActionViewModelService.UpdateCustomerActionModel(customeraction, model);
                     SuccessNotification(_localizationService.GetResource("Admin.Customers.CustomerAction.Updated"));
                     return continueEditing ? RedirectToAction("Edit", new { id = customeraction.Id }) : RedirectToAction("List");
                 }
-                PrepareReactObjectModel(model);
+                await _customerActionViewModelService.PrepareReactObjectModel(model);
                 return View(model);
             }
             catch (Exception exc)
@@ -318,42 +179,37 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult History(DataSourceRequest command, string customerActionId)
+        public async Task<IActionResult> History(DataSourceRequest command, string customerActionId)
         {
-            //we use own own binder for searchCustomerRoleIds property 
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var history = _customerActionService.GetAllCustomerActionHistory(customerActionId,
+            var history = await _customerActionService.GetAllCustomerActionHistory(customerActionId,
                 pageIndex: command.Page - 1,
                 pageSize: command.PageSize);
+            var items = new List<SerializeCustomerActionHistory>();
+            foreach (var item in history)
+            {
+                items.Add(await _customerActionViewModelService.PrepareHistoryModelForList(item));
+            }
             var gridModel = new DataSourceResult
             {
-                Data = history.Select(PrepareHistoryModelForList),
+                Data = items,
                 Total = history.TotalCount
             };
 
             return Json(gridModel);
         }
 
-
         [HttpPost]
-        public IActionResult Delete(string id)
+        public async Task<IActionResult> Delete(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(id);
+            var customerAction = await _customerActionService.GetCustomerActionById(id);
             if (customerAction == null)
                 return RedirectToAction("List");
 
             try
             {
                 //activity log
-                _customerActivityService.InsertActivity("DeleteCustomerAction", customerAction.Id, _localizationService.GetResource("ActivityLog.DeleteCustomerAction"), customerAction.Name);
-
-                _customerActionService.DeleteCustomerAction(customerAction);
-
+                await _customerActivityService.InsertActivity("DeleteCustomerAction", customerAction.Id, _localizationService.GetResource("ActivityLog.DeleteCustomerAction"), customerAction.Name);
+                await _customerActionService.DeleteCustomerAction(customerAction);
                 SuccessNotification(_localizationService.GetResource("Admin.Customers.CustomerAction.Deleted"));
                 return RedirectToAction("List");
             }
@@ -365,12 +221,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult Conditions(string customerActionId)
+        public async Task<IActionResult> Conditions(string customerActionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var conditions = _customerActionService.GetCustomerActionById(customerActionId);
+            var conditions = await _customerActionService.GetCustomerActionById(customerActionId);
             var gridModel = new DataSourceResult
             {
                 Data = conditions.Conditions.Select(x => new { Id = x.Id, Name = x.Name, Condition = x.CustomerActionConditionType.ToString() }),
@@ -383,73 +236,30 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Conditions
 
-        public IActionResult AddCondition(string customerActionId)
+        public async Task<IActionResult> AddCondition(string customerActionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(customerActionId);
-            var actionType = _customerActionService.GetCustomerActionTypeById(customerAction.ActionTypeId);
-
-            var model = new CustomerActionConditionModel();
-            model.CustomerActionId = customerActionId;
-
-            foreach (var item in actionType.ConditionType)
-            {
-                model.CustomerActionConditionType.Add(new SelectListItem()
-                {
-                    Value = item.ToString(),
-                    Text = ((CustomerActionConditionTypeEnum)item).ToString()
-                });
-            }
-
-
+            var model = await _customerActionViewModelService.PrepareCustomerActionConditionModel(customerActionId);
             return View(model);
-
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult AddCondition(CustomerActionConditionModel model, bool continueEditing)
+        public async Task<IActionResult> AddCondition(CustomerActionConditionModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
-                var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-                if (customerAction == null)
-                {
-                    return RedirectToAction("List");
-                }
-
-                var condition = new CustomerAction.ActionCondition()
-                {
-                    Name = model.Name,
-                    CustomerActionConditionTypeId = model.CustomerActionConditionTypeId,
-                    ConditionId = model.ConditionId,
-                };
-                customerAction.Conditions.Add(condition);
-                _customerActionService.UpdateCustomerAction(customerAction);
-
-                _customerActivityService.InsertActivity("AddNewCustomerActionCondition", customerAction.Id, _localizationService.GetResource("ActivityLog.AddNewCustomerAction"), customerAction.Name);
-
+                var customerAction = await _customerActionViewModelService.InsertCustomerActionConditionModel(model);
                 SuccessNotification(_localizationService.GetResource("Admin.Customers.CustomerActionCondition.Added"));
-
-                return continueEditing ? RedirectToAction("EditCondition", new { customerActionId = customerAction.Id, cid = condition.Id }) : RedirectToAction("Edit", new { id = customerAction.Id });
+                return continueEditing ? RedirectToAction("EditCondition", new { customerActionId = customerAction.customerActionId, cid = customerAction.conditionId }) : RedirectToAction("Edit", new { id = customerAction.customerActionId });
             }
-
             return View(model);
         }
 
-        public IActionResult EditCondition(string customerActionId, string cid)
+        public async Task<IActionResult> EditCondition(string customerActionId, string cid)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerAction = await _customerActionService.GetCustomerActionById(customerActionId);
             if (customerAction == null)
                 return RedirectToAction("List");
-            var actionType = _customerActionService.GetCustomerActionTypeById(customerAction.ActionTypeId);
+            var actionType = await _customerActionService.GetCustomerActionTypeById(customerAction.ActionTypeId);
             var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == cid);
             if (condition == null)
                 return RedirectToAction("List");
@@ -470,9 +280,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult EditCondition(string customerActionId, string cid, CustomerActionConditionModel model, bool continueEditing)
+        public async Task<IActionResult> EditCondition(string customerActionId, string cid, CustomerActionConditionModel model, bool continueEditing)
         {
-            var customerAction = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerAction = await _customerActionService.GetCustomerActionById(customerActionId);
             if (customerAction == null)
                 return RedirectToAction("List");
 
@@ -483,10 +293,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             {
                 if (ModelState.IsValid)
                 {
-                    condition = model.ToEntity(condition);
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                    //activity log
-                    _customerActivityService.InsertActivity("EditCustomerActionCondition", customerAction.Id, _localizationService.GetResource("ActivityLog.EditCustomerActionCondition"), customerAction.Name);
+                    await _customerActionViewModelService.UpdateCustomerActionConditionModel(customerAction, condition, model);
                     SuccessNotification(_localizationService.GetResource("Admin.Customers.CustomerActionCondition.Updated"));
                     return continueEditing ? RedirectToAction("EditCondition", new { customerActionId = customerAction.Id, cid = condition.Id }) : RedirectToAction("Edit", new { id = customerAction.Id });
                 }
@@ -500,95 +307,16 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ConditionDelete(string Id, string customerActionId)
+        public async Task<IActionResult> ConditionDelete(string Id, string customerActionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(customerActionId);
-            var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == Id);
-            customerAction.Conditions.Remove(condition);
-            _customerActionService.UpdateCustomerAction(customerAction);
-
+            await _customerActionViewModelService.ConditionDelete(Id, customerActionId);
             return new NullJsonResult();
         }
 
         [HttpPost]
-        public IActionResult ConditionDeletePosition(string id, string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionDeletePosition(string id, string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
-            var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.Product)
-            {
-                condition.Products.Remove(id);
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.Category)
-            {
-                condition.Categories.Remove(id);
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.Manufacturer)
-            {
-                condition.Manufacturers.Remove(id);
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.Vendor)
-            {
-                condition.Vendors.Remove(id);
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.ProductAttribute)
-            {
-                condition.ProductAttribute.Remove(condition.ProductAttribute.FirstOrDefault(x => x.Id == id));
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.ProductSpecification)
-            {
-                condition.ProductSpecifications.Remove(condition.ProductSpecifications.FirstOrDefault(x => x.Id == id));
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.CustomerRole)
-            {
-                condition.CustomerRoles.Remove(id);
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.CustomerTag)
-            {
-                condition.CustomerTags.Remove(id);
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.CustomCustomerAttribute)
-            {
-                condition.CustomCustomerAttributes.Remove(condition.CustomCustomerAttributes.FirstOrDefault(x => x.Id == id));
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.CustomerRegisterField)
-            {
-                condition.CustomerRegistration.Remove(condition.CustomerRegistration.FirstOrDefault(x => x.Id == id));
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.UrlCurrent)
-            {
-                condition.UrlCurrent.Remove(condition.UrlCurrent.FirstOrDefault(x => x.Id == id));
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.UrlReferrer)
-            {
-                condition.UrlReferrer.Remove(condition.UrlReferrer.FirstOrDefault(x => x.Id == id));
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-            if (condition.CustomerActionConditionTypeId == (int)CustomerActionConditionTypeEnum.Store)
-            {
-                condition.Stores.Remove(id);
-                _customerActionService.UpdateCustomerAction(customerActions);
-            }
-
+            await _customerActionViewModelService.ConditionDeletePosition(id, customerActionId, conditionId);
 
             return new NullJsonResult();
         }
@@ -597,112 +325,49 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Condition Product
 
         [HttpPost]
-        public IActionResult ConditionProduct(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionProduct(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
+            var items = new List<(string Id, string ProductName)>();
+            foreach (var item in condition.Products)
+            {
+                var product = (await _productService.GetProductById(item))?.Name;
+                items.Add((item, product));
+            }
             var gridModel = new DataSourceResult
             {
-                Data = condition != null ? condition.Products.Select(z => new { Id = z, ProductName = _productService.GetProductById(z) != null ? _productService.GetProductById(z).Name : "" }) : null,
+                Data = items.Select(x=>new { Id = x.Id, ProductName = x.ProductName }),
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
         }
 
 
-        public IActionResult ProductAddPopup(string customerActionId, string conditionId)
+        public async Task<IActionResult> ProductAddPopup(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var model = new CustomerActionConditionModel.AddProductToConditionModel();
-            model.CustomerActionConditionId = conditionId;
-            model.CustomerActionId = customerActionId;
-            //categories
-            model.AvailableCategories.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            var categories = _categoryService.GetAllCategories(showHidden: true);
-            foreach (var c in categories)
-                model.AvailableCategories.Add(new SelectListItem { Text = c.GetFormattedBreadCrumb(categories), Value = c.Id.ToString() });
-
-            //manufacturers
-            model.AvailableManufacturers.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            foreach (var m in _manufacturerService.GetAllManufacturers(showHidden: true))
-                model.AvailableManufacturers.Add(new SelectListItem { Text = m.Name, Value = m.Id.ToString() });
-
-            //stores
-            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            foreach (var s in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString() });
-
-            //vendors
-            model.AvailableVendors.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-            foreach (var v in _vendorService.GetAllVendors(showHidden: true))
-                model.AvailableVendors.Add(new SelectListItem { Text = v.Name, Value = v.Id.ToString() });
-
-            //product types
-            model.AvailableProductTypes = ProductType.SimpleProduct.ToSelectList(false).ToList();
-            model.AvailableProductTypes.Insert(0, new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = " " });
-
+            var model = await _customerActionViewModelService.PrepareAddProductToConditionModel(customerActionId, conditionId);
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult ProductAddPopupList(DataSourceRequest command, CustomerActionConditionModel.AddProductToConditionModel model)
+        public async Task<IActionResult> ProductAddPopupList(DataSourceRequest command, CustomerActionConditionModel.AddProductToConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var searchCategoryIds = new List<string>();
-            if (!String.IsNullOrEmpty(model.SearchCategoryId))
-                searchCategoryIds.Add(model.SearchCategoryId);
-
-            var products = _productService.SearchProducts(
-                categoryIds: searchCategoryIds,
-                manufacturerId: model.SearchManufacturerId,
-                storeId: model.SearchStoreId,
-                vendorId: model.SearchVendorId,
-                productType: model.SearchProductTypeId > 0 ? (ProductType?)model.SearchProductTypeId : null,
-                keywords: model.SearchProductName,
-                pageIndex: command.Page - 1,
-                pageSize: command.PageSize,
-                showHidden: true
-                );
+            var products = await _customerActionViewModelService.PrepareProductModel(model, command.Page, command.PageSize);
             var gridModel = new DataSourceResult();
-            gridModel.Data = products.Select(x => x.ToModel());
-            gridModel.Total = products.TotalCount;
+            gridModel.Data = products.products.ToList();
+            gridModel.Total = products.totalCount;
 
             return Json(gridModel);
         }
 
         [HttpPost]
         [FormValueRequired("save")]
-        public IActionResult ProductAddPopup(CustomerActionConditionModel.AddProductToConditionModel model)
+        public async Task<IActionResult> ProductAddPopup(CustomerActionConditionModel.AddProductToConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
             if (model.SelectedProductIds != null)
             {
-                foreach (string id in model.SelectedProductIds)
-                {
-                    var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-                    if (customerAction != null)
-                    {
-                        var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.CustomerActionConditionId);
-                        if (condition != null)
-                        {
-                            if (condition.Products.Where(x => x == id).Count() == 0)
-                            {
-                                condition.Products.Add(id);
-                                _customerActionService.UpdateCustomerAction(customerAction);
-                            }
-                        }
-                    }
-                }
+                await _customerActionViewModelService.InsertProductToConditionModel(model);
             }
             ViewBag.RefreshPage = true;
             return View(model);
@@ -712,17 +377,19 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Condition Category
 
         [HttpPost]
-        public IActionResult ConditionCategory(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionCategory(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
+            var items = new List<(string Id, string CategoryName)>();
+            foreach (var item in condition.Categories)
+            {
+                var category = (await _categoryService.GetCategoryById(item))?.Name;
+                items.Add((item, category));
+            }
             var gridModel = new DataSourceResult
             {
-                Data = condition != null ? condition.Categories.Select(z => new { Id = z, CategoryName = _categoryService.GetCategoryById(z) != null ? _categoryService.GetCategoryById(z).Name : "" }) : null,
+                Data = items.Select(x => new { Id = x.Id, CategoryName = x.CategoryName }),
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
@@ -730,31 +397,29 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         public IActionResult CategoryAddPopup(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var model = new CustomerActionConditionModel.AddCategoryConditionModel();
-            model.CustomerActionConditionId = conditionId;
-            model.CustomerActionId = customerActionId;
+            var model = new CustomerActionConditionModel.AddCategoryConditionModel
+            {
+                CustomerActionConditionId = conditionId,
+                CustomerActionId = customerActionId
+            };
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult CategoryAddPopupList(DataSourceRequest command, CustomerActionConditionModel.AddCategoryConditionModel model)
+        public async Task<IActionResult> CategoryAddPopupList(DataSourceRequest command, CustomerActionConditionModel.AddCategoryConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var categories = _categoryService.GetAllCategories(model.SearchCategoryName,
+            var categories = await _categoryService.GetAllCategories(model.SearchCategoryName,
                 pageIndex: command.Page - 1, pageSize: command.PageSize, showHidden: true);
+            var items = new List<CategoryModel>();
+            foreach (var x in categories)
+            {
+                var categoryModel = x.ToModel();
+                categoryModel.Breadcrumb = await _categoryService.GetFormattedBreadCrumb(x);
+                items.Add(categoryModel);
+            }
             var gridModel = new DataSourceResult
             {
-                Data = categories.Select(x =>
-                {
-                    var categoryModel = x.ToModel();
-                    categoryModel.Breadcrumb = x.GetFormattedBreadCrumb(_categoryService);
-                    return categoryModel;
-                }),
+                Data = items,
                 Total = categories.TotalCount
             };
 
@@ -763,50 +428,34 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         [HttpPost]
         [FormValueRequired("save")]
-        public IActionResult CategoryAddPopup(CustomerActionConditionModel.AddCategoryConditionModel model)
+        public async Task<IActionResult> CategoryAddPopup(CustomerActionConditionModel.AddCategoryConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
             if (model.SelectedCategoryIds != null)
             {
-                foreach (string id in model.SelectedCategoryIds)
-                {
-                    var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-                    if (customerAction != null)
-                    {
-                        var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.CustomerActionConditionId);
-                        if (condition != null)
-                        {
-                            if (condition.Categories.Where(x => x == id).Count() == 0)
-                            {
-                                condition.Categories.Add(id);
-                                _customerActionService.UpdateCustomerAction(customerAction);
-                            }
-                        }
-                    }
-                }
+                await _customerActionViewModelService.InsertCategoryConditionModel(model);
             }
             ViewBag.RefreshPage = true;
             return View(model);
         }
 
-
         #endregion
 
         #region Condition Manufacturer
         [HttpPost]
-        public IActionResult ConditionManufacturer(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionManufacturer(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
 
+            var items = new List<(string Id, string ManufacturerName)>();
+            foreach (var item in condition.Manufacturers)
+            {
+                var manufacturer = (await _manufacturerService.GetManufacturerById(item))?.Name;
+                items.Add((item, manufacturer));
+            }
             var gridModel = new DataSourceResult
             {
-                Data = condition != null ? condition.Manufacturers.Select(z => new { Id = z, ManufacturerName = _manufacturerService.GetManufacturerById(z) != null ? _manufacturerService.GetManufacturerById(z).Name : "" }) : null,
+                Data = items.Select(x => new { Id = x.Id, ManufacturerName = x.ManufacturerName }),
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
@@ -814,20 +463,18 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         public IActionResult ManufacturerAddPopup(string customerActionId, string conditionId)
         {
-            var model = new CustomerActionConditionModel.AddManufacturerConditionModel();
-            model.CustomerActionConditionId = conditionId;
-            model.CustomerActionId = customerActionId;
+            var model = new CustomerActionConditionModel.AddManufacturerConditionModel
+            {
+                CustomerActionConditionId = conditionId,
+                CustomerActionId = customerActionId
+            };
             return View(model);
-
         }
 
         [HttpPost]
-        public IActionResult ManufacturerAddPopupList(DataSourceRequest command, CustomerActionConditionModel.AddManufacturerConditionModel model)
+        public async Task<IActionResult> ManufacturerAddPopupList(DataSourceRequest command, CustomerActionConditionModel.AddManufacturerConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var manufacturers = _manufacturerService.GetAllManufacturers(model.SearchManufacturerName, "",
+            var manufacturers = await _manufacturerService.GetAllManufacturers(model.SearchManufacturerName, "",
                 command.Page - 1, command.PageSize, true);
             var gridModel = new DataSourceResult
             {
@@ -840,86 +487,45 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         [HttpPost]
         [FormValueRequired("save")]
-        public IActionResult ManufacturerAddPopup(CustomerActionConditionModel.AddManufacturerConditionModel model)
+        public async Task<IActionResult> ManufacturerAddPopup(CustomerActionConditionModel.AddManufacturerConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
             if (model.SelectedManufacturerIds != null)
             {
-                foreach (string id in model.SelectedManufacturerIds)
-                {
-                    var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-                    if (customerAction != null)
-                    {
-                        var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.CustomerActionConditionId);
-                        if (condition != null)
-                        {
-                            if (condition.Manufacturers.Where(x => x == id).Count() == 0)
-                            {
-                                condition.Manufacturers.Add(id);
-                                _customerActionService.UpdateCustomerAction(customerAction);
-                            }
-                        }
-                    }
-
-                }
+                await _customerActionViewModelService.InsertManufacturerConditionModel(model);
             }
             ViewBag.RefreshPage = true;            
             return View(model);
         }
-
 
         #endregion
 
         #region Condition Vendor
 
         [HttpPost]
-        public IActionResult ConditionVendor(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionVendor(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
+            var vendors = await _vendorService.GetAllVendors();
             var gridModel = new DataSourceResult
             {
-                Data = condition != null ? condition.Vendors.Select(z => new { Id = z, VendorName = _vendorService.GetVendorById(z).Name }) : null,
+                Data = condition != null ? condition.Vendors.Select(z => new { Id = z, VendorName = vendors.FirstOrDefault(y=>y.Id == z).Name }) : null,
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
         }
 
         [HttpPost]
-        public IActionResult ConditionVendorInsert(CustomerActionConditionModel.AddVendorConditionModel model)
+        public async Task<IActionResult> ConditionVendorInsert(CustomerActionConditionModel.AddVendorConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    if (condition.Vendors.Where(x => x == model.VendorId).Count() == 0)
-                    {
-                        condition.Vendors.Add(model.VendorId);
-                        _customerActionService.UpdateCustomerAction(customerAction);
-                    }
-                }
-            }
+            await _customerActionViewModelService.InsertVendorConditionModel(model);
             return new NullJsonResult();
         }
 
-
         [HttpGet]
-        public IActionResult Vendors()
+        public async Task<IActionResult> Vendors()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-            var customerVendors = _vendorService.GetAllVendors().Select(x => new { Id = x.Id, Name = x.Name });
+            var customerVendors = (await _vendorService.GetAllVendors()).Select(x => new { Id = x.Id, Name = x.Name });
             return Json(customerVendors);
         }
         #endregion
@@ -927,51 +533,35 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Condition Customer role
 
         [HttpPost]
-        public IActionResult ConditionCustomerRole(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionCustomerRole(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
+            var items = new List<(string Id, string CustomerRole)>();
+            foreach (var item in condition.CustomerRoles)
+            {
+                var roles = (await _customerService.GetCustomerRoleById(item))?.Name;
+                items.Add((item, roles));
+            }
             var gridModel = new DataSourceResult
             {
-                Data = condition != null ? condition.CustomerRoles.Select(z => new { Id = z, CustomerRole = _customerService.GetCustomerRoleById(z) != null ? _customerService.GetCustomerRoleById(z).Name : "" }) : null,
+                Data = items.Select(x => new { Id = x.Id, CustomerRole = x.CustomerRole }),
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
         }
 
         [HttpPost]
-        public IActionResult ConditionCustomerRoleInsert(CustomerActionConditionModel.AddCustomerRoleConditionModel model)
+        public async Task<IActionResult> ConditionCustomerRoleInsert(CustomerActionConditionModel.AddCustomerRoleConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    if (condition.CustomerRoles.Where(x => x == model.CustomerRoleId).Count() == 0)
-                    {
-                        condition.CustomerRoles.Add(model.CustomerRoleId);
-                        _customerActionService.UpdateCustomerAction(customerAction);
-                    }
-                }
-            }
+            await _customerActionViewModelService.InsertCustomerRoleConditionModel(model);
             return new NullJsonResult();
         }
 
-
         [HttpGet]
-        public IActionResult CustomerRoles()
+        public async Task<IActionResult> CustomerRoles()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-            var customerRole = _customerService.GetAllCustomerRoles().Select(x => new { Id = x.Id, Name = x.Name });
+            var customerRole = (await _customerService.GetAllCustomerRoles()).Select(x => new { Id = x.Id, Name = x.Name });
             return Json(customerRole);
         }
 
@@ -980,182 +570,114 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Stores
 
         [HttpGet]
-        public IActionResult Stores()
+        public async Task<IActionResult> Stores()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-            var stores = _storeService.GetAllStores().Select(x => new { Id = x.Id, Name = x.Name });
+            var stores = (await _storeService.GetAllStores()).Select(x => new { Id = x.Id, Name = x.Shortcut });
             return Json(stores);
         }
 
         [HttpPost]
-        public IActionResult ConditionStore(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionStore(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
+            var items = new List<(string Id, string Store)>();
+            foreach (var item in condition.Stores)
+            {
+                var store = (await _storeService.GetStoreById(item))?.Shortcut;
+                items.Add((item, store));
+            }
             var gridModel = new DataSourceResult
             {
-                Data = condition != null ? condition.Stores.Select(z => new { Id = z, Store = _storeService.GetStoreById(z) != null ? _storeService.GetStoreById(z).Name : "" }) : null,
+                Data = items.Select(x => new { Id = x.Id, Store = x.Store }),
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
         }
 
         [HttpPost]
-        public IActionResult ConditionStoreInsert(CustomerActionConditionModel.AddStoreConditionModel model)
+        public async Task<IActionResult> ConditionStoreInsert(CustomerActionConditionModel.AddStoreConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    if (condition.Stores.Where(x => x == model.StoreId).Count() == 0)
-                    {
-                        condition.Stores.Add(model.StoreId);
-                        _customerActionService.UpdateCustomerAction(customerAction);
-                    }
-                }
-            }
+            await _customerActionViewModelService.InsertStoreConditionModel(model);
             return new NullJsonResult();
         }
-
 
         #endregion
 
         #region Customer Tags
 
         [HttpPost]
-        public IActionResult ConditionCustomerTag(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionCustomerTag(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
+            var items = new List<(string Id, string CustomerTag)>();
+            foreach (var item in condition.CustomerTags)
+            {
+                var tag = (await _customerTagService.GetCustomerTagById(item))?.Name;
+                items.Add((item, tag));
+            }
             var gridModel = new DataSourceResult
             {
-                Data = condition != null ? condition.CustomerTags.Select(z => new { Id = z, CustomerTag = _customerTagService.GetCustomerTagById(z) != null ? _customerTagService.GetCustomerTagById(z).Name : "" }) : null,
+                Data = items.Select(x => new { Id = x.Id, CustomerTag = x.CustomerTag }),
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
         }
 
-
-
         [HttpPost]
-        public IActionResult ConditionCustomerTagInsert(CustomerActionConditionModel.AddCustomerTagConditionModel model)
+        public async Task<IActionResult> ConditionCustomerTagInsert(CustomerActionConditionModel.AddCustomerTagConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    if (condition.CustomerTags.Where(x => x == model.CustomerTagId).Count() == 0)
-                    {
-                        condition.CustomerTags.Add(model.CustomerTagId);
-                        _customerActionService.UpdateCustomerAction(customerAction);
-                    }
-                }
-            }
+            await _customerActionViewModelService.InsertCustomerTagConditionModel(model);
             return new NullJsonResult();
         }
 
-
         [HttpGet]
-        public IActionResult CustomerTags()
+        public async Task<IActionResult> CustomerTags()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-            var customerTag = _customerTagService.GetAllCustomerTags().Select(x => new { Id = x.Id, Name = x.Name });
+            var customerTag = (await _customerTagService.GetAllCustomerTags()).Select(x => new { Id = x.Id, Name = x.Name });
             return Json(customerTag);
         }
         #endregion
 
-
         #region Condition Product Attributes
 
         [HttpPost]
-        public IActionResult ConditionProductAttribute(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionProductAttribute(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
+            var items = new List<(string Id, string ProductAttributeId, string ProductAttributeName)>();
+            foreach (var item in condition.ProductAttribute)
+            {
+                var pa = (await _productAttributeService.GetProductAttributeById(item.ProductAttributeId))?.Name;
+                items.Add((item.Id, item.ProductAttributeId, pa));
+            }
             var gridModel = new DataSourceResult
             {
-                Data = condition != null ? condition.ProductAttribute.Select(z => new { Id = z.Id, ProductAttributeId = z.ProductAttributeId, ProductAttributeName = _productAttributeService.GetProductAttributeById(z.ProductAttributeId).Name, Name = z.Name }) : null,
+                Data = items.Select(x => new { Id = x.Id, ProductAttributeId = x.ProductAttributeId, ProductAttributeName = x.ProductAttributeName }),
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
         }
 
         [HttpPost]
-        public IActionResult ConditionProductAttributeInsert(CustomerActionConditionModel.AddProductAttributeConditionModel model)
+        public async Task<IActionResult> ConditionProductAttributeInsert(CustomerActionConditionModel.AddProductAttributeConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var _pv = new CustomerAction.ActionCondition.ProductAttributeValue()
-                    {
-                        ProductAttributeId = model.ProductAttributeId,
-                        Name = model.Name
-                    };
-                    condition.ProductAttribute.Add(_pv);
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.InsertProductAttributeConditionModel(model);
             return new NullJsonResult();
         }
         [HttpPost]
-        public IActionResult ConditionProductAttributeUpdate(CustomerActionConditionModel.AddProductAttributeConditionModel model)
+        public async Task<IActionResult> ConditionProductAttributeUpdate(CustomerActionConditionModel.AddProductAttributeConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var pva = condition.ProductAttribute.FirstOrDefault(x => x.Id == model.Id);
-                    pva.ProductAttributeId = model.ProductAttributeId;
-                    pva.Name = model.Name;
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.UpdateProductAttributeConditionModel(model);
             return new NullJsonResult();
         }
 
-
-
         [HttpGet]
-        public IActionResult ProductAttributes()
+        public async Task<IActionResult> ProductAttributes()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-            var customerAttr = _productAttributeService.GetAllProductAttributes().Select(x => new { Id = x.Id, Name = x.Name });
+            var customerAttr = (await _productAttributeService.GetAllProductAttributes()).Select(x => new { Id = x.Id, Name = x.Name });
             return Json(customerAttr);
         }
         #endregion
@@ -1163,14 +685,11 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Condition Product Specification
 
         [HttpPost]
-        public IActionResult ConditionProductSpecification(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionProductSpecification(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
-
+            var specs = await _specificationAttributeService.GetSpecificationAttributes();
             var gridModel = new DataSourceResult
             {
                 Data = condition != null ? condition.ProductSpecifications
@@ -1178,62 +697,35 @@ namespace Grand.Web.Areas.Admin.Controllers
                         {
                             Id = z.Id,
                             SpecificationId = z.ProductSpecyficationId,
-                            SpecificationName = _specificationAttributeService.GetSpecificationAttributeById(z.ProductSpecyficationId).Name,
-                            SpecificationValueName = !String.IsNullOrEmpty(z.ProductSpecyficationValueId) ? _specificationAttributeService.GetSpecificationAttributeById(z.ProductSpecyficationId).SpecificationAttributeOptions.FirstOrDefault(x => x.Id == z.ProductSpecyficationValueId).Name : "Undefined"
+                            SpecificationName = specs.FirstOrDefault(x=>x.Id == z.ProductSpecyficationId)?.Name,
+                            SpecificationValueName = !String.IsNullOrEmpty(z.ProductSpecyficationValueId) ? specs.FirstOrDefault(x => x.Id == z.ProductSpecyficationId).SpecificationAttributeOptions.FirstOrDefault(x => x.Id == z.ProductSpecyficationValueId).Name : "Undefined"
                         }) : null,
                 Total = customerActions.Conditions.Where(x => x.Id == conditionId).Count()
             };
             return Json(gridModel);
         }
 
-
         [HttpPost]
-        public IActionResult ConditionProductSpecificationInsert(CustomerActionConditionModel.AddProductSpecificationConditionModel model)
+        public async Task<IActionResult> ConditionProductSpecificationInsert(CustomerActionConditionModel.AddProductSpecificationConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    if (condition.ProductSpecifications.Where(x => x.ProductSpecyficationId == model.SpecificationId && x.ProductSpecyficationValueId == model.SpecificationValueId).Count() == 0)
-                    {
-                        var _ps = new CustomerAction.ActionCondition.ProductSpecification()
-                        {
-                            ProductSpecyficationId = model.SpecificationId,
-                            ProductSpecyficationValueId = model.SpecificationValueId
-                        };
-                        condition.ProductSpecifications.Add(_ps);
-                        _customerActionService.UpdateCustomerAction(customerAction);
-                    }
-                }
-            }
+            await _customerActionViewModelService.InsertProductSpecificationConditionModel(model);
             return new NullJsonResult();
         }
 
         [HttpGet]
-        public IActionResult ProductSpecification()
+        public async Task<IActionResult> ProductSpecification()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-            var customerAttr = _specificationAttributeService.GetSpecificationAttributes().Select(x => new { Id = x.Id, Name = x.Name });
+            var customerAttr = (await _specificationAttributeService.GetSpecificationAttributes()).Select(x => new { Id = x.Id, Name = x.Name });
             return Json(customerAttr);
         }
 
         [HttpGet]
-        public IActionResult ProductSpecificationValue(string specificationId)
+        public async Task<IActionResult> ProductSpecificationValue(string specificationId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
             if (String.IsNullOrEmpty(specificationId))
                 return new NullJsonResult();
 
-            var customerSpec = _specificationAttributeService.GetSpecificationAttributeById(specificationId).SpecificationAttributeOptions.Select(x => new { Id = x.Id, Name = x.Name });
-
+            var customerSpec = (await _specificationAttributeService.GetSpecificationAttributeById(specificationId)).SpecificationAttributeOptions.Select(x => new { Id = x.Id, Name = x.Name });
             return Json(customerSpec);
         }
 
@@ -1242,12 +734,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Condition Customer Register
 
         [HttpPost]
-        public IActionResult ConditionCustomerRegister(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionCustomerRegister(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
 
             var gridModel = new DataSourceResult
@@ -1265,55 +754,21 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ConditionCustomerRegisterInsert(CustomerActionConditionModel.AddCustomerRegisterConditionModel model)
+        public async Task<IActionResult> ConditionCustomerRegisterInsert(CustomerActionConditionModel.AddCustomerRegisterConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var _cr = new CustomerAction.ActionCondition.CustomerRegister()
-                    {
-                        RegisterField = model.CustomerRegisterName,
-                        RegisterValue = model.CustomerRegisterValue,
-                    };
-                    condition.CustomerRegistration.Add(_cr);
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.InsertCustomerRegisterConditionModel(model);
             return new NullJsonResult();
         }
         [HttpPost]
-        public IActionResult ConditionCustomerRegisterUpdate(CustomerActionConditionModel.AddCustomerRegisterConditionModel model)
+        public async Task<IActionResult> ConditionCustomerRegisterUpdate(CustomerActionConditionModel.AddCustomerRegisterConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var cr = condition.CustomerRegistration.FirstOrDefault(x => x.Id == model.Id);
-                    cr.RegisterField = model.CustomerRegisterName;
-                    cr.RegisterValue = model.CustomerRegisterValue;
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.UpdateCustomerRegisterConditionModel(model);
             return new NullJsonResult();
         }
 
         [HttpGet]
         public IActionResult CustomerRegisterFields()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
             var list = new List<Tuple<string, string>>();
             list.Add(Tuple.Create("Gender", "Gender"));
             list.Add(Tuple.Create("Company", "Company"));
@@ -1332,13 +787,13 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Condition Custom Customer Attribute
 
-        private string CustomerAttribute(string registerField)
+        private async Task<string> CustomerAttribute(string registerField)
         {
             string _field = registerField;
             var _rf = registerField.Split(':');
             if (_rf.Count() > 1)
             {
-                var ca = _customerAttributeService.GetCustomerAttributeById(_rf.FirstOrDefault());
+                var ca = await _customerAttributeService.GetCustomerAttributeById(_rf.FirstOrDefault());
                 if (ca != null)
                 {
                     _field = ca.Name;
@@ -1354,12 +809,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ConditionCustomCustomerAttribute(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionCustomCustomerAttribute(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
 
             var gridModel = new DataSourceResult
@@ -1378,56 +830,23 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ConditionCustomCustomerAttributeInsert(CustomerActionConditionModel.AddCustomCustomerAttributeConditionModel model)
+        public async Task<IActionResult> ConditionCustomCustomerAttributeInsert(CustomerActionConditionModel.AddCustomCustomerAttributeConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var _cr = new CustomerAction.ActionCondition.CustomerRegister()
-                    {
-                        RegisterField = model.CustomerAttributeName,
-                        RegisterValue = model.CustomerAttributeValue,
-                    };
-                    condition.CustomCustomerAttributes.Add(_cr);
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.InsertCustomCustomerAttributeConditionModel(model);
             return new NullJsonResult();
         }
         [HttpPost]
-        public IActionResult ConditionCustomCustomerAttributeUpdate(CustomerActionConditionModel.AddCustomCustomerAttributeConditionModel model)
+        public async Task<IActionResult> ConditionCustomCustomerAttributeUpdate(CustomerActionConditionModel.AddCustomCustomerAttributeConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var cr = condition.CustomCustomerAttributes.FirstOrDefault(x => x.Id == model.Id);
-                    cr.RegisterField = model.CustomerAttributeName;
-                    cr.RegisterValue = model.CustomerAttributeValue;
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.UpdateCustomCustomerAttributeConditionModel(model);
             return new NullJsonResult();
         }
 
         [HttpGet]
-        public IActionResult CustomCustomerAttributeFields()
+        public async Task<IActionResult> CustomCustomerAttributeFields()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
             var list = new List<Tuple<string, string>>();
-            foreach (var item in _customerAttributeService.GetAllCustomerAttributes())
+            foreach (var item in await _customerAttributeService.GetAllCustomerAttributes())
             {
                 if (item.AttributeControlType == AttributeControlType.Checkboxes ||
                     item.AttributeControlType == AttributeControlType.DropdownList ||
@@ -1444,16 +863,12 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
         #endregion
 
-
         #region Url Referrer
 
         [HttpPost]
-        public IActionResult ConditionUrlReferrer(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionUrlReferrer(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
 
             var gridModel = new DataSourceResult
@@ -1465,44 +880,15 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ConditionUrlReferrerInsert(CustomerActionConditionModel.AddUrlConditionModel model)
+        public async Task<IActionResult> ConditionUrlReferrerInsert(CustomerActionConditionModel.AddUrlConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var _url = new CustomerAction.ActionCondition.Url()
-                    {
-                        Name = model.Name
-                    };
-                    condition.UrlReferrer.Add(_url);
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.InsertUrlConditionModel(model);
             return new NullJsonResult();
         }
         [HttpPost]
-        public IActionResult ConditionUrlReferrerUpdate(CustomerActionConditionModel.AddUrlConditionModel model)
+        public async Task<IActionResult> ConditionUrlReferrerUpdate(CustomerActionConditionModel.AddUrlConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var _url = condition.UrlReferrer.FirstOrDefault(x => x.Id == model.Id);
-                    _url.Name = model.Name;
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.UpdateUrlConditionModel(model);
             return new NullJsonResult();
         }
 
@@ -1511,12 +897,9 @@ namespace Grand.Web.Areas.Admin.Controllers
         #region Url Current
 
         [HttpPost]
-        public IActionResult ConditionUrlCurrent(string customerActionId, string conditionId)
+        public async Task<IActionResult> ConditionUrlCurrent(string customerActionId, string conditionId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerActions = _customerActionService.GetCustomerActionById(customerActionId);
+            var customerActions = await _customerActionService.GetCustomerActionById(customerActionId);
             var condition = customerActions.Conditions.FirstOrDefault(x => x.Id == conditionId);
 
             var gridModel = new DataSourceResult
@@ -1528,49 +911,18 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult ConditionUrlCurrentInsert(CustomerActionConditionModel.AddUrlConditionModel model)
+        public async Task<IActionResult> ConditionUrlCurrentInsert(CustomerActionConditionModel.AddUrlConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var _url = new CustomerAction.ActionCondition.Url()
-                    {
-                        Name = model.Name
-                    };
-                    condition.UrlCurrent.Add(_url);
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.InsertUrlCurrentConditionModel(model);
             return new NullJsonResult();
         }
         [HttpPost]
-        public IActionResult ConditionUrlCurrentUpdate(CustomerActionConditionModel.AddUrlConditionModel model)
+        public async Task<IActionResult> ConditionUrlCurrentUpdate(CustomerActionConditionModel.AddUrlConditionModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageActions))
-                return AccessDeniedView();
-
-            var customerAction = _customerActionService.GetCustomerActionById(model.CustomerActionId);
-            if (customerAction != null)
-            {
-                var condition = customerAction.Conditions.FirstOrDefault(x => x.Id == model.ConditionId);
-                if (condition != null)
-                {
-                    var _url = condition.UrlCurrent.FirstOrDefault(x => x.Id == model.Id);
-                    _url.Name = model.Name;
-                    _customerActionService.UpdateCustomerAction(customerAction);
-                }
-            }
+            await _customerActionViewModelService.UpdateUrlCurrentConditionModel(model);
             return new NullJsonResult();
         }
 
         #endregion
-
-
     }
 }

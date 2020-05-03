@@ -66,12 +66,15 @@ namespace Grand.Core.Domain.Orders
         /// <summary>
         /// Gets or sets a value indicating we should attach PDF invoice to "Order paid" email
         /// </summary>
-        public bool AttachPdfInvoiceToOrderPaidEmail { get; set; }
+        public bool AttachPdfInvoiceToOrderPaidEmail { get; set; }    
         /// <summary>
         /// Gets or sets a value indicating we should attach PDF invoice to "Order completed" email
         /// </summary>
         public bool AttachPdfInvoiceToOrderCompletedEmail { get; set; }
-
+        /// <summary>
+        /// Gets or sets a value indicating we should attach PDF invoice to binary field
+        /// </summary>
+        public bool AttachPdfInvoiceToBinary { get; set; }
         /// <summary>
         /// Gets or sets a value indicating whether "Return requests" are allowed
         /// </summary>
@@ -103,9 +106,9 @@ namespace Grand.Core.Domain.Orders
         public int GiftCards_Activated_OrderStatusId { get; set; }
 
         /// <summary>
-        ///  Gift cards are deactivated when the order status is
+        ///  Gift cards are deactivated when the order is canceled
         /// </summary>
-        public int GiftCards_Deactivated_OrderStatusId { get; set; }
+        public bool DeactivateGiftCardsAfterCancelOrder { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to deactivate related gift cards after deleting the order
@@ -135,5 +138,10 @@ namespace Grand.Core.Domain.Orders
         /// Gets or sets a value indicating whether customers can add order notes
         /// </summary>
         public bool AllowCustomerToAddOrderNote { get; set; }
+
+        /// <summary>
+        /// Gets or sets a length for order code
+        /// </summary>
+        public int LengthCode { get; set; }
     }
 }

@@ -36,8 +36,8 @@ function toggleEnableColorSquaresRgb() {
     }
 }
 </script>
-
-@(Html.LocalizedEditor<SpecificationAttributeOptionModel, SpecificationAttributeOptionLocalizedModel>("specificationattribute-localized",
+<vc:admin-widget widget-zone="specification_attribute_option_details_top" additional-data="null" />
+@(await Html.LocalizedEditor<SpecificationAttributeOptionModel, SpecificationAttributeOptionLocalizedModel>("specificationattribute-localized",
     @<div class="form-horizontal">
         <div class="form-body">
             <div class="form-group">
@@ -65,12 +65,21 @@ function toggleEnableColorSquaresRgb() {
 ))
 <div class="form-horizontal">
     <div class="form-body">
+        <div class="form-body">
+            <div class="form-group">
+                <admin-label asp-for="SeName" />
+                <div class="col-md-9 col-sm-9">
+                    <admin-input asp-for="SeName" />
+                    <span asp-validation-for="SeName"></span>
+                </div>
+            </div>
+        </div>
         <div class="form-group">
             <admin-label asp-for="EnableColorSquaresRgb" class="col-sm-3" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="EnableColorSquaresRgb" />
-                    <span></span>
+                    <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="EnableColorSquaresRgb"></span>
             </div>
@@ -97,4 +106,4 @@ function toggleEnableColorSquaresRgb() {
         </div>
     </div>
 </div>
-
+<vc:admin-widget widget-zone="specification_attribute_option_details_bottom" additional-data="Model" />

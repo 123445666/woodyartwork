@@ -1,12 +1,16 @@
 ﻿using Grand.Core.Caching;
 using Grand.Core.Data;
 using Grand.Core.Domain.Localization;
+using Grand.Core.Tests.Caching;
 using Grand.Services.Configuration;
 using Grand.Services.Events;
 using Grand.Services.Stores;
 using Grand.Services.Tests;
+using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Localization.Tests
 {
@@ -17,7 +21,7 @@ namespace Grand.Services.Localization.Tests
         private IStoreMappingService _storeMappingService;
         private ILanguageService _languageService;
         private ISettingService _settingService;
-        private IEventPublisher _eventPublisher;
+        private IMediator _eventPublisher;
         private LocalizationSettings _localizationSettings;
 
         [TestInitialize()]
@@ -46,21 +50,21 @@ namespace Grand.Services.Localization.Tests
 
             _storeMappingService = new Mock<IStoreMappingService>().Object;
             _settingService = new Mock<ISettingService>().Object;
-            var tempEventPublisher = new Mock<IEventPublisher>();
+            var tempEventPublisher = new Mock<IMediator>();
             {
-                tempEventPublisher.Setup(x => x.Publish(It.IsAny<object>()));
+                //tempEventPublisher.Setup(x => x.PublishAsync(It.IsAny<object>()));
                 _eventPublisher = tempEventPublisher.Object;
             }
             _localizationSettings = new LocalizationSettings();
 
-            _languageService = new LanguageService(new GrandNullCache(), _languageRepo, _storeMappingService,
+            _languageService = new LanguageService(new TestMemoryCacheManager(new Mock<IMemoryCache>().Object, _eventPublisher), _languageRepo, _storeMappingService,
                 _settingService, _localizationSettings, _eventPublisher);
         }
 
         [TestMethod()]
-        public void Can_get_all_languages()
+        public async Task Can_get_all_languages()
         {
-            var languages = _languageService.GetAllLanguages();
+            var languages = await _languageService.GetAllLanguages();
             Assert.IsNotNull(languages);
             Assert.IsTrue(languages.Count > 0);
         }

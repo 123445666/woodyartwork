@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System;
+using System.Threading.Tasks;
 
 namespace Grand.Framework.Mvc.Filters
 {
@@ -25,22 +26,25 @@ namespace Grand.Framework.Mvc.Filters
         /// <summary>
         /// Represents a filter that saves last customer activity date
         /// </summary>
-        private class SaveLastActivityFilter : IActionFilter
+        private class SaveLastActivityFilter : IAsyncActionFilter
         {
             #region Fields
 
             private readonly ICustomerService _customerService;
             private readonly IWorkContext _workContext;
+            private readonly ICustomerActionEventService _customerActionEventService;
 
             #endregion
 
             #region Ctor
 
             public SaveLastActivityFilter(ICustomerService customerService,
-                IWorkContext workContext)
+                IWorkContext workContext,
+                ICustomerActionEventService customerActionEventService)
             {
-                this._customerService = customerService;
-                this._workContext = workContext;
+                _customerService = customerService;
+                _workContext = workContext;
+                _customerActionEventService = customerActionEventService;
             }
 
             #endregion
@@ -51,8 +55,9 @@ namespace Grand.Framework.Mvc.Filters
             /// Called before the action executes, after model binding is complete
             /// </summary>
             /// <param name="context">A context for action filters</param>
-            public void OnActionExecuting(ActionExecutingContext context)
+            public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
             {
+                await next();
                 if (context == null || context.HttpContext == null || context.HttpContext.Request == null)
                     return;
 
@@ -67,19 +72,13 @@ namespace Grand.Framework.Mvc.Filters
                 if (_workContext.CurrentCustomer.LastActivityDateUtc.AddMinutes(1.0) < DateTime.UtcNow)
                 {
                     _workContext.CurrentCustomer.LastActivityDateUtc = DateTime.UtcNow;
-                    _customerService.UpdateCustomerLastActivityDate(_workContext.CurrentCustomer);
+                    await _customerService.UpdateCustomerLastActivityDate(_workContext.CurrentCustomer);
                 }
+
+                await _customerActionEventService.Url(_workContext.CurrentCustomer, context.HttpContext?.Request?.Path.ToString(), context.HttpContext?.Request?.Headers["Referer"]);
             }
 
-            /// <summary>
-            /// Called after the action executes, before the action result
-            /// </summary>
-            /// <param name="context">A context for action filters</param>
-            public void OnActionExecuted(ActionExecutedContext context)
-            {
-                //do nothing
-            }
-
+           
             #endregion
         }
 

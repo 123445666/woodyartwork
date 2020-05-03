@@ -1,13 +1,15 @@
 using Grand.Core;
 using Grand.Core.Data;
-using Grand.Core.Domain.Customers;
 using Grand.Core.Domain.Orders;
-using Grand.Services.Customers;
 using Grand.Services.Events;
+using Grand.Services.Queries.Models.Orders;
+using MediatR;
+using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Orders
 {
@@ -17,9 +19,9 @@ namespace Grand.Services.Orders
     public partial class GiftCardService : IGiftCardService
     {
         #region Fields
-        
+
         private readonly IRepository<GiftCard> _giftCardRepository;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         #endregion
 
@@ -29,30 +31,30 @@ namespace Grand.Services.Orders
         /// Ctor
         /// </summary>
         /// <param name="giftCardRepository">Gift card context</param>
-        /// <param name="eventPublisher">Event published</param>
-        public GiftCardService(IRepository<GiftCard> giftCardRepository, IEventPublisher eventPublisher)
+        /// <param name="mediator">Mediator</param>
+        public GiftCardService(IRepository<GiftCard> giftCardRepository, IMediator mediator)
         {
             _giftCardRepository = giftCardRepository;
-            _eventPublisher = eventPublisher;
+            _mediator = mediator;
         }
 
         #endregion
-        
+
         #region Methods
 
         /// <summary>
         /// Deletes a gift card
         /// </summary>
         /// <param name="giftCard">Gift card</param>
-        public virtual void DeleteGiftCard(GiftCard giftCard)
+        public virtual async Task DeleteGiftCard(GiftCard giftCard)
         {
             if (giftCard == null)
                 throw new ArgumentNullException("giftCard");
 
-            _giftCardRepository.Delete(giftCard);
+            await _giftCardRepository.DeleteAsync(giftCard);
 
             //event notification
-            _eventPublisher.EntityDeleted(giftCard);
+            await _mediator.EntityDeleted(giftCard);
         }
 
         /// <summary>
@@ -60,9 +62,9 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="giftCardId">Gift card identifier</param>
         /// <returns>Gift card entry</returns>
-        public virtual GiftCard GetGiftCardById(string giftCardId)
+        public virtual Task<GiftCard> GetGiftCardById(string giftCardId)
         {
-            return _giftCardRepository.GetById(giftCardId);
+            return _giftCardRepository.GetByIdAsync(giftCardId);
         }
 
         /// <summary>
@@ -77,69 +79,66 @@ namespace Grand.Services.Orders
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Gift cards</returns>
-        public virtual IPagedList<GiftCard> GetAllGiftCards(string purchasedWithOrderId = "",
-            DateTime? createdFromUtc = null, DateTime? createdToUtc = null, 
+        public virtual async Task<IPagedList<GiftCard>> GetAllGiftCards(string purchasedWithOrderItemId = "",
+            DateTime? createdFromUtc = null, DateTime? createdToUtc = null,
             bool? isGiftCardActivated = null, string giftCardCouponCode = null,
             string recipientName = null,
             int pageIndex = 0, int pageSize = int.MaxValue)
         {
-            var query = _giftCardRepository.Table;
+            var model = new GetGiftCardQuery() {
+                CreatedFromUtc = createdFromUtc,
+                CreatedToUtc = createdToUtc,
+                GiftCardCouponCode = giftCardCouponCode,
+                IsGiftCardActivated = isGiftCardActivated,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                PurchasedWithOrderItemId = purchasedWithOrderItemId,
+                RecipientName = recipientName
+            };
 
-            if (createdFromUtc.HasValue)
-                query = query.Where(gc => createdFromUtc.Value <= gc.CreatedOnUtc);
-            if (createdToUtc.HasValue)
-                query = query.Where(gc => createdToUtc.Value >= gc.CreatedOnUtc);
-            if (isGiftCardActivated.HasValue)
-                query = query.Where(gc => gc.IsGiftCardActivated == isGiftCardActivated.Value);
-            if (!String.IsNullOrEmpty(giftCardCouponCode))
-                query = query.Where(gc => gc.GiftCardCouponCode == giftCardCouponCode);
-            if (!String.IsNullOrWhiteSpace(recipientName))
-                query = query.Where(c => c.RecipientName.Contains(recipientName));
-            query = query.OrderByDescending(gc => gc.CreatedOnUtc);
-
-            var giftCards = new PagedList<GiftCard>(query, pageIndex, pageSize);
-            return giftCards;
+            var query = await _mediator.Send(model);
+            return await PagedList<GiftCard>.Create(query, pageIndex, pageSize);
         }
 
-        public IList<GiftCardUsageHistory> GetAllGiftCardUsageHistory(string orderId = "")
+        public virtual async Task<IList<GiftCardUsageHistory>> GetAllGiftCardUsageHistory(string orderId = "")
         {
             var query = from g in _giftCardRepository.Table
                         from h in g.GiftCardUsageHistory
                         select h;
 
             query = query.Where(x => x.UsedWithOrderId == orderId);
-            return query.ToList();
+            return await query.ToListAsync();
         }
 
         /// <summary>
         /// Inserts a gift card
         /// </summary>
         /// <param name="giftCard">Gift card</param>
-        public virtual void InsertGiftCard(GiftCard giftCard)
+        public virtual async Task InsertGiftCard(GiftCard giftCard)
         {
             if (giftCard == null)
                 throw new ArgumentNullException("giftCard");
             giftCard.GiftCardCouponCode = giftCard.GiftCardCouponCode.ToLowerInvariant();
-            _giftCardRepository.Insert(giftCard);
+            await _giftCardRepository.InsertAsync(giftCard);
 
             //event notification
-            _eventPublisher.EntityInserted(giftCard);
+            await _mediator.EntityInserted(giftCard);
         }
 
         /// <summary>
         /// Updates the gift card
         /// </summary>
         /// <param name="giftCard">Gift card</param>
-        public virtual void UpdateGiftCard(GiftCard giftCard)
+        public virtual async Task UpdateGiftCard(GiftCard giftCard)
         {
             if (giftCard == null)
                 throw new ArgumentNullException("giftCard");
 
             giftCard.GiftCardCouponCode = giftCard.GiftCardCouponCode.ToLowerInvariant();
-            _giftCardRepository.Update(giftCard);
+            await _giftCardRepository.UpdateAsync(giftCard);
 
             //event notification
-            _eventPublisher.EntityUpdated(giftCard);
+            await _mediator.EntityUpdated(giftCard);
         }
 
         /// <summary>
@@ -147,7 +146,7 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="purchasedWithOrderItemId">Purchased with order item identifier</param>
         /// <returns>Gift card entries</returns>
-        public virtual IList<GiftCard> GetGiftCardsByPurchasedWithOrderItemId(string purchasedWithOrderItemId)
+        public virtual async Task<IList<GiftCard>> GetGiftCardsByPurchasedWithOrderItemId(string purchasedWithOrderItemId)
         {
             if (String.IsNullOrEmpty(purchasedWithOrderItemId))
                 return new List<GiftCard>();
@@ -157,33 +156,7 @@ namespace Grand.Services.Orders
             query = query.Where(gc => gc.PurchasedWithOrderItem.Id == purchasedWithOrderItemId);
             query = query.OrderBy(gc => gc.Id);
 
-            var giftCards = query.ToList();
-            return giftCards;
-        }
-
-        /// <summary>
-        /// Get active gift cards that are applied by a customer
-        /// </summary>
-        /// <param name="customer">Customer</param>
-        /// <returns>Active gift cards</returns>
-        public virtual IList<GiftCard> GetActiveGiftCardsAppliedByCustomer(Customer customer)
-        {
-            var result = new List<GiftCard>();
-            if (customer == null)
-                return result;
-
-            string[] couponCodes = customer.ParseAppliedGiftCardCouponCodes();
-            foreach (var couponCode in couponCodes)
-            {
-                var giftCards = GetAllGiftCards(isGiftCardActivated: true, giftCardCouponCode: couponCode);
-                foreach (var gc in giftCards)
-                {
-                    if (gc.IsGiftCardValid())
-                        result.Add(gc);
-                }
-            }
-
-            return result;
+            return await query.ToListAsync();
         }
 
         /// <summary>

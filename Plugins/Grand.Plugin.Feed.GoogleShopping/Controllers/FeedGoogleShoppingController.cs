@@ -5,7 +5,7 @@ using Grand.Framework.Controllers;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
 using Grand.Framework.Mvc.Filters;
-using Grand.Framework.Security;
+using Grand.Framework.Security.Authorization;
 using Grand.Plugin.Feed.GoogleShopping.Domain;
 using Grand.Plugin.Feed.GoogleShopping.Models;
 using Grand.Plugin.Feed.GoogleShopping.Services;
@@ -20,12 +20,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Plugin.Feed.GoogleShopping.Controllers
 {
     [Area("Admin")]
     [AuthorizeAdmin]
+    [PermissionAuthorize(PermissionSystemName.Plugins)]
     public class FeedGoogleShoppingController : BasePluginController
     {
         private readonly IGoogleService _googleService;
@@ -39,6 +40,7 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
         private readonly GoogleShoppingSettings _GoogleShoppingSettings;
         private readonly ISettingService _settingService;
         private readonly IPermissionService _permissionService;
+        private readonly IServiceProvider _serviceProvider;
 
         public FeedGoogleShoppingController(IGoogleService googleService,
             IProductService productService,
@@ -50,22 +52,24 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
             IStoreService storeService,
             GoogleShoppingSettings GoogleShoppingSettings,
             ISettingService settingService,
-            IPermissionService permissionService)
+            IPermissionService permissionService,
+            IServiceProvider serviceProvider)
         {
-            this._googleService = googleService;
-            this._productService = productService;
-            this._currencyService = currencyService;
-            this._localizationService = localizationService;
-            this._pluginFinder = pluginFinder;
-            this._logger = logger;
-            this._webHelper = webHelper;
-            this._storeService = storeService;
-            this._GoogleShoppingSettings = GoogleShoppingSettings;
-            this._settingService = settingService;
-            this._permissionService = permissionService;
+            _googleService = googleService;
+            _productService = productService;
+            _currencyService = currencyService;
+            _localizationService = localizationService;
+            _pluginFinder = pluginFinder;
+            _logger = logger;
+            _webHelper = webHelper;
+            _storeService = storeService;
+            _GoogleShoppingSettings = GoogleShoppingSettings;
+            _settingService = settingService;
+            _permissionService = permissionService;
+            _serviceProvider = serviceProvider;
         }
 
-        public IActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
             var model = new FeedGoogleShoppingModel();
             model.ProductPictureSize = _GoogleShoppingSettings.ProductPictureSize;
@@ -75,27 +79,27 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
             //stores
             model.StoreId = _GoogleShoppingSettings.StoreId;
             model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
-            foreach (var s in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString() });
+            foreach (var s in await _storeService.GetAllStores())
+                model.AvailableStores.Add(new SelectListItem { Text = s.Shortcut, Value = s.Id.ToString() });
             //currencies
             model.CurrencyId = _GoogleShoppingSettings.CurrencyId;
-            foreach (var c in _currencyService.GetAllCurrencies())
+            foreach (var c in await _currencyService.GetAllCurrencies())
                 model.AvailableCurrencies.Add(new SelectListItem { Text = c.Name, Value = c.Id.ToString() });
             //Google categories
             model.DefaultGoogleCategory = _GoogleShoppingSettings.DefaultGoogleCategory;
-            model.AvailableGoogleCategories.Add(new SelectListItem {Text = "Select a category", Value = ""});
-            foreach (var gc in _googleService.GetTaxonomyList())
+            model.AvailableGoogleCategories.Add(new SelectListItem { Text = "Select a category", Value = "" });
+            foreach (var gc in await _googleService.GetTaxonomyList())
                 model.AvailableGoogleCategories.Add(new SelectListItem { Text = gc, Value = gc });
 
             //file paths
-            foreach (var store in _storeService.GetAllStores())
+            foreach (var store in await _storeService.GetAllStores())
             {
                 var appPath = CommonHelper.MapPath("wwwroot/content/files/exportimport");
-                var localFilePath = System.IO.Path.Combine(appPath, store.Id + "-" + _GoogleShoppingSettings.StaticFileName);           
+                var localFilePath = System.IO.Path.Combine(appPath, store.Id + "-" + _GoogleShoppingSettings.StaticFileName);
                 if (System.IO.File.Exists(localFilePath))
                     model.GeneratedFiles.Add(new FeedGoogleShoppingModel.GeneratedFileModel
                     {
-                        StoreName = store.Name,
+                        StoreName = store.Shortcut,
                         FileUrl = string.Format("{0}content/files/exportimport/{1}-{2}", _webHelper.GetStoreLocation(false), store.Id, _GoogleShoppingSettings.StaticFileName)
                     });
             }
@@ -105,11 +109,11 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
 
         [HttpPost]
         [FormValueRequired("save")]
-        public IActionResult Configure(FeedGoogleShoppingModel model)
+        public async Task<IActionResult> Configure(FeedGoogleShoppingModel model)
         {
             if (!ModelState.IsValid)
             {
-                return Configure();
+                return await Configure();
             }
 
             //save settings
@@ -120,17 +124,17 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
             _GoogleShoppingSettings.CurrencyId = model.CurrencyId;
             _GoogleShoppingSettings.StoreId = model.StoreId;
             _GoogleShoppingSettings.DefaultGoogleCategory = model.DefaultGoogleCategory;
-            _settingService.SaveSetting(_GoogleShoppingSettings);
+            await _settingService.SaveSetting(_GoogleShoppingSettings);
 
             SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
             //redisplay the form
-            return Configure();
+            return await Configure();
         }
 
         [HttpPost, ActionName("Configure")]
         [FormValueRequired("generate")]
-        public IActionResult GenerateFeed(FeedGoogleShoppingModel model)
+        public async Task<IActionResult> GenerateFeed(FeedGoogleShoppingModel model)
         {
             try
             {
@@ -139,19 +143,19 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
                     throw new Exception("Cannot load the plugin");
 
                 //plugin
-                var plugin = pluginDescriptor.Instance() as GoogleShoppingService;
+                var plugin = pluginDescriptor.Instance(_serviceProvider) as GoogleShoppingService;
                 if (plugin == null)
                     throw new Exception("Cannot load the plugin");
 
                 var stores = new List<Store>();
-                var storeById = _storeService.GetStoreById(_GoogleShoppingSettings.StoreId);
+                var storeById = await _storeService.GetStoreById(_GoogleShoppingSettings.StoreId);
                 if (storeById != null)
                     stores.Add(storeById);
                 else
-                    stores.AddRange(_storeService.GetAllStores());
+                    stores.AddRange(await _storeService.GetAllStores());
 
                 foreach (var store in stores)
-                    plugin.GenerateStaticFile(store);
+                    await plugin.GenerateStaticFile(store);
 
                 SuccessNotification(_localizationService.GetResource("Plugins.Feed.GoogleShopping.SuccessResult"));
             }
@@ -161,42 +165,41 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
                 _logger.Error(exc.Message, exc);
             }
 
-            return Configure();
+            return await Configure();
         }
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult GoogleProductList(DataSourceRequest command)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> GoogleProductList(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
                 return Content("Access denied");
 
-            var products = _productService.SearchProducts(pageIndex: command.Page - 1,
-                pageSize: command.PageSize, showHidden: true);
-            var productsModel = products
-                .Select(x =>
-                            {
-                                var gModel = new FeedGoogleShoppingModel.GoogleProductModel
-                                {
-                                    ProductId = x.Id,
-                                    ProductName = x.Name
+            var products = (await _productService.SearchProducts(pageIndex: command.Page - 1,
+                pageSize: command.PageSize, showHidden: true)).products;
+            var productsModel = new List<FeedGoogleShoppingModel.GoogleProductModel>();
+            foreach (var x in products)
+            {
 
-                                };
-                                var googleProduct = _googleService.GetByProductId(x.Id);
-                                if (googleProduct != null)
-                                {
-                                    gModel.GoogleCategory = googleProduct.Taxonomy;
-                                    gModel.Gender = googleProduct.Gender;
-                                    gModel.AgeGroup = googleProduct.AgeGroup;
-                                    gModel.Color = googleProduct.Color;
-                                    gModel.GoogleSize = googleProduct.Size;
-                                    gModel.CustomGoods = googleProduct.CustomGoods;
-                                }
+                var gModel = new FeedGoogleShoppingModel.GoogleProductModel
+                {
+                    ProductId = x.Id,
+                    ProductName = x.Name
 
-                                return gModel;
-                            })
-                .ToList();
+                };
+                var googleProduct = await _googleService.GetByProductId(x.Id);
+                if (googleProduct != null)
+                {
+                    gModel.GoogleCategory = googleProduct.Taxonomy;
+                    gModel.Gender = googleProduct.Gender;
+                    gModel.AgeGroup = googleProduct.AgeGroup;
+                    gModel.Color = googleProduct.Color;
+                    gModel.GoogleSize = googleProduct.Size;
+                    gModel.CustomGoods = googleProduct.CustomGoods;
+                }
 
+                productsModel.Add(gModel);
+            }
             var gridModel = new DataSourceResult
             {
                 Data = productsModel,
@@ -207,13 +210,13 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult GoogleProductUpdate(FeedGoogleShoppingModel.GoogleProductModel model)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> GoogleProductUpdate(FeedGoogleShoppingModel.GoogleProductModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
                 return Content("Access denied");
 
-            var googleProduct = _googleService.GetByProductId(model.ProductId);
+            var googleProduct = await _googleService.GetByProductId(model.ProductId);
             if (googleProduct != null)
             {
 
@@ -223,7 +226,7 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
                 googleProduct.Color = model.Color;
                 googleProduct.Size = model.GoogleSize;
                 googleProduct.CustomGoods = model.CustomGoods;
-                _googleService.UpdateGoogleProductRecord(googleProduct);
+                await _googleService.UpdateGoogleProductRecord(googleProduct);
             }
             else
             {
@@ -238,7 +241,7 @@ namespace Grand.Plugin.Feed.GoogleShopping.Controllers
                     Size = model.GoogleSize,
                     CustomGoods = model.CustomGoods
                 };
-                _googleService.InsertGoogleProductRecord(googleProduct);
+                await _googleService.InsertGoogleProductRecord(googleProduct);
             }
 
             return new NullJsonResult();

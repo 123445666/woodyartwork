@@ -11,6 +11,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Orders
 {
@@ -20,7 +21,6 @@ namespace Grand.Services.Orders
     public partial class CheckoutAttributeFormatter : ICheckoutAttributeFormatter
     {
         private readonly IWorkContext _workContext;
-        private readonly ICheckoutAttributeService _checkoutAttributeService;
         private readonly ICheckoutAttributeParser _checkoutAttributeParser;
         private readonly ICurrencyService _currencyService;
         private readonly ITaxService _taxService;
@@ -29,7 +29,6 @@ namespace Grand.Services.Orders
         private readonly IWebHelper _webHelper;
 
         public CheckoutAttributeFormatter(IWorkContext workContext,
-            ICheckoutAttributeService checkoutAttributeService,
             ICheckoutAttributeParser checkoutAttributeParser,
             ICurrencyService currencyService,
             ITaxService taxService,
@@ -37,14 +36,13 @@ namespace Grand.Services.Orders
             IDownloadService downloadService,
             IWebHelper webHelper)
         {
-            this._workContext = workContext;
-            this._checkoutAttributeService = checkoutAttributeService;
-            this._checkoutAttributeParser = checkoutAttributeParser;
-            this._currencyService = currencyService;
-            this._taxService = taxService;
-            this._priceFormatter = priceFormatter;
-            this._downloadService = downloadService;
-            this._webHelper = webHelper;
+            _workContext = workContext;
+            _checkoutAttributeParser = checkoutAttributeParser;
+            _currencyService = currencyService;
+            _taxService = taxService;
+            _priceFormatter = priceFormatter;
+            _downloadService = downloadService;
+            _webHelper = webHelper;
         }
 
         /// <summary>
@@ -52,10 +50,10 @@ namespace Grand.Services.Orders
         /// </summary>
         /// <param name="attributesXml">Attributes in XML format</param>
         /// <returns>Attributes</returns>
-        public virtual string FormatAttributes(string attributesXml)
+        public virtual async Task<string> FormatAttributes(string attributesXml)
         {
             var customer = _workContext.CurrentCustomer;
-            return FormatAttributes(attributesXml, customer);
+            return await FormatAttributes(attributesXml, customer);
         }
 
         /// <summary>
@@ -68,7 +66,7 @@ namespace Grand.Services.Orders
         /// <param name="renderPrices">A value indicating whether to render prices</param>
         /// <param name="allowHyperlinks">A value indicating whether to HTML hyperink tags could be rendered (if required)</param>
         /// <returns>Attributes</returns>
-        public virtual string FormatAttributes(string attributesXml,
+        public virtual async Task<string> FormatAttributes(string attributesXml,
             Customer customer, 
             string serapator = "<br />", 
             bool htmlEncode = true, 
@@ -77,7 +75,7 @@ namespace Grand.Services.Orders
         {
             var result = new StringBuilder();
 
-            var attributes = _checkoutAttributeParser.ParseCheckoutAttributes(attributesXml);
+            var attributes = await _checkoutAttributeParser.ParseCheckoutAttributes(attributesXml);
             for (int i = 0; i < attributes.Count; i++)
             {
                 var attribute = attributes[i];
@@ -104,7 +102,7 @@ namespace Grand.Services.Orders
                             //file upload
                             Guid downloadGuid;
                             Guid.TryParse(valueStr, out downloadGuid);
-                            var download = _downloadService.GetDownloadByGuid(downloadGuid);
+                            var download = await _downloadService.GetDownloadByGuid(downloadGuid);
                             if (download != null)
                             {
                                 //TODO add a method for getting URL (use routing because it handles all SEO friendly URLs)
@@ -150,8 +148,8 @@ namespace Grand.Services.Orders
                                 formattedAttribute = string.Format("{0}: {1}", attribute.GetLocalized(a => a.Name, _workContext.WorkingLanguage.Id), attributeValue.GetLocalized(a => a.Name, _workContext.WorkingLanguage.Id));
                                 if (renderPrices)
                                 {
-                                    decimal priceAdjustmentBase = _taxService.GetCheckoutAttributePrice(attributeValue, customer);
-                                    decimal priceAdjustment = _currencyService.ConvertFromPrimaryStoreCurrency(priceAdjustmentBase, _workContext.WorkingCurrency);
+                                    decimal priceAdjustmentBase = (await _taxService.GetCheckoutAttributePrice(attributeValue, customer)).checkoutPrice;
+                                    decimal priceAdjustment = await _currencyService.ConvertFromPrimaryStoreCurrency(priceAdjustmentBase, _workContext.WorkingCurrency);
                                     if (priceAdjustmentBase > 0)
                                     {
                                         string priceAdjustmentStr = _priceFormatter.FormatPrice(priceAdjustment);

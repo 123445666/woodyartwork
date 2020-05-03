@@ -6,9 +6,15 @@ using Grand.Services.Customers;
 using Grand.Services.Events;
 using Grand.Services.Localization;
 using Grand.Services.Logging;
+using Grand.Services.Messages.DotLiquidDrops;
+using Grand.Services.Stores;
+using MediatR;
+using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Messages
 {
@@ -20,65 +26,66 @@ namespace Grand.Services.Messages
         private readonly IRepository<Customer> _customerRepository;
         private readonly IEmailSender _emailSender;
         private readonly IMessageTokenProvider _messageTokenProvider;
-        private readonly ITokenizer _tokenizer;
         private readonly IQueuedEmailService _queuedEmailService;
         private readonly ICustomerService _customerService;
-        private readonly IStoreContext _storeContext;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IStoreService _storeService;
+        private readonly IMediator _mediator;
         private readonly ICustomerActivityService _customerActivityService;
         private readonly ILocalizationService _localizationService;
+        private readonly ILanguageService _languageService;
 
         public CampaignService(IRepository<Campaign> campaignRepository,
             IRepository<CampaignHistory> campaignHistoryRepository,
             IRepository<NewsLetterSubscription> newsLetterSubscriptionRepository,
             IRepository<Customer> customerRepository,
             IEmailSender emailSender, IMessageTokenProvider messageTokenProvider,
-            ITokenizer tokenizer, IQueuedEmailService queuedEmailService,
-            ICustomerService customerService, IStoreContext storeContext,
-            IEventPublisher eventPublisher,
+            IQueuedEmailService queuedEmailService,
+            ICustomerService customerService, IStoreService storeService,
+            IMediator mediator,
             ICustomerActivityService customerActivityService,
-            ILocalizationService localizationService)
+            ILocalizationService localizationService,
+            ILanguageService languageService)
         {
-            this._campaignRepository = campaignRepository;
-            this._campaignHistoryRepository = campaignHistoryRepository;
-            this._newsLetterSubscriptionRepository = newsLetterSubscriptionRepository;
-            this._customerRepository = customerRepository;
-            this._emailSender = emailSender;
-            this._messageTokenProvider = messageTokenProvider;
-            this._tokenizer = tokenizer;
-            this._queuedEmailService = queuedEmailService;
-            this._storeContext = storeContext;
-            this._customerService = customerService;
-            this._eventPublisher = eventPublisher;
-            this._customerActivityService = customerActivityService;
-            this._localizationService = localizationService;
+            _campaignRepository = campaignRepository;
+            _campaignHistoryRepository = campaignHistoryRepository;
+            _newsLetterSubscriptionRepository = newsLetterSubscriptionRepository;
+            _customerRepository = customerRepository;
+            _emailSender = emailSender;
+            _messageTokenProvider = messageTokenProvider;
+            _queuedEmailService = queuedEmailService;
+            _storeService = storeService;
+            _customerService = customerService;
+            _mediator = mediator;
+            _customerActivityService = customerActivityService;
+            _localizationService = localizationService;
+            _languageService = languageService;
         }
 
         /// <summary>
         /// Inserts a campaign
         /// </summary>
         /// <param name="campaign">Campaign</param>        
-        public virtual void InsertCampaign(Campaign campaign)
+        public virtual async Task InsertCampaign(Campaign campaign)
         {
             if (campaign == null)
                 throw new ArgumentNullException("campaign");
 
-            _campaignRepository.Insert(campaign);
+            await _campaignRepository.InsertAsync(campaign);
 
             //event notification
-            _eventPublisher.EntityInserted(campaign);
+            await _mediator.EntityInserted(campaign);
         }
 
         /// <summary>
         /// Inserts a campaign history
         /// </summary>
         /// <param name="campaign">Campaign</param>        
-        public virtual void InsertCampaignHistory(CampaignHistory campaignhistory)
+        public virtual async Task InsertCampaignHistory(CampaignHistory campaignhistory)
         {
             if (campaignhistory == null)
                 throw new ArgumentNullException("campaignhistory");
 
-            _campaignHistoryRepository.Insert(campaignhistory);
+            await _campaignHistoryRepository.InsertAsync(campaignhistory);
 
         }
 
@@ -86,30 +93,30 @@ namespace Grand.Services.Messages
         /// Updates a campaign
         /// </summary>
         /// <param name="campaign">Campaign</param>
-        public virtual void UpdateCampaign(Campaign campaign)
+        public virtual async Task UpdateCampaign(Campaign campaign)
         {
             if (campaign == null)
                 throw new ArgumentNullException("campaign");
 
-            _campaignRepository.Update(campaign);
+            await _campaignRepository.UpdateAsync(campaign);
 
             //event notification
-            _eventPublisher.EntityUpdated(campaign);
+            await _mediator.EntityUpdated(campaign);
         }
 
         /// <summary>
         /// Deleted a queued email
         /// </summary>
         /// <param name="campaign">Campaign</param>
-        public virtual void DeleteCampaign(Campaign campaign)
+        public virtual async Task DeleteCampaign(Campaign campaign)
         {
             if (campaign == null)
                 throw new ArgumentNullException("campaign");
 
-            _campaignRepository.Delete(campaign);
+            await _campaignRepository.DeleteAsync(campaign);
 
             //event notification
-            _eventPublisher.EntityDeleted(campaign);
+            await _mediator.EntityDeleted(campaign);
         }
 
         /// <summary>
@@ -117,9 +124,9 @@ namespace Grand.Services.Messages
         /// </summary>
         /// <param name="campaignId">Campaign identifier</param>
         /// <returns>Campaign</returns>
-        public virtual Campaign GetCampaignById(string campaignId)
+        public virtual Task<Campaign> GetCampaignById(string campaignId)
         {
-            return _campaignRepository.GetById(campaignId);
+            return _campaignRepository.GetByIdAsync(campaignId);
 
         }
 
@@ -127,17 +134,16 @@ namespace Grand.Services.Messages
         /// Gets all campaigns
         /// </summary>
         /// <returns>Campaigns</returns>
-        public virtual IList<Campaign> GetAllCampaigns()
+        public virtual async Task<IList<Campaign>> GetAllCampaigns()
         {
 
             var query = from c in _campaignRepository.Table
                         orderby c.CreatedOnUtc
                         select c;
-            var campaigns = query.ToList();
-
-            return campaigns;
+            return await query.ToListAsync();
         }
-        public virtual IPagedList<CampaignHistory> GetCampaignHistory(Campaign campaign, int pageIndex = 0, int pageSize = int.MaxValue)
+
+        public virtual async Task<IPagedList<CampaignHistory>> GetCampaignHistory(Campaign campaign, int pageIndex = 0, int pageSize = int.MaxValue)
         {
             if (campaign == null)
                 throw new ArgumentNullException("campaign");
@@ -146,11 +152,9 @@ namespace Grand.Services.Messages
                         where c.CampaignId == campaign.Id
                         orderby c.CreatedDateUtc descending
                         select c;
-            var list = new PagedList<CampaignHistory>(query, pageIndex, pageSize);
-            return list;
-
+            return await PagedList<CampaignHistory>.Create(query, pageIndex, pageSize);
         }
-        public virtual IPagedList<NewsLetterSubscription> CustomerSubscriptions(Campaign campaign, int pageIndex = 0, int pageSize = int.MaxValue)
+        public virtual async Task<IPagedList<NewsLetterSubscription>> CustomerSubscriptions(Campaign campaign, int pageIndex = 0, int pageSize = int.MaxValue)
         {
             if (campaign == null)
                 throw new ArgumentNullException("campaign");
@@ -160,11 +164,11 @@ namespace Grand.Services.Messages
                 campaign.CustomerHasShoppingCartCondition != CampaignCondition.All || campaign.CustomerHasShoppingCartCondition != CampaignCondition.All ||
                 campaign.CustomerLastActivityDateFrom.HasValue || campaign.CustomerLastActivityDateTo.HasValue ||
                 campaign.CustomerLastPurchaseDateFrom.HasValue || campaign.CustomerLastPurchaseDateTo.HasValue ||
-                campaign.CustomerTags.Count > 0 || campaign.CustomerRoles.Count > 0 || campaign.NewsletterCategories.Count > 0 )
+                campaign.CustomerTags.Count > 0 || campaign.CustomerRoles.Count > 0)
             {
 
                 var query = from o in _newsLetterSubscriptionRepository.Table
-                            where o.Active && o.CustomerId!="" && (o.StoreId == campaign.StoreId || String.IsNullOrEmpty(campaign.StoreId))
+                            where o.Active && o.CustomerId != "" && (o.StoreId == campaign.StoreId || String.IsNullOrEmpty(campaign.StoreId))
                             join c in _customerRepository.Table on o.CustomerId equals c.Id into joined
                             from customers in joined
                             select new CampaignCustomerHelp() {
@@ -200,7 +204,7 @@ namespace Grand.Services.Messages
                     query = query.Where(x => x.LastPurchaseDateUtc <= campaign.CustomerLastPurchaseDateTo.Value);
 
                 //customer has shopping carts
-                if(campaign.CustomerHasShoppingCartCondition == CampaignCondition.True)
+                if (campaign.CustomerHasShoppingCartCondition == CampaignCondition.True)
                     query = query.Where(x => x.HasShoppingCartItems);
                 if (campaign.CustomerHasShoppingCartCondition == CampaignCondition.False)
                     query = query.Where(x => !x.HasShoppingCartItems);
@@ -212,7 +216,7 @@ namespace Grand.Services.Messages
                     query = query.Where(x => !x.IsHasOrders);
 
                 //tags
-                if(campaign.CustomerTags.Count > 0)
+                if (campaign.CustomerTags.Count > 0)
                 {
                     foreach (var item in campaign.CustomerTags)
                     {
@@ -224,7 +228,7 @@ namespace Grand.Services.Messages
                 {
                     foreach (var item in campaign.CustomerRoles)
                     {
-                        query = query.Where(x => x.CustomerRoles.Any(z=>z.Id == item));
+                        query = query.Where(x => x.CustomerRoles.Any(z => z.Id == item));
                     }
                 }
                 //categories news
@@ -235,18 +239,25 @@ namespace Grand.Services.Messages
                         query = query.Where(x => x.NewsletterCategories.Contains(item));
                     }
                 }
-
-                model = new PagedList<NewsLetterSubscription>(query.Select(x => new NewsLetterSubscription() { CustomerId = x.CustomerId, Email = x.Email, NewsLetterSubscriptionGuid = x.NewsLetterSubscriptionGuid }), pageIndex, pageSize);
+                model = await PagedList<NewsLetterSubscription>.Create(query.Select(x => new NewsLetterSubscription() { CustomerId = x.CustomerId, Email = x.Email, NewsLetterSubscriptionGuid = x.NewsLetterSubscriptionGuid }), pageIndex, pageSize);
             }
             else
             {
                 var query = from o in _newsLetterSubscriptionRepository.Table
-                            where o.Active && (o.StoreId == campaign.StoreId || String.IsNullOrEmpty(campaign.StoreId))
+                            where o.Active && (o.StoreId == campaign.StoreId || string.IsNullOrEmpty(campaign.StoreId))
                             select o;
-                model = new PagedList<NewsLetterSubscription>(query, pageIndex, pageSize);
+
+                if (campaign.NewsletterCategories.Count > 0)
+                {
+                    foreach (var item in campaign.NewsletterCategories)
+                    {
+                        query = query.Where(x => x.Categories.Contains(item));
+                    }
+                }
+                model = await PagedList<NewsLetterSubscription>.Create(query, pageIndex, pageSize);
             }
 
-            return model;
+            return await Task.FromResult(model);
         }
 
         private class CampaignCustomerHelp
@@ -276,7 +287,7 @@ namespace Grand.Services.Messages
         /// <param name="emailAccount">Email account</param>
         /// <param name="subscriptions">Subscriptions</param>
         /// <returns>Total emails sent</returns>
-        public virtual int SendCampaign(Campaign campaign, EmailAccount emailAccount,
+        public virtual async Task<int> SendCampaign(Campaign campaign, EmailAccount emailAccount,
             IEnumerable<NewsLetterSubscription> subscriptions)
         {
             if (campaign == null)
@@ -286,41 +297,45 @@ namespace Grand.Services.Messages
                 throw new ArgumentNullException("emailAccount");
 
             int totalEmailsSent = 0;
+            var language = await _languageService.GetLanguageById(campaign.LanguageId);
+            if (language == null)
+                language = (await _languageService.GetAllLanguages()).FirstOrDefault();
 
             foreach (var subscription in subscriptions)
             {
                 Customer customer = null;
 
-                if(!String.IsNullOrEmpty(subscription.CustomerId))
+                if (!String.IsNullOrEmpty(subscription.CustomerId))
                 {
-                    customer = _customerService.GetCustomerById(subscription.CustomerId);
+                    customer = await _customerService.GetCustomerById(subscription.CustomerId);
                 }
 
-                if(customer == null)
+                if (customer == null)
                 {
-                    customer = _customerService.GetCustomerByEmail(subscription.Email);
+                    customer = await _customerService.GetCustomerByEmail(subscription.Email);
                 }
 
                 //ignore deleted or inactive customers when sending newsletter campaigns
                 if (customer != null && (!customer.Active || customer.Deleted))
                     continue;
 
-                var tokens = new List<Token>();
-                _messageTokenProvider.AddStoreTokens(tokens, _storeContext.CurrentStore, emailAccount);
-                _messageTokenProvider.AddNewsLetterSubscriptionTokens(tokens, subscription);
+                var liquidObject = new LiquidObject();
+                var store = await _storeService.GetStoreById(campaign.StoreId);
+                if (store == null)
+                    store = (await _storeService.GetAllStores()).FirstOrDefault();
+
+                await _messageTokenProvider.AddStoreTokens(liquidObject, store, language, emailAccount);
+                await _messageTokenProvider.AddNewsLetterSubscriptionTokens(liquidObject, subscription, store);
                 if (customer != null)
                 {
-                    _messageTokenProvider.AddCustomerTokens(tokens, customer);
-                    _messageTokenProvider.AddShoppingCartTokens(tokens, customer);
-                    _messageTokenProvider.AddRecommendedProductsTokens(tokens, customer);
-                    _messageTokenProvider.AddRecentlyViewedProductsTokens(tokens, customer);
+                    await _messageTokenProvider.AddCustomerTokens(liquidObject, customer, store, language);
+                    await _messageTokenProvider.AddShoppingCartTokens(liquidObject, customer, store, language);
                 }
 
-                string subject = _tokenizer.Replace(campaign.Subject, tokens, false);
-                string body = _tokenizer.Replace(campaign.Body, tokens, true);
+                var body = LiquidExtensions.Render(liquidObject, campaign.Body);
+                var subject = LiquidExtensions.Render(liquidObject, campaign.Subject);
 
-                var email = new QueuedEmail
-                {
+                var email = new QueuedEmail {
                     Priority = QueuedEmailPriority.Low,
                     From = emailAccount.Email,
                     FromName = emailAccount.DisplayName,
@@ -330,14 +345,14 @@ namespace Grand.Services.Messages
                     CreatedOnUtc = DateTime.UtcNow,
                     EmailAccountId = emailAccount.Id
                 };
-                _queuedEmailService.InsertQueuedEmail(email);
-                InsertCampaignHistory(new CampaignHistory() { CampaignId = campaign.Id, CustomerId = subscription.CustomerId, Email = subscription.Email, CreatedDateUtc = DateTime.UtcNow, StoreId = campaign.StoreId });
+                await _queuedEmailService.InsertQueuedEmail(email);
+                await InsertCampaignHistory(new CampaignHistory() { CampaignId = campaign.Id, CustomerId = subscription.CustomerId, Email = subscription.Email, CreatedDateUtc = DateTime.UtcNow, StoreId = campaign.StoreId });
 
                 //activity log
-                if(customer!=null)
-                    _customerActivityService.InsertActivity("CustomerReminder.SendCampaign", campaign.Id, _localizationService.GetResource("ActivityLog.SendCampaign"), customer, campaign.Name);
+                if (customer != null)
+                    await _customerActivityService.InsertActivity("CustomerReminder.SendCampaign", campaign.Id, _localizationService.GetResource("ActivityLog.SendCampaign"), customer, campaign.Name);
                 else
-                    _customerActivityService.InsertActivity("CustomerReminder.SendCampaign", campaign.Id, _localizationService.GetResource("ActivityLog.SendCampaign"), campaign.Name + " - " + subscription.Email);
+                    await _customerActivityService.InsertActivity("CustomerReminder.SendCampaign", campaign.Id, _localizationService.GetResource("ActivityLog.SendCampaign"), campaign.Name + " - " + subscription.Email);
 
                 totalEmailsSent++;
             }
@@ -350,7 +365,7 @@ namespace Grand.Services.Messages
         /// <param name="campaign">Campaign</param>
         /// <param name="emailAccount">Email account</param>
         /// <param name="email">Email</param>
-        public virtual void SendCampaign(Campaign campaign, EmailAccount emailAccount, string email)
+        public virtual async Task SendCampaign(Campaign campaign, EmailAccount emailAccount, string email)
         {
             if (campaign == null)
                 throw new ArgumentNullException("campaign");
@@ -358,21 +373,27 @@ namespace Grand.Services.Messages
             if (emailAccount == null)
                 throw new ArgumentNullException("emailAccount");
 
-            var tokens = new List<Token>();
-            _messageTokenProvider.AddStoreTokens(tokens, _storeContext.CurrentStore, emailAccount);
-            var customer = _customerService.GetCustomerByEmail(email);
+            var language = await _languageService.GetLanguageById(campaign.LanguageId);
+            if (language == null)
+                language = (await _languageService.GetAllLanguages()).FirstOrDefault();
+
+            var store = await _storeService.GetStoreById(campaign.StoreId);
+            if (store == null)
+                store = (await _storeService.GetAllStores()).FirstOrDefault();
+
+            var liquidObject = new LiquidObject();
+            await _messageTokenProvider.AddStoreTokens(liquidObject, store, language, emailAccount);
+            var customer = await _customerService.GetCustomerByEmail(email);
             if (customer != null)
             {
-                _messageTokenProvider.AddCustomerTokens(tokens, customer);
-                _messageTokenProvider.AddShoppingCartTokens(tokens, customer);
-                _messageTokenProvider.AddRecommendedProductsTokens(tokens, customer);
-                _messageTokenProvider.AddRecentlyViewedProductsTokens(tokens, customer);
+                await _messageTokenProvider.AddCustomerTokens(liquidObject, customer, store, language);
+                await _messageTokenProvider.AddShoppingCartTokens(liquidObject, customer, store, language);
             }
 
-            string subject = _tokenizer.Replace(campaign.Subject, tokens, false);
-            string body = _tokenizer.Replace(campaign.Body, tokens, true);
+            var body = LiquidExtensions.Render(liquidObject, campaign.Body);
+            var subject = LiquidExtensions.Render(liquidObject, campaign.Subject);
 
-            _emailSender.SendEmail(emailAccount, subject, body, emailAccount.Email, emailAccount.DisplayName, email, null);
+            await _emailSender.SendEmail(emailAccount, subject, body, emailAccount.Email, emailAccount.DisplayName, email, null);
         }
     }
 }

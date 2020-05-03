@@ -1,7 +1,6 @@
 using Grand.Core;
 using Grand.Core.Domain.Customers;
 using Grand.Services.Common;
-using Grand.Services.Configuration;
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -14,8 +13,6 @@ namespace Grand.Services.Helpers
     public partial class DateTimeHelper : IDateTimeHelper
     {
         private readonly IWorkContext _workContext;
-        private readonly IGenericAttributeService _genericAttributeService;
-        private readonly ISettingService _settingService;
         private readonly DateTimeSettings _dateTimeSettings;
 
         /// <summary>
@@ -26,14 +23,10 @@ namespace Grand.Services.Helpers
         /// <param name="settingService">Setting service</param>
         /// <param name="dateTimeSettings">Datetime settings</param>
         public DateTimeHelper(IWorkContext workContext,
-            IGenericAttributeService genericAttributeService,
-            ISettingService settingService, 
             DateTimeSettings dateTimeSettings)
         {
-            this._workContext = workContext;
-            this._genericAttributeService = genericAttributeService;
-            this._settingService = settingService;
-            this._dateTimeSettings = dateTimeSettings;
+            _workContext = workContext;
+            _dateTimeSettings = dateTimeSettings;
         }
 
         /// <summary>
@@ -156,7 +149,7 @@ namespace Grand.Services.Helpers
             {
                 string timeZoneId = string.Empty;
                 if (customer != null)
-                    timeZoneId = customer.GetAttribute<string>(SystemCustomerAttributeNames.TimeZoneId);
+                    timeZoneId = customer.GetAttributeFromEntity<string>(SystemCustomerAttributeNames.TimeZoneId);
 
                 try
                 {
@@ -177,16 +170,14 @@ namespace Grand.Services.Helpers
         }
 
         /// <summary>
-        /// Gets or sets a default store time zone
+        /// Gets a default store time zone
         /// </summary>
-        public virtual TimeZoneInfo DefaultStoreTimeZone
-        {
-            get
-            {
+        public virtual TimeZoneInfo DefaultStoreTimeZone {
+            get {
                 TimeZoneInfo timeZoneInfo = null;
                 try
                 {
-                    if (!String.IsNullOrEmpty(_dateTimeSettings.DefaultStoreTimeZoneId))
+                    if (!string.IsNullOrEmpty(_dateTimeSettings.DefaultStoreTimeZoneId))
                         timeZoneInfo = FindTimeZoneById(_dateTimeSettings.DefaultStoreTimeZoneId);
                 }
                 catch (Exception exc)
@@ -199,41 +190,14 @@ namespace Grand.Services.Helpers
 
                 return timeZoneInfo;
             }
-            set
-            {
-                string defaultTimeZoneId = string.Empty;
-                if (value != null)
-                {
-                    defaultTimeZoneId = value.Id;
-                }
-
-                _dateTimeSettings.DefaultStoreTimeZoneId = defaultTimeZoneId;
-                _settingService.SaveSetting(_dateTimeSettings);
-            }
         }
 
         /// <summary>
-        /// Gets or sets the current user time zone
+        /// Gets the current user time zone
         /// </summary>
-        public virtual TimeZoneInfo CurrentTimeZone
-        {
-            get
-            {
+        public virtual TimeZoneInfo CurrentTimeZone {
+            get {
                 return GetCustomerTimeZone(_workContext.CurrentCustomer);
-            }
-            set
-            {
-                if (!_dateTimeSettings.AllowCustomersToSetTimeZone)
-                    return;
-
-                string timeZoneId = string.Empty;
-                if (value != null)
-                {
-                    timeZoneId = value.Id;
-                }
-
-                _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer,
-                    SystemCustomerAttributeNames.TimeZoneId, timeZoneId);
             }
         }
     }

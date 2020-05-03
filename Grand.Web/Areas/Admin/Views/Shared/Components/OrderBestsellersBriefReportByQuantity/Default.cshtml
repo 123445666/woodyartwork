@@ -9,7 +9,7 @@
             dataSource: {
                 transport: {
                     read: {
-                        url: "@Html.Raw(Url.Action("BestsellersBriefReportByQuantityList", "Order"))",
+                        url: "@Html.Raw(Url.Action("BestsellersBriefReportByQuantityList", "Reports"))",
                         type: "POST",
                         dataType: "json",
                         data: addAntiForgeryToken
@@ -40,14 +40,14 @@
             scrollable: false,
             columns: [{
                 field: "ProductName",
-                title: "@T("Admin.SalesReport.Bestsellers.Fields.Name")",
+                title: "@T("Admin.Reports.Bestsellers.Fields.Name")",
                 template: '<a class="k-link" href="@Url.Content("~/Admin/Product/Edit/")#=ProductId#">#=ProductName#</a>',
             }, {
                 field: "TotalQuantity",
-                title: "@T("Admin.SalesReport.Bestsellers.Fields.TotalQuantity")"
+                title: "@T("Admin.Reports.Bestsellers.Fields.TotalQuantity")"
             }, {
                 field: "TotalAmount",
-                title: "@T("Admin.SalesReport.Bestsellers.Fields.TotalAmount")"
+                title: "@T("Admin.Reports.Bestsellers.Fields.TotalAmount")"
             }]
         });
     });

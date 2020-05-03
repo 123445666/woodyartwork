@@ -1,11 +1,16 @@
 ﻿using Grand.Core.Caching;
 using Grand.Core.Data;
 using Grand.Core.Domain.Directory;
+using Grand.Core.Tests.Caching;
 using Grand.Services.Events;
+using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MongoDB.Driver;
 using Moq;
+using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Directory.Tests
 {
@@ -15,8 +20,9 @@ namespace Grand.Services.Directory.Tests
         private IRepository<MeasureWeight> _measureWeightRepository;
         private IRepository<MeasureUnit> _measureUnitRepository;
         private MeasureSettings _measureSettings;
-        private IEventPublisher _eventPublisher;
+        private IMediator _eventPublisher;
         private IMeasureService _measureService;
+        private IServiceProvider _serviceProvider;
 
         private MeasureDimension _measureDimensionInches, _measureDimensionFeets, _measureDimensionMeters, _measureDimensionMilimeters;
         private MeasureWeight _measureWeightOunces, _measureWeightPounds, _measureWeightKilograms, _measureWeightGrams;
@@ -93,10 +99,16 @@ namespace Grand.Services.Directory.Tests
                 IMongoCollection.InsertOne(_measureDimensionMeters);
                 IMongoCollection.InsertOne(_measureDimensionMilimeters);
                 tempMeasureDimensionRepository.Setup(x => x.Table).Returns(IMongoCollection.AsQueryable());
-                tempMeasureDimensionRepository.Setup(x => x.GetById(_measureDimensionInches.Id)).Returns(_measureDimensionInches);
-                tempMeasureDimensionRepository.Setup(x => x.GetById(_measureDimensionFeets.Id)).Returns(_measureDimensionFeets);
-                tempMeasureDimensionRepository.Setup(x => x.GetById(_measureDimensionMeters.Id)).Returns(_measureDimensionMeters);
-                tempMeasureDimensionRepository.Setup(x => x.GetById(_measureDimensionMilimeters.Id)).Returns(_measureDimensionMilimeters);
+                tempMeasureDimensionRepository.Setup(x => x.GetByIdAsync(_measureDimensionInches.Id)).ReturnsAsync(_measureDimensionInches);
+                tempMeasureDimensionRepository.Setup(x => x.GetByIdAsync(_measureDimensionFeets.Id)).ReturnsAsync(_measureDimensionFeets);
+                tempMeasureDimensionRepository.Setup(x => x.GetByIdAsync(_measureDimensionMeters.Id)).ReturnsAsync(_measureDimensionMeters);
+                tempMeasureDimensionRepository.Setup(x => x.GetByIdAsync(_measureDimensionMilimeters.Id)).ReturnsAsync(_measureDimensionMilimeters);
+
+                tempMeasureDimensionRepository.Setup(x => x.GetByIdAsync(_measureDimensionInches.Id)).ReturnsAsync(_measureDimensionInches);
+                tempMeasureDimensionRepository.Setup(x => x.GetByIdAsync(_measureDimensionFeets.Id)).ReturnsAsync(_measureDimensionFeets);
+                tempMeasureDimensionRepository.Setup(x => x.GetByIdAsync(_measureDimensionMeters.Id)).ReturnsAsync(_measureDimensionMeters);
+                tempMeasureDimensionRepository.Setup(x => x.GetByIdAsync(_measureDimensionMilimeters.Id)).ReturnsAsync(_measureDimensionMilimeters);
+
                 _measureDimensionRepository = tempMeasureDimensionRepository.Object;
             }
 
@@ -108,10 +120,15 @@ namespace Grand.Services.Directory.Tests
                 IMongoCollection.InsertOne(_measureWeightKilograms);
                 IMongoCollection.InsertOne(_measureWeightGrams);
                 tempMeasureWeightRepository.Setup(x => x.Table).Returns(IMongoCollection.AsQueryable());
-                tempMeasureWeightRepository.Setup(x => x.GetById(_measureWeightOunces.Id)).Returns(_measureWeightOunces);
-                tempMeasureWeightRepository.Setup(x => x.GetById(_measureWeightPounds.Id)).Returns(_measureWeightPounds);
-                tempMeasureWeightRepository.Setup(x => x.GetById(_measureWeightKilograms.Id)).Returns(_measureWeightKilograms);
-                tempMeasureWeightRepository.Setup(x => x.GetById(_measureWeightGrams.Id)).Returns(_measureWeightGrams);
+                tempMeasureWeightRepository.Setup(x => x.GetByIdAsync(_measureWeightOunces.Id)).ReturnsAsync(_measureWeightOunces);
+                tempMeasureWeightRepository.Setup(x => x.GetByIdAsync(_measureWeightPounds.Id)).ReturnsAsync(_measureWeightPounds);
+                tempMeasureWeightRepository.Setup(x => x.GetByIdAsync(_measureWeightKilograms.Id)).ReturnsAsync(_measureWeightKilograms);
+                tempMeasureWeightRepository.Setup(x => x.GetByIdAsync(_measureWeightGrams.Id)).ReturnsAsync(_measureWeightGrams);
+
+                tempMeasureWeightRepository.Setup(x => x.GetByIdAsync(_measureWeightOunces.Id)).ReturnsAsync(_measureWeightOunces);
+                tempMeasureWeightRepository.Setup(x => x.GetByIdAsync(_measureWeightPounds.Id)).ReturnsAsync(_measureWeightPounds);
+                tempMeasureWeightRepository.Setup(x => x.GetByIdAsync(_measureWeightKilograms.Id)).ReturnsAsync(_measureWeightKilograms);
+                tempMeasureWeightRepository.Setup(x => x.GetByIdAsync(_measureWeightGrams.Id)).ReturnsAsync(_measureWeightGrams);
                 _measureWeightRepository = tempMeasureWeightRepository.Object;
             }
 
@@ -133,42 +150,42 @@ namespace Grand.Services.Directory.Tests
             _measureSettings.BaseDimensionId = _measureDimensionInches.Id; //inch(es) because all other dimensions are in relation to  inches
             _measureSettings.BaseWeightId = _measureWeightPounds.Id; //lb(s) because all other weights are in relation to pounds
 
-            var tempEventPublisher = new Mock<IEventPublisher>();
+            var tempEventPublisher = new Mock<IMediator>();
             {
-                tempEventPublisher.Setup(x => x.Publish(It.IsAny<object>()));
+                //tempEventPublisher.Setup(x => x.PublishAsync(It.IsAny<object>()));
                 _eventPublisher = tempEventPublisher.Object;
             }
-
-            _measureService = new MeasureService(new GrandNullCache(), _measureDimensionRepository,
+            _serviceProvider = new Mock<IServiceProvider>().Object;
+            _measureService = new MeasureService(new TestMemoryCacheManager(new Mock<IMemoryCache>().Object, _eventPublisher), _measureDimensionRepository,
                 _measureWeightRepository, _measureUnitRepository, _measureSettings, _eventPublisher);
         }
 
         [TestMethod()]
-        public void Can_convert_dimension() {
+        public async Task Can_convert_dimension() {
             //from meter(s) to feet
-           Assert.AreEqual(32.81M, _measureService.ConvertDimension(10M, _measureDimensionMeters, _measureDimensionFeets, true));
+           Assert.AreEqual(32.81M, await _measureService.ConvertDimension(10M, _measureDimensionMeters, _measureDimensionFeets, true));
            //from inch(es) to meter(s)
-           Assert.AreEqual(0.25M, _measureService.ConvertDimension(10M, _measureDimensionInches, _measureDimensionMeters, true));
+           Assert.AreEqual(0.25M, await _measureService.ConvertDimension(10M, _measureDimensionInches, _measureDimensionMeters, true));
            //from meter(s) to meter(s)
-           Assert.AreEqual(13.33M, _measureService.ConvertDimension(13.333M, _measureDimensionMeters, _measureDimensionMeters, true));
+           Assert.AreEqual(13.33M, await _measureService.ConvertDimension(13.333M, _measureDimensionMeters, _measureDimensionMeters, true));
            //from meter(s) to millimeter(s)
-           Assert.AreEqual(10000M, _measureService.ConvertDimension(10M, _measureDimensionMeters, _measureDimensionMilimeters, true));
+           Assert.AreEqual(10000M, await _measureService.ConvertDimension(10M, _measureDimensionMeters, _measureDimensionMilimeters, true));
            //from millimeter(s) to meter(s)
-           Assert.AreEqual(10M, _measureService.ConvertDimension(10000M, _measureDimensionMilimeters, _measureDimensionMeters, true));
+           Assert.AreEqual(10M, await _measureService.ConvertDimension(10000M, _measureDimensionMilimeters, _measureDimensionMeters, true));
         }
 
         [TestMethod()]
-        public void Can_convert_weight() {
+        public async Task Can_convert_weight() {
             //from ounce(s) to lb(s)
-            Assert.AreEqual(0.69M, _measureService.ConvertWeight(11M, _measureWeightOunces, _measureWeightPounds, true));
+            Assert.AreEqual(0.69M, await _measureService.ConvertWeight(11M, _measureWeightOunces, _measureWeightPounds, true));
             //from lb(s) to ounce(s)
-            Assert.AreEqual(176M, _measureService.ConvertWeight(11M, _measureWeightPounds, _measureWeightOunces, true));
+            Assert.AreEqual(176M, await _measureService.ConvertWeight(11M, _measureWeightPounds, _measureWeightOunces, true));
             //from ounce(s) to  ounce(s)
-            Assert.AreEqual(13.33M, _measureService.ConvertWeight(13.333M, _measureWeightOunces, _measureWeightOunces, true));
+            Assert.AreEqual(13.33M, await _measureService.ConvertWeight(13.333M, _measureWeightOunces, _measureWeightOunces, true));
             //from kg(s) to ounce(s)
-            Assert.AreEqual(388.01M, _measureService.ConvertWeight(11M, _measureWeightKilograms, _measureWeightOunces, true));
+            Assert.AreEqual(388.01M, await _measureService.ConvertWeight(11M, _measureWeightKilograms, _measureWeightOunces, true));
             //from kg(s) to gram(s)
-            Assert.AreEqual(10000M, _measureService.ConvertWeight(10M, _measureWeightKilograms, _measureWeightGrams, true));
+            Assert.AreEqual(10000M, await _measureService.ConvertWeight(10M, _measureWeightKilograms, _measureWeightGrams, true));
         }
     }
 }

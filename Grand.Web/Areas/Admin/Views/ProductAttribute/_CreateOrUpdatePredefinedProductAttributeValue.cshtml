@@ -11,7 +11,8 @@
         window.close();
     </script>
 }
-@(Html.LocalizedEditor<PredefinedProductAttributeValueModel, PredefinedProductAttributeValueLocalizedModel>("productattributevalue-localized",
+    <vc:admin-widget widget-zone="product_attribute_predefined_values_details_top" additional-data="Model" />
+@(await Html.LocalizedEditor<PredefinedProductAttributeValueModel, PredefinedProductAttributeValueLocalizedModel>("productattributevalue-localized",
 @<div class="form-horizontal">
      <div class="form-body">
          <div class="form-group">
@@ -63,9 +64,9 @@
         <div class="form-group">
             <admin-label asp-for="IsPreSelected" class="col-sm-3" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="IsPreSelected" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="IsPreSelected"></span>
             </div>
@@ -79,3 +80,4 @@
         </div>
     </div>
 </div>
+<vc:admin-widget widget-zone="product_attribute_predefined_values_details_bottom" additional-data="Model" />

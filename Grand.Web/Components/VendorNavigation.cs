@@ -1,28 +1,39 @@
-﻿using Grand.Core.Domain.Vendors;
+﻿using Grand.Core;
+using Grand.Core.Domain.Vendors;
 using Grand.Framework.Components;
-using Grand.Web.Services;
+using Grand.Web.Features.Models.Catalog;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.ViewComponents
 {
     public class VendorNavigationViewComponent : BaseViewComponent
     {
-        private readonly ICatalogViewModelService _catalogViewModelService;
+        private readonly IWorkContext _workContext;
+        private readonly IMediator _mediator;
         private readonly VendorSettings _vendorSettings;
-        public VendorNavigationViewComponent(ICatalogViewModelService catalogViewModelService,
+
+        public VendorNavigationViewComponent(
+            IWorkContext workContext,
+            IMediator mediator,
             VendorSettings vendorSettings)
         {
-            this._catalogViewModelService = catalogViewModelService;
-            this._vendorSettings = vendorSettings;
+            _workContext = workContext;
+            _mediator = mediator;
+            _vendorSettings = vendorSettings;
         }
 
-        public IViewComponentResult Invoke()
+        public async Task<IViewComponentResult> InvokeAsync()
         {
             if (_vendorSettings.VendorsBlockItemsToDisplay == 0)
                 return Content("");
 
-            var model = _catalogViewModelService.PrepareVendorNavigation();
+            var model = await _mediator.Send(new GetVendorNavigation() {
+                Language = _workContext.WorkingLanguage
+            });
+
             if (!model.Vendors.Any())
                 return Content("");
 

@@ -11,7 +11,7 @@ namespace Grand.Plugin.Tax.CountryStateZip
         public virtual void Register(ContainerBuilder builder, ITypeFinder typeFinder, GrandConfig config)
         {
             builder.RegisterType<TaxRateService>().As<ITaxRateService>().InstancePerLifetimeScope();
-
+            builder.RegisterType<CountryStateZipTaxProvider>().InstancePerLifetimeScope();
         }
 
         public int Order

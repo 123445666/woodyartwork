@@ -71,7 +71,7 @@
     }
 </script>
 <form asp-controller="WidgetsGoogleAnalytics" asp-action="Configure" method="post">
-    <antiforgery-token />
+    
     <div class="form-horizonal">
         <div class="form-body">
             <div class="form-group">
@@ -146,9 +146,9 @@
                     <admin-label asp-for="IncludingTax" class="control-label" />
                 </div>
                 <div class="col-md-8 col-sm-8">
-                    <label class="mt-checkbox mt-checkbox-outline">
+                    <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                         <admin-input asp-for="IncludingTax" />
-                        <span></span>
+                         <div class="control__indicator"></div>
                     </label>
                     <span asp-validation-for="IncludingTax"></span>
                 </div>

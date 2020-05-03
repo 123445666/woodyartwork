@@ -1,6 +1,8 @@
-﻿using Grand.Core;
+﻿using DotLiquid;
+using Grand.Core;
 using Grand.Core.Domain.Messages;
-using Grand.Services.Events;
+using MediatR;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Messages
 {
@@ -9,31 +11,31 @@ namespace Grand.Services.Messages
         /// <summary>
         /// Publishes the newsletter subscribe event.
         /// </summary>
-        /// <param name="eventPublisher">The event publisher.</param>
+        /// <param name="mediator">mediator</param>
         /// <param name="email">The email.</param>
-        public static void PublishNewsletterSubscribe(this IEventPublisher eventPublisher, string email)
+        public static async Task PublishNewsletterSubscribe(this IMediator mediator, string email)
         {
-            eventPublisher.Publish(new EmailSubscribedEvent(email));
+            await mediator.Publish(new EmailSubscribedEvent(email));
         }
 
         /// <summary>
         /// Publishes the newsletter unsubscribe event.
         /// </summary>
-        /// <param name="eventPublisher">The event publisher.</param>
+        /// <param name="mediator">Mediator</param>
         /// <param name="email">The email.</param>
-        public static void PublishNewsletterUnsubscribe(this IEventPublisher eventPublisher, string email)
+        public static async Task PublishNewsletterUnsubscribe(this IMediator mediator, string email)
         {
-            eventPublisher.Publish(new EmailUnsubscribedEvent(email));
+            await mediator.Publish(new EmailUnsubscribedEvent(email));
         }
 
-        public static void EntityTokensAdded<T, U>(this IEventPublisher eventPublisher, T entity, System.Collections.Generic.IList<U> tokens) where T : ParentEntity
+        public static async Task EntityTokensAdded<T>(this IMediator mediator, T entity, Drop liquidDrop, LiquidObject liquidObject) where T : ParentEntity
         {
-            eventPublisher.Publish(new EntityTokensAddedEvent<T, U>(entity, tokens));
+            await mediator.Publish(new EntityTokensAddedEvent<T>(entity, liquidDrop, liquidObject));
         }
 
-        public static void MessageTokensAdded<U>(this IEventPublisher eventPublisher, MessageTemplate message, System.Collections.Generic.IList<U> tokens)
+        public static async Task MessageTokensAdded(this IMediator mediator, MessageTemplate message, LiquidObject liquidObject)
         {
-            eventPublisher.Publish(new MessageTokensAddedEvent<U>(message, tokens));
+            await mediator.Publish(new MessageTokensAddedEvent(message, liquidObject));
         }
     }
 }

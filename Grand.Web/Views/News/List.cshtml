@@ -5,9 +5,9 @@
     //title
     Html.AddTitleParts(T("PageTitle.NewsArchive").Text);
 }
-<div class="page news-list-page">
-        
-        <h1 class="h2 generalTitle"><a href="@Url.RouteUrl("NewsRSS", new { languageId = Model.WorkingLanguageId })" class="btn btn-sm btn-outline-info link-rss" title="@T("News.RSS.Hint")">@T("News.RSS")</a> @T("News")</h1>
+<div class="page news-list-page pt-lg-0 pt-3">
+    <a class="js-offcanvas-trigger blog-filter filter-button btn btn-outline-info d-lg-none d-flex mb-3" data-offcanvas-trigger="leftSide" href="#leftSide"><span class="mdi mdi-tune"></span><span class="ml-3">@T("News") @T("catalog.selectors.fiters")</span></a>
+        <h2 class="generalTitle"><a href="@Url.RouteUrl("NewsRSS", new { languageId = Model.WorkingLanguageId })" class="btn btn-sm btn-outline-info link-rss" title="@T("News.RSS.Hint")">@T("News.RSS")</a> @T("News")</h2>
         @await Component.InvokeAsync("Widget", new { widgetZone = "newslist_page_before_items"})
 
     <div class="news-items row">
@@ -25,10 +25,10 @@
                     <h4 class="card-header border-bottom-0 pb-0">@item.Title</h4>
                     </a>
                     <div class="card-body pt-0">
-                        <h6 class="card-subtitle text-muted"><i class="far fa-clock mr-2"></i>@item.CreatedOn.ToString("D")</h6>
+                        <h6 class="card-subtitle text-muted d-flex align-items-center"><span class="mdi mdi-alarm mr-2"></span>@item.CreatedOn.ToString("D")</h6>
                         @Html.Raw(item.Short)
                         <div class="buttons pt-3 text-center">
-                            <a class="btn btn-sm btn-primary read-more" href="@Url.RouteUrl("NewsItem", new { SeName = item.SeName })">@T("News.MoreInfo")</a>
+                            <a class="btn btn-sm btn-outline-info read-more" href="@Url.RouteUrl("NewsItem", new { SeName = item.SeName })">@T("News.MoreInfo")</a>
                         </div>
                         @await Component.InvokeAsync("Widget", new { widgetZone = "newslist_page_inside_item", additionalData = item.Id })
                     </div>

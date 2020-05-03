@@ -4,11 +4,11 @@
     ViewBag.Title = T("Admin.Configuration.Plugins.Local").Text;
 }
 <form asp-controller="Plugin" asp-action="List" method="post" id="plugins-form">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-plug"></i>
                         @T("Admin.Configuration.Plugins.Local")
@@ -18,7 +18,7 @@
                         <input type="button" id="importfile" class="btn btn-success" value="@T("Admin.Configuration.Plugins.Upload")" />
                     </div>
                 </div>
-                <div class="portlet-body form">
+                <div class="x_content form">
                     <div class="note note-info">
                         <h4>@T("Admin.Configuration.Plugins.Description"):</h4>
                         <ol>
@@ -59,8 +59,10 @@
                         </div>
                     </div>
                 </div>
-                <div class="portlet-body">
+                <div class="x_content">
+                    <vc:admin-widget widget-zone="plugin_list_top" additional-data="Model" />
                     <div id="plugins-grid"></div>
+                    <vc:admin-widget widget-zone="plugin_list_bottom" additional-data="Model" />
                 </div>
             </div>
         </div>
@@ -171,8 +173,8 @@
                             '<br />@T("Admin.Configuration.Plugins.Fields.Installed"): # if(Installed) {# <i class="fa fa-check" aria-hidden="true" style="color:green"></i> #} else {# <i class="fa fa-times" aria-hidden="true" style="color:red"></i> #} # ' +
                             '# if(CanChangeEnabled) {# <br />@T("Admin.Configuration.Plugins.Fields.IsEnabled"):  # if(IsEnabled) {# <i class="fa fa-check" aria-hidden="true" style="color:green"></i> #} else {# <i class="fa fa-times" aria-hidden="true" style="color:red"></i> #} # #} #' +
                             //allow configuration only when a plugin has a configuration URL specified
-                            '<br /># if(ConfigurationUrl && ConfigurationUrl.length > 0) {# <a class="btn default" href="#=ConfigurationUrl#">@T("Admin.Configuration.Plugins.Fields.Configure")</a>&nbsp;&nbsp;&nbsp; #} #' +
-                            '<a class="btn default" href="javascript:OpenWindow(\'@Url.Content("~/Admin/Plugin/EditPopup")?systemName=#=SystemName#&btnId=btnRefresh&formId=plugins-form\', 800, 500, true);">@T("Admin.Common.Edit")</a>',
+                            '<br /># if(ConfigurationUrl && ConfigurationUrl.length > 0) {# <a class="k-button" href="#=ConfigurationUrl#">@T("Admin.Configuration.Plugins.Fields.Configure")</a>&nbsp;&nbsp;&nbsp; #} #' +
+                            '<a class="k-button" href="javascript:OpenWindow(\'@Url.Content("~/Admin/Plugin/EditPopup")?systemName=#=SystemName#&btnId=btnRefresh&formId=plugins-form\', 800, 500, true);">@T("Admin.Common.Edit")</a>',
                     }, {
                         field: "Installed",
                         title: "@T("Admin.Configuration.Plugins.Fields.Installation")",
@@ -218,7 +220,7 @@
 
 <div class="modal-dialog" id="importfile-window" style="display:none; padding: 0 10px;">
     <form asp-controller="Plugin" asp-action="UploadPlugin" method="post" enctype = "multipart/form-data">
-        <antiforgery-token />
+        
         <ul class="common-list">
             <li>
                 <strong>NOTE: It can take up to several minutes.</strong>
@@ -245,7 +247,7 @@
                     &nbsp;
                 </div>
                 <div class="col-md-10 text-right mt-10">
-                    <input id="importfilesubmit" class="btn blue" value="@T("Admin.Configuration.Plugins.Upload")" type="submit">
+                    <input id="importfilesubmit" class="btn btn-success" value="@T("Admin.Configuration.Plugins.Upload")" type="submit">
                 </div>
             </div>
     </form>

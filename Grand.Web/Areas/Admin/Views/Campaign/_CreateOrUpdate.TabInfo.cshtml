@@ -1,4 +1,9 @@
 ﻿@model CampaignModel
+@{
+    Html.AddScriptParts("~/content/codemirror/codemirror.js", excludeFromBundle: true);
+    Html.AddScriptParts("~/content/codemirror/mode/xml/xml.js", excludeFromBundle: true);
+    Html.AddCssFileParts("~/content/codemirror/codemirror.css", excludeFromBundle: true);
+}
 
 <div class="form-horizontal">
     <div class="form-body">
@@ -19,10 +24,17 @@
         <div class="form-group">
             <admin-label asp-for="Body" />
             <div class="col-md-9 col-sm-9">
-                @{
-                    ViewData["Grand.RichEditor.EnableFullPage"] = true;
-                }
-                <admin-input asp-for="Body" asp-template="RichEditor" />
+                <div>
+                    <label>@T("Admin.ContentManagement.MessageTemplates.Fields.AllowedTokens")</label>
+                    <input type="search" name="SearchTokens" class="form-control SearchTokens" placeholder="@T("Search")" />
+                </div>
+                <div class="AllowedTokens">
+                    @foreach (var token in Model.AllowedTokens)
+                    {
+                        <button type="button" onclick="AddTokenToEditor(this)" class="btn btn-info">@token</button>
+                    }
+                </div>
+                <admin-input asp-for="Body" asp-template="Codemirror" />
                 <span asp-validation-for="Body"></span>
             </div>
         </div>
@@ -34,10 +46,38 @@
             </div>
         </div>
         <div class="form-group">
-            <admin-label asp-for="AllowedTokens" />
+            <admin-label asp-for="LanguageId" />
             <div class="col-md-9 col-sm-9">
-                @Model.AllowedTokens
+                <admin-select asp-for="LanguageId" asp-items="Model.AvailableLanguages" />
+                <span asp-validation-for="LanguageId"></span>
             </div>
         </div>
     </div>
 </div>
+<script type="text/javascript">
+    $(document).ready(function () {
+        $(".SearchTokens").on("input", function (e) { SearchTokens(e); })
+        $("input").click(function (e) {
+            onInputFocus = $(e.target);
+        });
+    });
+
+    function AddTokenToEditor(e) {
+        var cm = $('.CodeMirror')[0].CodeMirror;
+        var doc = cm.getDoc();
+        var cursor = doc.getCursor(); // gets the line number in the cursor position
+        doc.replaceRange($(e).text(), cursor);
+    }
+
+    function SearchTokens(e) {
+        var searchVal = $(e.target).val();
+        var TokensPnl = $(e.target).closest(".form-group").find(".AllowedTokens");
+        $(TokensPnl).find(".btn").show()
+            .each(function (i, c) {
+                var Token = $(c).text();
+                if (Token.search(new RegExp(searchVal, "i")) == -1) {
+                    $(c).hide();
+                }
+            });
+    }
+</script>

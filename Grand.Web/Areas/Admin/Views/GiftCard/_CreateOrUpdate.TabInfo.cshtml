@@ -20,20 +20,21 @@
     }
 </script>
 <div class="form-horizontal">
+    <vc:admin-widget widget-zone="gift_card_details_info_top" additional-data="Model" />
     <div class="form-body">
         <div class="form-group">
             <admin-label asp-for="GiftCardTypeId" />
             <div class="col-md-9 col-sm-9">
-                <admin-select asp-for="GiftCardTypeId" asp-items="((GiftCardType)Model.GiftCardTypeId).ToSelectList()" />
+                <admin-select asp-for="GiftCardTypeId" asp-items="((GiftCardType)Model.GiftCardTypeId).ToSelectList(Context)" />
                 <span asp-validation-for="GiftCardTypeId"></span>
             </div>
         </div>
         @if (!String.IsNullOrEmpty(Model.PurchasedWithOrderId))
-            {
+        {
             <div class="form-group">
                 <admin-label asp-for="PurchasedWithOrderId" />
                 <div class="col-md-9 col-sm-9">
-                    <label class="control-label"><a href="@Url.Action("Edit", "Order", new { Id = Model.PurchasedWithOrderId })">@Model.PurchasedWithOrderNumber - @T("Admin.Common.View")</a></label>
+                    <label class="control-label"><a href="@Url.Action("Edit", "Order", new { Id = Model.PurchasedWithOrderId })" class="k-button"><span class="k-icon k-i-eye"></span>&nbsp;@T("Admin.Common.View") #@Model.PurchasedWithOrderNumber</a></label>
                 </div>
             </div>
         }
@@ -56,9 +57,9 @@
         <div class="form-group">
             <admin-label asp-for="IsGiftCardActivated" />
             <div class="col-md-9 col-sm-9">
-                <label class="mt-checkbox mt-checkbox-outline">
+                <label class="mt-checkbox mt-checkbox-outline control control-checkbox">
                     <admin-input asp-for="IsGiftCardActivated" />
-                    <span></span>
+                     <div class="control__indicator"></div>
                 </label>
                 <span asp-validation-for="IsGiftCardActivated"></span>
             </div>
@@ -141,7 +142,7 @@
                 <admin-label asp-for="IsRecipientNotified" />
                 <div class="col-md-9 col-sm-9">
                     <label class="control-label">@Model.IsRecipientNotified.ToString()</label>
-                    <input type="submit" name="notifyRecipient" class="k-button" value="@T("Admin.GiftCards.Fields.IsRecipientNotified.Notify")" />
+                    <button type="submit" name="notifyRecipient" class="k-button"><span class="k-icon k-i-notification"></span>&nbsp;@T("Admin.GiftCards.Fields.IsRecipientNotified.Notify")</button>
                 </div>
             </div>
         }
@@ -155,4 +156,5 @@
             </div>
         }
     </div>
+    <vc:admin-widget widget-zone="gift_card_details_info_bottom" additional-data="Model" />
 </div>

@@ -1,54 +1,36 @@
 ﻿@model CustomerRoleModel
-@inject IEventPublisher eventPublisher
+
 <div asp-validation-summary="All"></div>
 <input asp-for="Id" type="hidden" />
-<script type="text/javascript">
-    $(document).ready(function () {
-        toggleRemoveButton();
-
-        $("#customerrole-edit").kendoTabStrip({
-            animation: {
-                open: {
-                    effects: "fadeIn"
-                }
-            },
-            select: tabstrip_on_tab_select
-        });
-    });
-    function toggleRemoveButton() {
-        if ($('#@Html.FieldIdFor(model => model.PurchasedWithProductId)').val() > 0) {
-            $('#purchased-with-product-name-remove').show();
-        }
-        else {
-            $('#purchased-with-product-name-remove').hide();
-        }
-    }
-</script>
-
-<div id="customerrole-edit">
-    <ul>
-        <li @Html.RenderSelectedTabIndex(0, GetSelectedTabIndex())>
-            @T("Admin.Customers.CustomerRoles.Info")
-        </li>
-        <li @Html.RenderSelectedTabIndex(1, GetSelectedTabIndex())>
-            @T("Admin.Customers.CustomerRoles.Products")
-        </li>
-    </ul>
-    <div>
-        @Html.Partial("_CreateOrUpdate.TabInfo", Model)
-    </div>
-    <div>
-        @Html.Partial("_CreateOrUpdate.TabProducts", Model)
-    </div>
-</div>
-@{
-    //custom tabs
-    var eventMessage = new AdminTabStripCreated(this.Html, "customerrole-edit");
-    eventPublisher.Publish(eventMessage);
-    foreach (var eventBlock in eventMessage.BlocksToRender)
-    {
-        @eventBlock
-    }
-}
-@*save selected tab index*@
-<input type="hidden" id="selected-tab-index" name="selected-tab-index" value="@(GetSelectedTabIndex())">
+<vc:admin-widget widget-zone="customer_role_details_top" additional-data="Model" />
+<admin-tabstrip name="customerrole-edit">
+    <items>
+        <tabstrip-item text="@T("Admin.Customers.CustomerRoles.Info")" tab-index="0">
+            <content>
+                <div>
+                    <partial name="_CreateOrUpdate.TabInfo" model="Model" />
+                </div>
+            </content>
+        </tabstrip-item>
+        <tabstrip-item text="@T("Admin.Customers.CustomerRoles.Products")" tab-index="1">
+            <content>
+                <div>
+                    <partial name="_CreateOrUpdate.TabProducts" model="Model" />
+                </div>
+            </content>
+        </tabstrip-item>
+        <tabstrip-item text="@T("Admin.Common.GenericAttributes.Tab")" tab-index="2">
+            <content>
+                <div>
+                    @{
+                        ViewData["ObjectType"] = "CustomerRole";
+                        ViewData["TabIndex"] = 2;
+                     }
+                    <partial name="_GenericAttributes" model="Model" view-data="ViewData" />
+                </div>
+            </content>
+        </tabstrip-item>
+        <vc:admin-widget widget-zone="customerrole_details_tabs" additional-data="Model" />
+    </items>
+</admin-tabstrip>
+<vc:admin-widget widget-zone="customer_role_details_bottom" additional-data="Model" />

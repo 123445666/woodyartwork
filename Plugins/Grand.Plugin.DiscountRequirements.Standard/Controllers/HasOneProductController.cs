@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
 {
@@ -48,24 +49,24 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
             IVendorService vendorService,
             IProductService productService)
         {
-            this._discountService = discountService;
-            this._settingService = settingService;
-            this._permissionService = permissionService;
-            this._workContext = workContext;
-            this._localizationService = localizationService;
-            this._categoryService = categoryService;
-            this._manufacturerService = manufacturerService;
-            this._storeService = storeService;
-            this._vendorService = vendorService;
-            this._productService = productService;
+            _discountService = discountService;
+            _settingService = settingService;
+            _permissionService = permissionService;
+            _workContext = workContext;
+            _localizationService = localizationService;
+            _categoryService = categoryService;
+            _manufacturerService = manufacturerService;
+            _storeService = storeService;
+            _vendorService = vendorService;
+            _productService = productService;
         }
 
-        public IActionResult Configure(string discountId, string discountRequirementId)
+        public async Task<IActionResult> Configure(string discountId, string discountRequirementId)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageDiscounts))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManageDiscounts))
                 return Content("Access denied");
 
-            var discount = _discountService.GetDiscountById(discountId);
+            var discount = await _discountService.GetDiscountById(discountId);
             if (discount == null)
                 throw new ArgumentException("Discount could not be loaded");
 
@@ -90,13 +91,13 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult Configure(string discountId, string discountRequirementId, string productIds)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> Configure(string discountId, string discountRequirementId, string productIds)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageDiscounts))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManageDiscounts))
                 return Content("Access denied");
 
-            var discount = _discountService.GetDiscountById(discountId);
+            var discount = await _discountService.GetDiscountById(discountId);
             if (discount == null)
                 throw new ArgumentException("Discount could not be loaded");
 
@@ -107,7 +108,7 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
             if (discountRequirement != null)
             {
                 //update existing rule
-                _settingService.SetSetting(string.Format("DiscountRequirements.Standard.RestrictedProductIds-{0}-{1}", discount.Id, discountRequirement.Id), productIds);
+                await _settingService.SetSetting(string.Format("DiscountRequirements.Standard.RestrictedProductIds-{0}-{1}", discount.Id, discountRequirement.Id), productIds);
             }
             else
             {
@@ -117,16 +118,16 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
                     DiscountRequirementRuleSystemName = "DiscountRequirements.HasOneProduct"
                 };
                 discount.DiscountRequirements.Add(discountRequirement);
-                _discountService.UpdateDiscount(discount);
+                await _discountService.UpdateDiscount(discount);
 
-                _settingService.SetSetting(string.Format("DiscountRequirements.Standard.RestrictedProductIds-{0}-{1}", discount.Id, discountRequirement.Id), productIds);
+                await _settingService.SetSetting(string.Format("DiscountRequirements.Standard.RestrictedProductIds-{0}-{1}", discount.Id, discountRequirement.Id), productIds);
             }
             return new JsonResult(new { Result = true, NewRequirementId = discountRequirement.Id });
         }
 
-        public IActionResult ProductAddPopup(string btnId, string productIdsInput)
+        public async Task<IActionResult> ProductAddPopup(string btnId, string productIdsInput)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageProducts))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManageProducts))
                 return Content("Access denied");
 
             var model = new RequirementModel.AddProductModel();
@@ -135,27 +136,27 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
 
             //categories
             model.AvailableCategories.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
-            var categories = _categoryService.GetAllCategories(showHidden: true);
+            var categories = await _categoryService.GetAllCategories(showHidden: true);
             foreach (var c in categories)
-                model.AvailableCategories.Add(new SelectListItem { Text = c.GetFormattedBreadCrumb(categories), Value = c.Id.ToString() });
+                model.AvailableCategories.Add(new SelectListItem { Text = _categoryService.GetFormattedBreadCrumb(c, categories), Value = c.Id.ToString() });
 
             //manufacturers
             model.AvailableManufacturers.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
-            foreach (var m in _manufacturerService.GetAllManufacturers(showHidden: true))
+            foreach (var m in await _manufacturerService.GetAllManufacturers(showHidden: true))
                 model.AvailableManufacturers.Add(new SelectListItem { Text = m.Name, Value = m.Id.ToString() });
 
             //stores
             model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
-            foreach (var s in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString() });
+            foreach (var s in await _storeService.GetAllStores())
+                model.AvailableStores.Add(new SelectListItem { Text = s.Shortcut, Value = s.Id.ToString() });
 
             //vendors
             model.AvailableVendors.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
-            foreach (var v in _vendorService.GetAllVendors(showHidden: true))
+            foreach (var v in await _vendorService.GetAllVendors(showHidden: true))
                 model.AvailableVendors.Add(new SelectListItem { Text = v.Name, Value = v.Id.ToString() });
 
             //product types
-            model.AvailableProductTypes = ProductType.SimpleProduct.ToSelectList(false).ToList();
+            model.AvailableProductTypes = ProductType.SimpleProduct.ToSelectList(HttpContext, false).ToList();
             model.AvailableProductTypes.Insert(0, new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
 
 
@@ -166,10 +167,10 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult ProductAddPopupList(DataSourceRequest command, RequirementModel.AddProductModel model)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> ProductAddPopupList(DataSourceRequest command, RequirementModel.AddProductModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageProducts))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManageProducts))
                 return Content("Access denied");
 
             //a vendor should have access only to his products
@@ -182,7 +183,7 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
             if (!String.IsNullOrEmpty(model.SearchCategoryId))
                 searchCategoryIds.Add(model.SearchCategoryId);
 
-            var products = _productService.SearchProducts(
+            var products = (await _productService.SearchProducts(
                 categoryIds: searchCategoryIds,
                 manufacturerId: model.SearchManufacturerId,
                 storeId: model.SearchStoreId,
@@ -192,7 +193,7 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
                 pageIndex: command.Page - 1,
                 pageSize: command.PageSize,
                 showHidden: true
-                );
+                )).products;
             var gridModel = new DataSourceResult();
             gridModel.Data = products.Select(x => new RequirementModel.ProductModel
             {
@@ -206,12 +207,12 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult LoadProductFriendlyNames(string productIds)
+        [AutoValidateAntiforgeryToken]
+        public async Task<IActionResult> LoadProductFriendlyNames(string productIds)
         {
             var result = "";
 
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageProducts))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManageProducts))
                 return new JsonResult(new { Text = result });
 
             if (!String.IsNullOrWhiteSpace(productIds))
@@ -239,7 +240,7 @@ namespace Grand.Plugin.DiscountRequirements.HasOneProduct.Controllers
                     ids.Add(str2);
                 }
 
-                var products = _productService.GetProductsByIds(ids.ToArray());
+                var products = await _productService.GetProductsByIds(ids.ToArray(), true);
                 for (int i = 0; i <= products.Count - 1; i++)
                 {
                     result += products[i].Name;

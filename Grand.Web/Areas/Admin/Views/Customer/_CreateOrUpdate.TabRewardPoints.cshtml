@@ -1,9 +1,11 @@
 ﻿@model CustomerModel
 
 <div class="panel panel-default">
+    <vc:admin-widget widget-zone="customer_details_reward_points_top" additional-data="Model" />
     <div class="panel-body">
         <div id="customer-rewardpoints-grid"></div>
     </div>
+    <vc:admin-widget widget-zone="customer_details_reward_points_bottom" additional-data="Model" />
 </div>
 
 <script>
@@ -94,7 +96,7 @@
     </div>
     <div class="form-actions">
         <div class="col-md-offset-3">
-            <input type="button" id="addRewardPoints" class="btn default" value="@T("Admin.Customers.Customers.RewardPoints.AddButton")" />
+            <input type="button" id="addRewardPoints" class="k-button" value="@T("Admin.Customers.Customers.RewardPoints.AddButton")" />
         </div>
     </div>
 </div>

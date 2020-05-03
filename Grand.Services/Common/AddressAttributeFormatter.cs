@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Common
 {
@@ -15,16 +16,13 @@ namespace Grand.Services.Common
     public partial class AddressAttributeFormatter : IAddressAttributeFormatter
     {
         private readonly IWorkContext _workContext;
-        private readonly IAddressAttributeService _addressAttributeService;
         private readonly IAddressAttributeParser _addressAttributeParser;
 
         public AddressAttributeFormatter(IWorkContext workContext,
-            IAddressAttributeService addressAttributeService,
             IAddressAttributeParser addressAttributeParser)
         {
-            this._workContext = workContext;
-            this._addressAttributeService = addressAttributeService;
-            this._addressAttributeParser = addressAttributeParser;
+            _workContext = workContext;
+            _addressAttributeParser = addressAttributeParser;
         }
         
         /// <summary>
@@ -34,13 +32,13 @@ namespace Grand.Services.Common
         /// <param name="serapator">Serapator</param>
         /// <param name="htmlEncode">A value indicating whether to encode (HTML) values</param>
         /// <returns>Attributes</returns>
-        public virtual string FormatAttributes(string attributesXml,
+        public virtual async Task<string> FormatAttributes(string attributesXml,
             string serapator = "<br />", 
             bool htmlEncode = true)
         {
             var result = new StringBuilder();
 
-            var attributes = _addressAttributeParser.ParseAddressAttributes(attributesXml);
+            var attributes = await _addressAttributeParser.ParseAddressAttributes(attributesXml);
             for (int i = 0; i < attributes.Count; i++)
             {
                 var attribute = attributes[i];

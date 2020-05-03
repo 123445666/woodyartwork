@@ -1,36 +1,30 @@
 ﻿using Grand.Core;
-using Grand.Core.Caching;
 using Grand.Core.Data;
 using Grand.Core.Domain.Catalog;
 using Grand.Core.Domain.Localization;
 using Grand.Core.Domain.Orders;
+using Grand.Core.Tests.Caching;
 using Grand.Services.Catalog;
 using Grand.Services.Directory;
-using Grand.Services.Events;
 using Grand.Services.Media;
 using Grand.Services.Stores;
 using Grand.Services.Tax;
+using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using MongoDB.Driver;
 using Moq;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Orders.Tests
 {
     [TestClass()]
     public class CheckoutAttributeParserTests {
         private IRepository<CheckoutAttribute> _checkoutAttributeRepo;
-        private IEventPublisher _eventPublisher;
-        private IStoreMappingService _storeMappingService;
+        private IMediator _eventPublisher;
         private ICheckoutAttributeService _checkoutAttributeService;
         private ICheckoutAttributeParser _checkoutAttributeParser;
-        private IWorkContext _workContext;
-        private ICurrencyService _currencyService;
-        private ITaxService _taxService;
-        private IPriceFormatter _priceFormatter;
-        private IDownloadService _downloadService;
-        private IWebHelper _webHelper;
-        private ICheckoutAttributeFormatter _checkoutAttributeFormatter;
 
         private CheckoutAttribute ca1, ca2, ca3;
         private CheckoutAttributeValue cav1_1, cav1_2, cav2_1, cav2_2;
@@ -101,7 +95,11 @@ namespace Grand.Services.Orders.Tests
                 DisplayOrder = 3,
             };
 
-
+            var tempEventPublisher = new Mock<IMediator>();
+            {
+                //tempEventPublisher.Setup(x => x.PublishAsync(It.IsAny<object>()));
+                _eventPublisher = tempEventPublisher.Object;
+            }
 
             var tempCheckoutAttributeRepo = new Mock<IRepository<CheckoutAttribute>>();
             {
@@ -110,27 +108,16 @@ namespace Grand.Services.Orders.Tests
                 IMongoCollection.InsertOne(ca2);
                 IMongoCollection.InsertOne(ca3);
                 tempCheckoutAttributeRepo.Setup(x => x.Table).Returns(IMongoCollection.AsQueryable());
-                tempCheckoutAttributeRepo.Setup(x => x.GetById(ca1.Id)).Returns(ca1);
-                tempCheckoutAttributeRepo.Setup(x => x.GetById(ca2.Id)).Returns(ca2);
-                tempCheckoutAttributeRepo.Setup(x => x.GetById(ca3.Id)).Returns(ca3);
+                tempCheckoutAttributeRepo.Setup(x => x.GetByIdAsync(ca1.Id)).ReturnsAsync(ca1);
+                tempCheckoutAttributeRepo.Setup(x => x.GetByIdAsync(ca2.Id)).ReturnsAsync(ca2);
+                tempCheckoutAttributeRepo.Setup(x => x.GetByIdAsync(ca3.Id)).ReturnsAsync(ca3);
                 _checkoutAttributeRepo = tempCheckoutAttributeRepo.Object;
             }
 
-            var cacheManager = new GrandNullCache();
-
-            _storeMappingService = new Mock<IStoreMappingService>().Object;
-
-
-
-            var tempEventPublisher = new Mock<IEventPublisher>();
-            {
-                tempEventPublisher.Setup(x => x.Publish(It.IsAny<object>()));
-                _eventPublisher = tempEventPublisher.Object;
-            }
-
+            var cacheManager = new TestMemoryCacheManager(new Mock<IMemoryCache>().Object, _eventPublisher);
 
             _checkoutAttributeService = new CheckoutAttributeService(cacheManager, _checkoutAttributeRepo,
-                _storeMappingService, _eventPublisher, null, null);
+               _eventPublisher, null, null);
 
             _checkoutAttributeParser = new CheckoutAttributeParser(_checkoutAttributeService);
 
@@ -140,26 +127,11 @@ namespace Grand.Services.Orders.Tests
             var tempWorkContext = new Mock<IWorkContext>();
             {
                 tempWorkContext.Setup(x => x.WorkingLanguage).Returns(workingLanguage);
-                _workContext = tempWorkContext.Object;
             }
-            _currencyService = new Mock<ICurrencyService>().Object;
-            _taxService = new Mock<ITaxService>().Object;
-            _priceFormatter = new Mock<IPriceFormatter>().Object;
-            _downloadService = new Mock<IDownloadService>().Object;
-            _webHelper = new Mock<IWebHelper>().Object;
-
-            _checkoutAttributeFormatter = new CheckoutAttributeFormatter(_workContext,
-                _checkoutAttributeService,
-                _checkoutAttributeParser,
-                _currencyService,
-                _taxService,
-                _priceFormatter,
-                _downloadService,
-                _webHelper);
         }
 
         [TestMethod()]
-        public void Can_add_and_parse_checkoutAttributes() {
+        public async Task Can_add_and_parse_checkoutAttributes() {
             string attributes = "";
             //color: green
             attributes = _checkoutAttributeParser.AddCheckoutAttribute(attributes, ca1, cav1_1.Id.ToString());
@@ -169,7 +141,7 @@ namespace Grand.Services.Orders.Tests
             //custom text
             attributes = _checkoutAttributeParser.AddCheckoutAttribute(attributes, ca3, "absolutely any value");
 
-            var parsed_attributeValues = _checkoutAttributeParser.ParseCheckoutAttributeValues(attributes);
+            var parsed_attributeValues = await _checkoutAttributeParser.ParseCheckoutAttributeValues(attributes);
             Assert.IsTrue(parsed_attributeValues.Contains(cav1_1));
             Assert.IsFalse(parsed_attributeValues.Contains(cav1_2)); //not inserted
             Assert.IsTrue(parsed_attributeValues.Contains(cav2_1));

@@ -6,9 +6,11 @@ using Grand.Services.Catalog;
 using Grand.Services.Orders;
 using Grand.Services.Security;
 using Grand.Services.Stores;
-using Grand.Web.Services;
+using Grand.Web.Features.Models.Products;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Components
 {
@@ -16,11 +18,13 @@ namespace Grand.Web.Components
     {
         #region Fields
         private readonly IProductService _productService;
-        private readonly IWorkContext _workContext;
         private readonly IAclService _aclService;
-        private readonly IStoreMappingService _storeMappingService;
-        private readonly IProductViewModelService _productViewModelService;
         private readonly IStoreContext _storeContext;
+        private readonly IWorkContext _workContext;
+        private readonly IStoreMappingService _storeMappingService;
+        private readonly IMediator _mediator;
+
+        private readonly CatalogSettings _catalogSettings;
         private readonly ShoppingCartSettings _shoppingCartSettings;
         #endregion
 
@@ -28,35 +32,39 @@ namespace Grand.Web.Components
 
         public CrossSellProductsViewComponent(
             IProductService productService,
-            IWorkContext workContext,
             IAclService aclService,
-            IStoreMappingService storeMappingService,
-            IProductViewModelService productViewModelService,
             IStoreContext storeContext,
-            ShoppingCartSettings shoppingCartSettings
-)
+            IWorkContext workContext,
+            IStoreMappingService storeMappingService,
+            IMediator mediator,
+            CatalogSettings catalogSettings,
+            ShoppingCartSettings shoppingCartSettings)
         {
-            this._productService = productService;
-            this._workContext = workContext;
-            this._aclService = aclService;
-            this._shoppingCartSettings = shoppingCartSettings;
-            this._productViewModelService = productViewModelService;
-            this._storeMappingService = storeMappingService;
-            this._storeContext = storeContext;
+            _productService = productService;
+            _aclService = aclService;
+            _storeContext = storeContext;
+            _workContext = workContext;
+            _storeMappingService = storeMappingService;
+            _mediator = mediator;
+            _catalogSettings = catalogSettings;
+            _shoppingCartSettings = shoppingCartSettings;
         }
 
         #endregion
 
         #region Invoker
 
-        public IViewComponentResult Invoke(int? productThumbPictureSize)
+        public async Task<IViewComponentResult> InvokeAsync(int? productThumbPictureSize)
         {
+            if (_shoppingCartSettings.CrossSellsNumber == 0)
+                return Content("");
+
             var cart = _workContext.CurrentCustomer.ShoppingCartItems
                 .Where(sci => sci.ShoppingCartType == ShoppingCartType.ShoppingCart)
-                .LimitPerStore(_storeContext.CurrentStore.Id)
+                .LimitPerStore(_shoppingCartSettings.CartsSharedBetweenStores, _storeContext.CurrentStore.Id)
                 .ToList();
 
-            var products = _productService.GetCrosssellProductsByShoppingCart(cart, _shoppingCartSettings.CrossSellsNumber);
+            var products = await _productService.GetCrosssellProductsByShoppingCart(cart, _shoppingCartSettings.CrossSellsNumber);
             //ACL and store mapping
             products = products.Where(p => _aclService.Authorize(p) && _storeMappingService.Authorize(p)).ToList();
             //availability dates
@@ -65,9 +73,12 @@ namespace Grand.Web.Components
             if (!products.Any())
                 return Content("");
 
-            var model = _productViewModelService.PrepareProductOverviewModels(products,
-                productThumbPictureSize: productThumbPictureSize, forceRedirectionAfterAddingToCart: true)
-                .ToList();
+            var model = await _mediator.Send(new GetProductOverview() {
+                PrepareSpecificationAttributes = _catalogSettings.ShowSpecAttributeOnCatalogPages,
+                ProductThumbPictureSize = productThumbPictureSize,
+                Products = products,
+                ForceRedirectionAfterAddingToCart = true,
+            });
 
             return View(model);
 

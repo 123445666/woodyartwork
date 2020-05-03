@@ -12,8 +12,13 @@ namespace Grand.Services.Payments
     {
         public ProcessPaymentRequest()
         {
-            this.CustomValues = new Dictionary<string, object>();
+            CustomValues = new Dictionary<string, object>();
         }
+
+        /// <summary>
+        /// Gets or sets a order identifier
+        /// </summary>
+        public string OrderCode { get; set; }
 
         /// <summary>
         /// Gets or sets a store identifier

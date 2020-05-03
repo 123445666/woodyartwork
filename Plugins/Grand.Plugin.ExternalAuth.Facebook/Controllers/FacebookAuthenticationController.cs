@@ -1,20 +1,19 @@
-﻿using System.Linq;
-using System.Security.Claims;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Facebook;
-using Microsoft.AspNetCore.Mvc;
-using Grand.Core;
+﻿using Grand.Core;
+using Grand.Framework.Controllers;
+using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security;
 using Grand.Plugin.ExternalAuth.Facebook.Models;
 using Grand.Services.Authentication.External;
 using Grand.Services.Configuration;
 using Grand.Services.Localization;
 using Grand.Services.Security;
 using Grand.Services.Stores;
-using Grand.Framework.Controllers;
-using Grand.Framework.Mvc.Filters;
-using Grand.Framework.Security;
-using System;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Facebook;
+using Microsoft.AspNetCore.Mvc;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace Grand.Plugin.ExternalAuth.Facebook.Controllers
 {
@@ -27,8 +26,6 @@ namespace Grand.Plugin.ExternalAuth.Facebook.Controllers
         private readonly ILocalizationService _localizationService;
         private readonly IPermissionService _permissionService;
         private readonly ISettingService _settingService;
-        private readonly IStoreService _storeService;
-        private readonly IWorkContext _workContext;
 
         #endregion
 
@@ -38,17 +35,13 @@ namespace Grand.Plugin.ExternalAuth.Facebook.Controllers
             IExternalAuthenticationService externalAuthenticationService,
             ILocalizationService localizationService,
             IPermissionService permissionService,
-            ISettingService settingService,
-            IStoreService storeService,
-            IWorkContext workContext)
+            ISettingService settingService)
         {
-            this._facebookExternalAuthSettings = facebookExternalAuthSettings;
-            this._externalAuthenticationService = externalAuthenticationService;
-            this._localizationService = localizationService;
-            this._permissionService = permissionService;
-            this._settingService = settingService;
-            this._storeService = storeService;
-            this._workContext = workContext;
+            _facebookExternalAuthSettings = facebookExternalAuthSettings;
+            _externalAuthenticationService = externalAuthenticationService;
+            _localizationService = localizationService;
+            _permissionService = permissionService;
+            _settingService = settingService;
         }
 
         #endregion
@@ -57,65 +50,43 @@ namespace Grand.Plugin.ExternalAuth.Facebook.Controllers
 
         [AuthorizeAdmin]
         [Area("Admin")]
-        public IActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageExternalAuthenticationMethods))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManageExternalAuthenticationMethods))
                 return AccessDeniedView();
-
-            //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
-            var settings = _settingService.LoadSetting<FacebookExternalAuthSettings>(storeScope);
 
             var model = new ConfigurationModel
             {
-                ClientId = settings.ClientKeyIdentifier,
-                ClientSecret = settings.ClientSecret,
-                ActiveStoreScopeConfiguration = storeScope
+                ClientId = _facebookExternalAuthSettings.ClientKeyIdentifier,
+                ClientSecret = _facebookExternalAuthSettings.ClientSecret,
             };
-            if (!string.IsNullOrEmpty(storeScope))
-            {
-                model.ClientId_OverrideForStore = _settingService.SettingExists(settings, setting => setting.ClientKeyIdentifier, storeScope);
-                model.ClientSecret_OverrideForStore = _settingService.SettingExists(settings, setting => setting.ClientSecret, storeScope);
-            }
+           
 
             return View("~/Plugins/ExternalAuth.Facebook/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
-        [AdminAntiForgery]
+        [AutoValidateAntiforgeryToken]
         [AuthorizeAdmin]
         [Area("Admin")]
-        public IActionResult Configure(ConfigurationModel model)
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageExternalAuthenticationMethods))
+            if (!await _permissionService.Authorize(StandardPermissionProvider.ManageExternalAuthenticationMethods))
                 return AccessDeniedView();
 
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
 
-            //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
-            var settings = _settingService.LoadSetting<FacebookExternalAuthSettings>(storeScope);
-
-            settings.ClientKeyIdentifier = model.ClientId;
-            settings.ClientSecret = model.ClientSecret;
-
-            if (model.ClientId_OverrideForStore || storeScope == "")
-                _settingService.SaveSetting(settings, x => x.ClientKeyIdentifier, storeScope, false);
-            else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(settings, x => x.ClientKeyIdentifier, storeScope);
-
-            if (model.ClientSecret_OverrideForStore || storeScope == "")
-                _settingService.SaveSetting(settings, x => x.ClientSecret, storeScope, false);
-            else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(settings, x => x.ClientSecret, storeScope);
+            _facebookExternalAuthSettings.ClientKeyIdentifier = model.ClientId;
+            _facebookExternalAuthSettings.ClientSecret = model.ClientSecret;
+            await _settingService.SaveSetting(_facebookExternalAuthSettings);
 
             //now clear settings cache
-            _settingService.ClearCache();
+            await _settingService.ClearCache();
 
             SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Configure();
         }
 
         public IActionResult Login(string returnUrl)
@@ -138,7 +109,7 @@ namespace Grand.Plugin.ExternalAuth.Facebook.Controllers
         public async Task<IActionResult> LoginCallback(string returnUrl)
         {
             //authenticate Facebook user
-            var authenticateResult = await this.HttpContext.AuthenticateAsync(FacebookDefaults.AuthenticationScheme);
+            var authenticateResult = await HttpContext.AuthenticateAsync(FacebookDefaults.AuthenticationScheme);
             if (!authenticateResult.Succeeded || !authenticateResult.Principal.Claims.Any())
                 return RedirectToRoute("Login");
 
@@ -146,7 +117,7 @@ namespace Grand.Plugin.ExternalAuth.Facebook.Controllers
             var authenticationParameters = new ExternalAuthenticationParameters
             {
                 ProviderSystemName = FacebookAuthenticationDefaults.ProviderSystemName,
-                AccessToken = await this.HttpContext.GetTokenAsync(FacebookDefaults.AuthenticationScheme, "access_token"),
+                AccessToken = await HttpContext.GetTokenAsync(FacebookDefaults.AuthenticationScheme, "access_token"),
                 Email = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.Email)?.Value,
                 ExternalIdentifier = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.NameIdentifier)?.Value,
                 ExternalDisplayIdentifier = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.Name)?.Value,
@@ -154,7 +125,7 @@ namespace Grand.Plugin.ExternalAuth.Facebook.Controllers
             };
 
             //authenticate Grand user
-            return _externalAuthenticationService.Authenticate(authenticationParameters, returnUrl);
+            return await _externalAuthenticationService.Authenticate(authenticationParameters, returnUrl);
         }
         public IActionResult SignInFailed(string error_code, string error_message, string state)
         {

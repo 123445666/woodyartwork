@@ -1,8 +1,7 @@
-﻿using Grand.Core.Domain.Localization;
-using Grand.Core.Domain.Messages;
-using Grand.Framework.Controllers;
+﻿using Grand.Framework.Controllers;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc.Filters;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Localization;
 using Grand.Services.Messages;
 using Grand.Services.Security;
@@ -10,17 +9,16 @@ using Grand.Services.Stores;
 using Grand.Web.Areas.Admin.Extensions;
 using Grand.Web.Areas.Admin.Models.Messages;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.NewsletterSubscribers)]
     public partial class NewsletterCategoryController: BaseAdminController
     {
         #region Fields 
 
-        private readonly IPermissionService _permissionService;
         private readonly INewsletterCategoryService _newsletterCategoryService;
         private readonly ILanguageService _languageService;
         private readonly ILocalizationService _localizationService;
@@ -30,10 +28,9 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Ctor
 
-        public NewsletterCategoryController(IPermissionService permissionService, INewsletterCategoryService newsletterCategoryService, ILanguageService languageService,
+        public NewsletterCategoryController(INewsletterCategoryService newsletterCategoryService, ILanguageService languageService,
             ILocalizationService localizationService, IStoreService storeService)
         {
-            this._permissionService = permissionService;
             this._newsletterCategoryService = newsletterCategoryService;
             this._languageService = languageService;
             this._localizationService = localizationService;
@@ -42,71 +39,16 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #endregion
 
-        #region Utilities
-
-        [NonAction]
-        protected virtual List<LocalizedProperty> UpdateLocales(NewsletterCategory newsletterCategory, NewsletterCategoryModel model)
-        {
-            List<LocalizedProperty> localized = new List<LocalizedProperty>();
-            foreach (var local in model.Locales)
-            {
-                localized.Add(new LocalizedProperty()
-                {
-                    LanguageId = local.LanguageId,
-                    LocaleKey = "Name",
-                    LocaleValue = local.Name
-                });
-
-                localized.Add(new LocalizedProperty()
-                {
-                    LanguageId = local.LanguageId,
-                    LocaleKey = "Description",
-                    LocaleValue = local.Description
-                });
-            }
-            return localized;
-        }
-
-        [NonAction]
-        protected virtual void PrepareStoresMappingModel(NewsletterCategoryModel model, NewsletterCategory newsletterCategory, bool excludeProperties)
-        {
-            if (model == null)
-                throw new ArgumentNullException("model");
-
-            model.AvailableStores = _storeService.GetAllStores().Select(s => s.ToModel()).ToList();
-
-            if (!excludeProperties)
-            {
-                if (newsletterCategory != null)
-                {
-                    model.SelectedStoreIds = newsletterCategory.Stores.ToArray();
-                }
-            }
-        }
-        #endregion
-
         #region Methods
 
-        public IActionResult Index()
-        {
-            return RedirectToAction("List");
-        }
+        public IActionResult Index() => RedirectToAction("List");
 
-        public IActionResult List()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageNewsletterSubscribers))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult List() => View();
 
         [HttpPost]
-        public IActionResult List(DataSourceRequest command)
+        public async Task<IActionResult> List(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageNewsletterSubscribers))
-                return AccessDeniedView();
-
-            var newslettercategories = _newsletterCategoryService.GetAllNewsletterCategory();
+            var newslettercategories = await _newsletterCategoryService.GetAllNewsletterCategory();
             var gridModel = new DataSourceResult
             {
                 Data = newslettercategories.Select(x =>
@@ -123,106 +65,84 @@ namespace Grand.Web.Areas.Admin.Controllers
             return Json(gridModel);
         }
 
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageNewsletterSubscribers))
-                return AccessDeniedView();
-
             var model = new NewsletterCategoryModel();
             //locales
-            AddLocales(_languageService, model.Locales);
+            await AddLocales(_languageService, model.Locales);
             //Stores
-            PrepareStoresMappingModel(model, null, false);
-
+            await model.PrepareStoresMappingModel(null, _storeService, false);
             return View(model);
         }
 
         [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
-        public IActionResult Create(NewsletterCategoryModel model, bool continueEditing)
+        public async Task<IActionResult> Create(NewsletterCategoryModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageNewsletterSubscribers))
-                return AccessDeniedView();
-
             if (ModelState.IsValid)
             {
                 var newsletterCategory = model.ToEntity();
-                newsletterCategory.Locales = UpdateLocales(newsletterCategory, model);
-                newsletterCategory.Stores = model.SelectedStoreIds != null ? model.SelectedStoreIds.ToList() : new List<string>();
-                _newsletterCategoryService.InsertNewsletterCategory(newsletterCategory);
-
+                await _newsletterCategoryService.InsertNewsletterCategory(newsletterCategory);
                 SuccessNotification(_localizationService.GetResource("Admin.Promotions.NewsletterCategory.Added"));
                 return continueEditing ? RedirectToAction("Edit", new { id = newsletterCategory.Id }) : RedirectToAction("List");
             }
 
             //Stores
-            PrepareStoresMappingModel(model, null, false);
+            await model.PrepareStoresMappingModel(null, _storeService, false);
 
             return View(model);
         }
 
-        public IActionResult Edit(string id)
+        public async Task<IActionResult> Edit(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageNewsletterSubscribers))
-                return AccessDeniedView();
-
-            var newsletterCategory = _newsletterCategoryService.GetNewsletterCategoryById(id);
+            var newsletterCategory = await _newsletterCategoryService.GetNewsletterCategoryById(id);
             if (newsletterCategory == null)
                 return RedirectToAction("List");
 
             var model = newsletterCategory.ToModel();
 
             //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
+            await AddLocales(_languageService, model.Locales, (locale, languageId) =>
             {
                 locale.Name = newsletterCategory.GetLocalized(x => x.Name, languageId, false, false);
                 locale.Description = newsletterCategory.GetLocalized(x => x.Description, languageId, false, false);
             });
 
             //Stores
-            PrepareStoresMappingModel(model, newsletterCategory, false);
-
+            await model.PrepareStoresMappingModel(newsletterCategory, _storeService, false);
             return View(model);
         }
 
         [HttpPost]
         [ParameterBasedOnFormName("save-continue", "continueEditing")]
         [FormValueRequired("save", "save-continue")]
-        public IActionResult Edit(NewsletterCategoryModel model, bool continueEditing)
+        public async Task<IActionResult> Edit(NewsletterCategoryModel model, bool continueEditing)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageNewsletterSubscribers))
-                return AccessDeniedView();
-
-            var newsletterCategory = _newsletterCategoryService.GetNewsletterCategoryById(model.Id);
+            var newsletterCategory = await _newsletterCategoryService.GetNewsletterCategoryById(model.Id);
             if (newsletterCategory == null)
                 return RedirectToAction("List");
 
             if (ModelState.IsValid)
             {
                 newsletterCategory = model.ToEntity(newsletterCategory);
-                newsletterCategory.Locales = UpdateLocales(newsletterCategory, model);
-                newsletterCategory.Stores = model.SelectedStoreIds != null ? model.SelectedStoreIds.ToList() : new List<string>();
-                _newsletterCategoryService.UpdateNewsletterCategory(newsletterCategory);
+                await _newsletterCategoryService.UpdateNewsletterCategory(newsletterCategory);
 
                 SuccessNotification(_localizationService.GetResource("Admin.Promotions.NewsletterCategory.Updated"));
                 return continueEditing ? RedirectToAction("Edit", new { id = newsletterCategory.Id }) : RedirectToAction("List");
             }
             //Stores
-            PrepareStoresMappingModel(model, newsletterCategory, true);
+            await model.PrepareStoresMappingModel(newsletterCategory, _storeService, true);
 
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult Delete(string id)
+        public async Task<IActionResult> Delete(string id)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageBanners))
-                return AccessDeniedView();
-
-            var newsletterCategory = _newsletterCategoryService.GetNewsletterCategoryById(id);
+            var newsletterCategory = await _newsletterCategoryService.GetNewsletterCategoryById(id);
             if (newsletterCategory == null)
                 return RedirectToAction("List");
 
-            _newsletterCategoryService.DeleteNewsletterCategory(newsletterCategory);
+            await _newsletterCategoryService.DeleteNewsletterCategory(newsletterCategory);
 
             SuccessNotification(_localizationService.GetResource("Admin.Promotions.NewsletterCategory.Deleted"));
             return RedirectToAction("List");

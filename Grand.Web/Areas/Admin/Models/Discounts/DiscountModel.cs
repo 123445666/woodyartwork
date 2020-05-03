@@ -1,4 +1,5 @@
 ﻿using FluentValidation.Attributes;
+using Grand.Framework.Mapping;
 using Grand.Framework.Mvc.ModelBinding;
 using Grand.Framework.Mvc.Models;
 using Grand.Web.Areas.Admin.Validators.Discounts;
@@ -10,7 +11,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Grand.Web.Areas.Admin.Models.Discounts
 {
     [Validator(typeof(DiscountValidator))]
-    public partial class DiscountModel : BaseGrandEntityModel
+    public partial class DiscountModel : BaseGrandEntityModel, IStoreMappingModel
     {
         public DiscountModel()
         {
@@ -54,11 +55,11 @@ namespace Grand.Web.Areas.Admin.Models.Discounts
 
         [GrandResourceDisplayName("Admin.Promotions.Discounts.Fields.StartDate")]
         [UIHint("DateTimeNullable")]
-        public DateTime? StartDateUtc { get; set; }
+        public DateTime? StartDate { get; set; }
 
         [GrandResourceDisplayName("Admin.Promotions.Discounts.Fields.EndDate")]
         [UIHint("DateTimeNullable")]
-        public DateTime? EndDateUtc { get; set; }
+        public DateTime? EndDate { get; set; }
 
         [GrandResourceDisplayName("Admin.Promotions.Discounts.Fields.RequiresCouponCode")]
         public bool RequiresCouponCode { get; set; }
@@ -78,6 +79,13 @@ namespace Grand.Web.Areas.Admin.Models.Discounts
         [GrandResourceDisplayName("Admin.Promotions.Discounts.Fields.MaximumDiscountedQuantity")]
         [UIHint("Int32Nullable")]
         public int? MaximumDiscountedQuantity { get; set; }
+
+        //Store mapping
+        [GrandResourceDisplayName("Admin.Promotions.Discounts.Fields.LimitedToStores")]
+        public bool LimitedToStores { get; set; }
+        [GrandResourceDisplayName("Admin.Promotions.Discounts.Fields.AvailableStores")]
+        public List<StoreModel> AvailableStores { get; set; }
+        public string[] SelectedStoreIds { get; set; }
 
         [GrandResourceDisplayName("Admin.Promotions.Discounts.Requirements.DiscountRequirementType")]
         public string AddDiscountRequirement { get; set; }
@@ -104,6 +112,7 @@ namespace Grand.Web.Areas.Admin.Models.Discounts
             [GrandResourceDisplayName("Admin.Promotions.Discounts.History.Order")]
             public string OrderId { get; set; }
             public int OrderNumber { get; set; }
+            public string OrderCode { get; set; }
 
             [GrandResourceDisplayName("Admin.Promotions.Discounts.History.OrderTotal")]
             public string OrderTotal { get; set; }

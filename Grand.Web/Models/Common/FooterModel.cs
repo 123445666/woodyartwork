@@ -11,11 +11,15 @@ namespace Grand.Web.Models.Common
         }
 
         public string StoreName { get; set; }
+        public string CompanyName { get; set; }
+        public string CompanyEmail { get; set; }
+        public string CompanyHours { get; set; }
+        public string CompanyAddress { get; set; }
+        public string CompanyPhone { get; set; }
 
         public string FacebookLink { get; set; }
         public string TwitterLink { get; set; }
         public string YoutubeLink { get; set; }
-        public string GooglePlusLink { get; set; }
         public string InstagramLink { get; set; }
         public string LinkedInLink { get; set; }
         public string PinterestLink { get; set; }
@@ -31,6 +35,7 @@ namespace Grand.Web.Models.Common
         public bool NewProductsEnabled { get; set; }
         public bool AllowCustomersToApplyForVendorAccount { get; set; }
         public bool DisplayTaxShippingInfoFooter { get; set; }
+        public bool InclTax { get; set; }
         public bool HidePoweredByGrandNode { get; set; }
         public bool KnowledgebaseEnabled { get; set; }
 
@@ -45,9 +50,9 @@ namespace Grand.Web.Models.Common
             public string Name { get; set; }
             public string SeName { get; set; }
 
-            public bool IncludeInFooterColumn1 { get; set; }
-            public bool IncludeInFooterColumn2 { get; set; }
-            public bool IncludeInFooterColumn3 { get; set; }
+            public bool IncludeInFooterRow1 { get; set; }
+            public bool IncludeInFooterRow2 { get; set; }
+            public bool IncludeInFooterRow3 { get; set; }
         }
 
         #endregion

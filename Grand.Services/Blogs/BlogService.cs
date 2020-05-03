@@ -3,11 +3,13 @@ using Grand.Core.Data;
 using Grand.Core.Domain.Blogs;
 using Grand.Core.Domain.Catalog;
 using Grand.Services.Events;
+using MediatR;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Blogs
 {
@@ -20,8 +22,10 @@ namespace Grand.Services.Blogs
 
         private readonly IRepository<BlogPost> _blogPostRepository;
         private readonly IRepository<BlogComment> _blogCommentRepository;
+        private readonly IRepository<BlogCategory> _blogCategoryRepository;
+        private readonly IRepository<BlogProduct> _blogProductRepository;
         private readonly CatalogSettings _catalogSettings;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
 
         #endregion
 
@@ -29,13 +33,17 @@ namespace Grand.Services.Blogs
 
         public BlogService(IRepository<BlogPost> blogPostRepository,
             IRepository<BlogComment> blogCommentRepository,
-            CatalogSettings catalogSettings, 
-            IEventPublisher eventPublisher)
+            IRepository<BlogCategory> blogCategoryRepository,
+            IRepository<BlogProduct> blogProductRepository,
+            CatalogSettings catalogSettings,
+            IMediator mediator)
         {
-            this._blogPostRepository = blogPostRepository;
-            this._blogCommentRepository = blogCommentRepository;
-            this._catalogSettings = catalogSettings;
-            this._eventPublisher = eventPublisher;
+            _blogPostRepository = blogPostRepository;
+            _blogCommentRepository = blogCommentRepository;
+            _blogCategoryRepository = blogCategoryRepository;
+            _blogProductRepository = blogProductRepository;
+            _catalogSettings = catalogSettings;
+            _mediator = mediator;
         }
 
         #endregion
@@ -46,15 +54,15 @@ namespace Grand.Services.Blogs
         /// Deletes a blog post
         /// </summary>
         /// <param name="blogPost">Blog post</param>
-        public virtual void DeleteBlogPost(BlogPost blogPost)
+        public virtual async Task DeleteBlogPost(BlogPost blogPost)
         {
             if (blogPost == null)
                 throw new ArgumentNullException("blogPost");
 
-            _blogPostRepository.Delete(blogPost);
+            await _blogPostRepository.DeleteAsync(blogPost);
 
             //event notification
-            _eventPublisher.EntityDeleted(blogPost);
+            await _mediator.EntityDeleted(blogPost);
         }
 
         /// <summary>
@@ -62,9 +70,9 @@ namespace Grand.Services.Blogs
         /// </summary>
         /// <param name="blogPostId">Blog post identifier</param>
         /// <returns>Blog post</returns>
-        public virtual BlogPost GetBlogPostById(string blogPostId)
+        public virtual Task<BlogPost> GetBlogPostById(string blogPostId)
         {
-            return _blogPostRepository.GetById(blogPostId);
+            return _blogPostRepository.GetByIdAsync(blogPostId);
         }
 
         /// <summary>
@@ -79,17 +87,27 @@ namespace Grand.Services.Blogs
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <param name="blogPostName">Blog post name</param>
         /// <returns>Blog posts</returns>
-        public virtual IPagedList<BlogPost> GetAllBlogPosts(string storeId = "", 
+        public virtual async Task<IPagedList<BlogPost>> GetAllBlogPosts(string storeId = "",
             DateTime? dateFrom = null, DateTime? dateTo = null,
-            int pageIndex = 0, int pageSize = int.MaxValue, bool showHidden = false, string tag = null, string blogPostName = "")
+            int pageIndex = 0, int pageSize = int.MaxValue, bool showHidden = false, string tag = null, string blogPostName = "", string categoryId = "")
         {
 
             var query = _blogPostRepository.Table;
 
+            if (!string.IsNullOrEmpty(categoryId))
+            {
+                var category = _blogCategoryRepository.Table.FirstOrDefault(x => x.Id == categoryId);
+                if (category != null)
+                {
+                    var postsIds = category.BlogPosts.Select(x => x.BlogPostId);
+                    query = query.Where(x => postsIds.Contains(x.Id));
+                }
+            }
+
             if (!String.IsNullOrWhiteSpace(blogPostName))
             {
                 query = query.Where
-                    (b => (b.Title != null && b.Title.ToLower().Contains(blogPostName.ToLower())) || 
+                    (b => (b.Title != null && b.Title.ToLower().Contains(blogPostName.ToLower())) ||
                     (b.BodyOverview != null && b.BodyOverview.ToLower().Contains(blogPostName.ToLower())));
             }
             if (dateFrom.HasValue)
@@ -108,16 +126,17 @@ namespace Grand.Services.Blogs
             {
                 query = query.Where(b => b.Stores.Contains(storeId) || !b.LimitedToStores);
             }
-            if(!(String.IsNullOrEmpty(tag)))
+            if (!(String.IsNullOrEmpty(tag)))
             {
                 query = query.Where(x => x.Tags.Contains(tag));
             }
+
             query = query.OrderByDescending(b => b.CreatedOnUtc);
 
-            var blogPosts = new PagedList<BlogPost>(query, pageIndex, pageSize);
-            return blogPosts;
-
+            return await PagedList<BlogPost>.Create(query, pageIndex, pageSize);
+           
         }
+
 
         /// <summary>
         /// Gets all blog posts
@@ -129,14 +148,14 @@ namespace Grand.Services.Blogs
         /// <param name="pageSize">Page size</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Blog posts</returns>
-        public virtual IPagedList<BlogPost> GetAllBlogPostsByTag(string storeId = "",
+        public virtual async Task<IPagedList<BlogPost>> GetAllBlogPostsByTag(string storeId = "",
             string tag = "",
             int pageIndex = 0, int pageSize = int.MaxValue, bool showHidden = false)
         {
             tag = tag.Trim();
 
             //we load all records and only then filter them by tag
-            var blogPostsAll = GetAllBlogPosts(storeId: storeId, showHidden: showHidden, tag:tag);
+            var blogPostsAll = await GetAllBlogPosts(storeId: storeId, showHidden: showHidden, tag: tag);
             var taggedBlogPosts = new List<BlogPost>();
             foreach (var blogPost in blogPostsAll)
             {
@@ -146,8 +165,7 @@ namespace Grand.Services.Blogs
             }
 
             //server-side paging
-            var result = new PagedList<BlogPost>(taggedBlogPosts, pageIndex, pageSize);
-            return result;
+            return new PagedList<BlogPost>(taggedBlogPosts, pageIndex, pageSize);
         }
 
         /// <summary>
@@ -157,11 +175,11 @@ namespace Grand.Services.Blogs
         /// <param name="languageId">Language identifier. 0 if you want to get all news</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Blog post tags</returns>
-        public virtual IList<BlogPostTag> GetAllBlogPostTags(string storeId, bool showHidden = false)
+        public virtual async Task<IList<BlogPostTag>> GetAllBlogPostTags(string storeId, bool showHidden = false)
         {
             var blogPostTags = new List<BlogPostTag>();
 
-            var blogPosts = GetAllBlogPosts(storeId: storeId, showHidden: showHidden);
+            var blogPosts = await GetAllBlogPosts(storeId: storeId, showHidden: showHidden);
             foreach (var blogPost in blogPosts)
             {
                 var tags = blogPost.ParseTags();
@@ -189,60 +207,60 @@ namespace Grand.Services.Blogs
         /// Inserts an blog post
         /// </summary>
         /// <param name="blogPost">Blog post</param>
-        public virtual void InsertBlogPost(BlogPost blogPost)
+        public virtual async Task InsertBlogPost(BlogPost blogPost)
         {
             if (blogPost == null)
                 throw new ArgumentNullException("blogPost");
 
-            _blogPostRepository.Insert(blogPost);
+            await _blogPostRepository.InsertAsync(blogPost);
 
             //event notification
-            _eventPublisher.EntityInserted(blogPost);
+            await _mediator.EntityInserted(blogPost);
         }
 
         /// <summary>
         /// Inserts a blog post comment
         /// </summary>
         /// <param name="blogPost">Blog post comment</param>
-        public virtual void InsertBlogComment(BlogComment blogComment)
+        public virtual async Task InsertBlogComment(BlogComment blogComment)
         {
             if (blogComment == null)
                 throw new ArgumentNullException("blogPost");
 
-            _blogCommentRepository.Insert(blogComment);
+            await _blogCommentRepository.InsertAsync(blogComment);
 
             //event notification
-            _eventPublisher.EntityInserted(blogComment);
+            await _mediator.EntityInserted(blogComment);
         }
 
         /// <summary>
         /// Updates the blog post
         /// </summary>
         /// <param name="blogPost">Blog post</param>
-        public virtual void UpdateBlogPost(BlogPost blogPost)
+        public virtual async Task UpdateBlogPost(BlogPost blogPost)
         {
             if (blogPost == null)
                 throw new ArgumentNullException("blogPost");
 
-            _blogPostRepository.Update(blogPost);
+            await _blogPostRepository.UpdateAsync(blogPost);
 
             //event notification
-            _eventPublisher.EntityUpdated(blogPost);
+            await _mediator.EntityUpdated(blogPost);
         }
-        
+
         /// <summary>
         /// Gets all comments
         /// </summary>
         /// <param name="customerId">Customer identifier; "" to load all records</param>
         /// <returns>Comments</returns>
-        public virtual IList<BlogComment> GetAllComments(string customerId)
+        public virtual async Task<IList<BlogComment>> GetAllComments(string customerId, string storeId)
         {
             var query = from c in _blogCommentRepository.Table
                         orderby c.CreatedOnUtc
-                        where (customerId == "" || c.CustomerId == customerId)
-                        select c;
-            var content = query.ToList();
-            return content;
+                        where (customerId == "" || c.CustomerId == customerId) && (storeId == "" || c.StoreId == storeId)
+                        select c;        
+            
+            return await query.ToListAsync();
         }
 
         /// <summary>
@@ -250,26 +268,26 @@ namespace Grand.Services.Blogs
         /// </summary>
         /// <param name="blogCommentId">Blog comment identifier</param>
         /// <returns>Blog comment</returns>
-        public virtual BlogComment GetBlogCommentById(string blogCommentId)
+        public virtual Task<BlogComment> GetBlogCommentById(string blogCommentId)
         {
-            return _blogCommentRepository.GetById(blogCommentId);
+            return _blogCommentRepository.GetByIdAsync(blogCommentId);
         }
 
-        public virtual IList<BlogComment> GetBlogCommentsByBlogPostId(string blogPostId)
+        public virtual async Task<IList<BlogComment>> GetBlogCommentsByBlogPostId(string blogPostId)
         {
             var query = from c in _blogCommentRepository.Table
                         where c.BlogPostId == blogPostId
                         orderby c.CreatedOnUtc
                         select c;
-            var content = query.ToList();
-            return content;
+
+            return await query.ToListAsync();
         }
 
         /// Get blog comments by identifiers
         /// </summary>
         /// <param name="commentIds">Blog comment identifiers</param>
         /// <returns>Blog comments</returns>
-        public virtual IList<BlogComment> GetBlogCommentsByIds(string[] commentIds)
+        public virtual async Task<IList<BlogComment>> GetBlogCommentsByIds(string[] commentIds)
         {
             if (commentIds == null || commentIds.Length == 0)
                 return new List<BlogComment>();
@@ -277,7 +295,7 @@ namespace Grand.Services.Blogs
             var query = from bc in _blogCommentRepository.Table
                         where commentIds.Contains(bc.Id)
                         select bc;
-            var comments = query.ToList();
+            var comments = await query.ToListAsync();
             //sort by passed identifiers
             var sortedComments = new List<BlogComment>();
             foreach (string id in commentIds)
@@ -289,13 +307,174 @@ namespace Grand.Services.Blogs
             return sortedComments;
         }
 
-        public virtual void DeleteBlogComment(BlogComment blogComment)
+        public virtual async Task DeleteBlogComment(BlogComment blogComment)
         {
             if (blogComment == null)
                 throw new ArgumentNullException("blogComment");
 
-            _blogCommentRepository.Delete(blogComment);
+            await _blogCommentRepository.DeleteAsync(blogComment);
         }
+
+        #region Blog category
+
+        /// <summary>
+        /// Get category by id
+        /// </summary>
+        /// <param name="blogCategoryId">Blog category id</param>
+        /// <returns></returns>
+        public virtual Task<BlogCategory> GetBlogCategoryById(string blogCategoryId)
+        {
+            return _blogCategoryRepository.GetByIdAsync(blogCategoryId);
+        }
+
+        /// <summary>
+        /// Get all blog categories
+        /// </summary>
+        /// <returns></returns>
+        public virtual async Task<IList<BlogCategory>> GetAllBlogCategories(string storeId = "")
+        {
+            var query = from c in _blogCategoryRepository.Table
+                        select c;
+
+            if (!String.IsNullOrEmpty(storeId) && !_catalogSettings.IgnoreStoreLimitations)
+            {
+                query = query.Where(b => b.Stores.Contains(storeId) || !b.LimitedToStores);
+            }
+
+            return await query.OrderBy(x => x.DisplayOrder).ToListAsync();
+        }
+
+        /// <summary>
+        /// Inserts an blog category
+        /// </summary>
+        /// <param name="blogCategory">Blog category</param>
+        public virtual async Task<BlogCategory> InsertBlogCategory(BlogCategory blogCategory)
+        {
+            if (blogCategory == null)
+                throw new ArgumentNullException("blogCategory");
+
+            await _blogCategoryRepository.InsertAsync(blogCategory);
+
+            //event notification
+            await _mediator.EntityInserted(blogCategory);
+
+            return blogCategory;
+        }
+
+        /// <summary>
+        /// Updates the blog category
+        /// </summary>
+        /// <param name="blogCategory">Blog category</param>
+        public virtual async Task<BlogCategory> UpdateBlogCategory(BlogCategory blogCategory)
+        {
+            if (blogCategory == null)
+                throw new ArgumentNullException("blogCategory");
+
+            await _blogCategoryRepository.UpdateAsync(blogCategory);
+
+            //event notification
+            await _mediator.EntityUpdated(blogCategory);
+
+            return blogCategory;
+        }
+
+        /// <summary>
+        /// Delete blog category
+        /// </summary>
+        /// <param name="blogCategory">Blog category</param>
+        public virtual async Task DeleteBlogCategory(BlogCategory blogCategory)
+        {
+            if (blogCategory == null)
+                throw new ArgumentNullException("blogCategory");
+
+            await _blogCategoryRepository.DeleteAsync(blogCategory);
+
+            //event notification
+            await _mediator.EntityDeleted(blogCategory);
+        }
+
+        #endregion
+
+        #region Blog post product
+
+        /// <summary>
+        /// Gets a blog product
+        /// </summary>
+        /// <param name="id">id</param>
+        /// <returns>Blog product</returns>
+        public virtual Task<BlogProduct> GetBlogProductById(string id)
+        {
+            return _blogProductRepository.GetByIdAsync(id);
+        }
+
+        /// <summary>
+        /// Insert an blog product
+        /// </summary>
+        /// <param name="blogProduct">Blog product</param>
+        public virtual async Task InsertBlogProduct(BlogProduct blogProduct)
+        {
+            if (blogProduct == null)
+                throw new ArgumentNullException("blogProduct");
+
+            await _blogProductRepository.InsertAsync(blogProduct);
+
+            //event notification
+            await _mediator.EntityInserted(blogProduct);
+
+        }
+
+        /// <summary>
+        /// Update an blog product
+        /// </summary>
+        /// <param name="blogPostProduct">Blog product</param>
+        public virtual async Task UpdateBlogProduct(BlogProduct blogProduct)
+        {
+            if (blogProduct == null)
+                throw new ArgumentNullException("blogProduct");
+
+            await _blogProductRepository.UpdateAsync(blogProduct);
+
+            //event notification
+            await _mediator.EntityUpdated(blogProduct);
+
+        }
+
+        /// <summary>
+        /// Delete an blog product
+        /// </summary>
+        /// <param name="blogProduct">Blog product</param>
+        public virtual async Task DeleteBlogProduct(BlogProduct blogProduct)
+        {
+            if (blogProduct == null)
+                throw new ArgumentNullException("blogProduct");
+
+            await _blogProductRepository.DeleteAsync(blogProduct);
+
+            //event notification
+            await _mediator.EntityDeleted(blogProduct);
+
+        }
+
+        /// <summary>
+        /// Get all product by blog post id
+        /// </summary>
+        /// <returns></returns>
+        public virtual async Task<IList<BlogProduct>> GetProductsByBlogPostId(string blogPostId)
+        {
+            if (string.IsNullOrEmpty(blogPostId))
+                return new List<BlogProduct>();
+
+            var query = from bp in _blogProductRepository.Table
+                        where bp.BlogPostId == blogPostId
+                        orderby bp.DisplayOrder
+                        select bp;
+
+            return await query.ToListAsync();
+        }
+
+        #endregion
+
+
         #endregion
     }
 }

@@ -9,12 +9,13 @@ using Grand.Core.Plugins;
 using Grand.Framework.Controllers;
 using Grand.Framework.Extensions;
 using Grand.Framework.Kendoui;
+using Grand.Framework.Mvc.Models;
+using Grand.Framework.Security.Authorization;
 using Grand.Framework.Themes;
 using Grand.Services.Authentication.External;
 using Grand.Services.Cms;
 using Grand.Services.Common;
 using Grand.Services.Configuration;
-using Grand.Services.Events;
 using Grand.Services.Localization;
 using Grand.Services.Logging;
 using Grand.Services.Payments;
@@ -24,81 +25,82 @@ using Grand.Services.Stores;
 using Grand.Services.Tax;
 using Grand.Web.Areas.Admin.Extensions;
 using Grand.Web.Areas.Admin.Models.Plugins;
+using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.Plugins)]
     public partial class PluginController : BaseAdminController
-	{
-		#region Fields
+    {
+        #region Fields
 
         private readonly IPluginFinder _pluginFinder;
         private readonly ILocalizationService _localizationService;
         private readonly IWebHelper _webHelper;
-        private readonly IPermissionService _permissionService;
         private readonly ILanguageService _languageService;
-	    private readonly ISettingService _settingService;
+        private readonly ISettingService _settingService;
         private readonly ICustomerActivityService _customerActivityService;
         private readonly IStoreService _storeService;
         private readonly IThemeProvider _themeProvider;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IMediator _mediator;
         private readonly ICacheManager _cacheManager;
         private readonly PaymentSettings _paymentSettings;
         private readonly ShippingSettings _shippingSettings;
         private readonly TaxSettings _taxSettings;
         private readonly ExternalAuthenticationSettings _externalAuthenticationSettings;
         private readonly WidgetSettings _widgetSettings;
-	    #endregion
+        #endregion
 
-		#region Constructors
+        #region Constructors
 
         public PluginController(IPluginFinder pluginFinder,
             ILocalizationService localizationService,
             IWebHelper webHelper,
-            IPermissionService permissionService, 
             ILanguageService languageService,
             ISettingService settingService,
             ICustomerActivityService customerActivityService,
             IStoreService storeService,
             IThemeProvider themeProvider,
-            IEventPublisher eventPublisher,
+            IMediator mediator,
             ICacheManager cacheManager,
             PaymentSettings paymentSettings,
             ShippingSettings shippingSettings,
-            TaxSettings taxSettings, 
-            ExternalAuthenticationSettings externalAuthenticationSettings, 
+            TaxSettings taxSettings,
+            ExternalAuthenticationSettings externalAuthenticationSettings,
             WidgetSettings widgetSettings)
-		{
+        {
             this._pluginFinder = pluginFinder;
             this._localizationService = localizationService;
             this._webHelper = webHelper;
-            this._permissionService = permissionService;
             this._languageService = languageService;
             this._settingService = settingService;
             this._customerActivityService = customerActivityService;
             this._storeService = storeService;
             this._themeProvider = themeProvider;
-            this._eventPublisher = eventPublisher;
+            this._mediator = mediator;
             this._cacheManager = cacheManager;
             this._paymentSettings = paymentSettings;
             this._shippingSettings = shippingSettings;
             this._taxSettings = taxSettings;
             this._externalAuthenticationSettings = externalAuthenticationSettings;
             this._widgetSettings = widgetSettings;
-		}
+        }
 
-		#endregion 
+        #endregion
 
         #region Utilities
 
         [NonAction]
-        protected virtual PluginModel PreparePluginModel(PluginDescriptor pluginDescriptor, 
+        protected virtual async Task<PluginModel> PreparePluginModel(PluginDescriptor pluginDescriptor,
             bool prepareLocales = true, bool prepareStores = true)
         {
             var pluginModel = pluginDescriptor.ToModel();
@@ -108,17 +110,17 @@ namespace Grand.Web.Areas.Admin.Controllers
             if (prepareLocales)
             {
                 //locales
-                AddLocales(_languageService, pluginModel.Locales, (locale, languageId) =>
+                await AddLocales(_languageService, pluginModel.Locales, (locale, languageId) =>
                 {
-                    locale.FriendlyName = pluginDescriptor.Instance().GetLocalizedFriendlyName(_localizationService, languageId, false);
+                    locale.FriendlyName = pluginDescriptor.Instance(_pluginFinder.ServiceProvider).GetLocalizedFriendlyName(_localizationService, languageId, false);
                 });
             }
             if (prepareStores)
             {
                 //stores
-                pluginModel.AvailableStores = _storeService
-                    .GetAllStores()
-                    .Select(s => s.ToModel())
+                pluginModel.AvailableStores = (await _storeService
+                    .GetAllStores())
+                    .Select(s => new StoreModel() { Id = s.Id, Name = s.Shortcut })
                     .ToList();
                 pluginModel.SelectedStoreIds = pluginDescriptor.LimitedToStores.ToArray();
                 pluginModel.LimitedToStores = pluginDescriptor.LimitedToStores.Count > 0;
@@ -130,7 +132,7 @@ namespace Grand.Web.Areas.Admin.Controllers
             if (pluginDescriptor.Installed)
             {
                 //display configuration URL only when a plugin is already installed
-                var pluginInstance = pluginDescriptor.Instance();
+                var pluginInstance = pluginDescriptor.Instance(_pluginFinder.ServiceProvider);
                 pluginModel.ConfigurationUrl = pluginInstance.GetConfigurationPageUrl();
 
 
@@ -174,19 +176,14 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         #region Methods
 
-        public IActionResult Index()
-        {
-            return RedirectToAction("List");
-        }
+        public IActionResult Index() => RedirectToAction("List");
 
         public IActionResult List()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
-            var model = new PluginListModel();
-            //load modes
-            model.AvailableLoadModes = LoadPluginsMode.All.ToSelectList(false).ToList();
+            var model = new PluginListModel {
+                //load modes
+                AvailableLoadModes = LoadPluginsMode.All.ToSelectList(HttpContext, false).ToList()
+            };
             //groups
             model.AvailableGroups.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "" });
             foreach (var g in _pluginFinder.GetPluginGroups())
@@ -194,32 +191,28 @@ namespace Grand.Web.Areas.Admin.Controllers
             return View(model);
         }
 
-	    [HttpPost]
-        public IActionResult ListSelect(DataSourceRequest command, PluginListModel model)
-	    {
-	        if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-	            return AccessDeniedView();
-
-	        var loadMode = (LoadPluginsMode) model.SearchLoadModeId;
+        [HttpPost]
+        public async Task<IActionResult> ListSelect(DataSourceRequest command, PluginListModel model)
+        {
+            var loadMode = (LoadPluginsMode)model.SearchLoadModeId;
             var pluginDescriptors = _pluginFinder.GetPluginDescriptors(loadMode, "", model.SearchGroup).ToList();
-	        var gridModel = new DataSourceResult
+            var items = new List<PluginModel>();
+            foreach (var item in pluginDescriptors.OrderBy(x => x.Group))
             {
-                Data = pluginDescriptors.Select(x => PreparePluginModel(x, false, false))
-                .OrderBy(x => x.Group)
-                .ToList(),
+                items.Add(await PreparePluginModel(item, false, false));
+            }
+            var gridModel = new DataSourceResult {
+                Data = items,
                 Total = pluginDescriptors.Count()
             };
-	        return Json(gridModel);
-	    }
+            return Json(gridModel);
+        }
 
         [HttpPost, ActionName("List")]
         [FormValueRequired(FormValueRequirement.StartsWith, "install-plugin-link-")]
-        
-        public IActionResult Install(IFormCollection form)
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
 
+        public async Task<IActionResult> Install(IFormCollection form)
+        {
             try
             {
                 //get plugin system name
@@ -238,7 +231,8 @@ namespace Grand.Web.Areas.Admin.Controllers
                     return RedirectToAction("List");
 
                 //install plugin
-                pluginDescriptor.Instance().Install();
+                var plugin = pluginDescriptor.Instance(_pluginFinder.ServiceProvider);
+                await plugin.Install();
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Plugins.Installed"));
 
                 //restart application
@@ -248,17 +242,14 @@ namespace Grand.Web.Areas.Admin.Controllers
             {
                 ErrorNotification(exc);
             }
-             
+
             return RedirectToAction("List");
         }
 
         [HttpPost, ActionName("List")]
-        [FormValueRequired(FormValueRequirement.StartsWith, "uninstall-plugin-link-")]        
-        public IActionResult Uninstall(IFormCollection form)
+        [FormValueRequired(FormValueRequirement.StartsWith, "uninstall-plugin-link-")]
+        public async Task<IActionResult> Uninstall(IFormCollection form)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
             try
             {
                 //get plugin system name
@@ -277,7 +268,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                     return RedirectToAction("List");
 
                 //uninstall plugin
-                pluginDescriptor.Instance().Uninstall();
+                await pluginDescriptor.Instance(_pluginFinder.ServiceProvider).Uninstall();
                 SuccessNotification(_localizationService.GetResource("Admin.Configuration.Plugins.Uninstalled"));
 
                 //restart application
@@ -295,9 +286,6 @@ namespace Grand.Web.Areas.Admin.Controllers
         [FormValueRequired(FormValueRequirement.StartsWith, "remove-plugin-link-")]
         public IActionResult Remove(IFormCollection form)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
             try
             {
                 //get plugin system name
@@ -337,9 +325,6 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         public IActionResult ReloadList()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
             //restart application
             _webHelper.RestartAppDomain();
             return RedirectToAction("List");
@@ -347,11 +332,8 @@ namespace Grand.Web.Areas.Admin.Controllers
 
 
         [HttpPost]
-        public IActionResult UploadPlugin(IFormFile zippedFile)
+        public async Task<IActionResult> UploadPlugin(IFormFile zippedFile)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
             if (zippedFile == null || zippedFile.Length == 0)
             {
                 ErrorNotification(_localizationService.GetResource("Admin.Common.UploadFile"));
@@ -376,10 +358,10 @@ namespace Grand.Web.Areas.Admin.Controllers
 
                 descriptor = (PluginDescriptor)UploadSingleItem(zipFilePath);
 
-                _customerActivityService.InsertActivity("UploadNewPlugin", "",
+                await _customerActivityService.InsertActivity("UploadNewPlugin", "",
                            string.Format(_localizationService.GetResource("ActivityLog.UploadNewPlugin"), descriptor.FriendlyName));
 
-                _eventPublisher.Publish(new PluginUploadedEvent(descriptor));
+                await _mediator.Publish(new PluginUploadedEvent(descriptor));
 
                 var message = _localizationService.GetResource("Admin.Configuration.Plugins.Uploaded");
                 SuccessNotification(message);
@@ -398,11 +380,8 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult UploadTheme(IFormFile zippedFile)
+        public async Task<IActionResult> UploadTheme(IFormFile zippedFile)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
             if (zippedFile == null || zippedFile.Length == 0)
             {
                 ErrorNotification(_localizationService.GetResource("Admin.Common.UploadFile"));
@@ -430,10 +409,10 @@ namespace Grand.Web.Areas.Admin.Controllers
                 var configs = _themeProvider.GetThemeConfigurations();
                 var b = _themeProvider.ThemeConfigurationExists(descriptor.FriendlyName);
 
-                _customerActivityService.InsertActivity("UploadNewTheme", "",
+                await _customerActivityService.InsertActivity("UploadNewTheme", "",
                            string.Format(_localizationService.GetResource("ActivityLog.UploadNewTheme"), descriptor.FriendlyName));
 
-                _eventPublisher.Publish(new ThemeUploadedEvent(descriptor));
+                await _mediator.Publish(new ThemeUploadedEvent(descriptor));
 
                 var message = _localizationService.GetResource("Admin.Configuration.Themes.Uploaded");
                 SuccessNotification(message);
@@ -554,43 +533,34 @@ namespace Grand.Web.Areas.Admin.Controllers
 
         public IActionResult ConfigureMiscPlugin(string systemName)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
-
             var descriptor = _pluginFinder.GetPluginDescriptorBySystemName<IMiscPlugin>(systemName);
             if (descriptor == null || !descriptor.Installed)
                 return Redirect("List");
 
-            var plugin  = descriptor.Instance<IMiscPlugin>();
-            var model = new MiscPluginModel();
-            model.FriendlyName = descriptor.FriendlyName;
-            model.ConfigurationUrl = plugin.GetConfigurationPageUrl();
+            var plugin = descriptor.Instance<IMiscPlugin>(_pluginFinder.ServiceProvider);
+            var model = new MiscPluginModel {
+                FriendlyName = descriptor.FriendlyName,
+                ConfigurationUrl = plugin.GetConfigurationPageUrl()
+            };
 
             return View(model);
         }
 
         //edit
-        public IActionResult EditPopup(string systemName)
+        public async Task<IActionResult> EditPopup(string systemName)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
             var pluginDescriptor = _pluginFinder.GetPluginDescriptorBySystemName(systemName, LoadPluginsMode.All);
             if (pluginDescriptor == null)
                 //No plugin found with the specified id
                 return RedirectToAction("List");
 
-            var model = PreparePluginModel(pluginDescriptor);
+            var model = await PreparePluginModel(pluginDescriptor);
 
             return View(model);
         }
         [HttpPost]
-        public IActionResult EditPopup(string btnId, string formId, PluginModel model)
+        public async Task<IActionResult> EditPopup(string btnId, string formId, PluginModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePlugins))
-                return AccessDeniedView();
-
             var pluginDescriptor = _pluginFinder.GetPluginDescriptorBySystemName(model.SystemName, LoadPluginsMode.All);
             if (pluginDescriptor == null)
                 //No plugin found with the specified id
@@ -612,23 +582,22 @@ namespace Grand.Web.Areas.Admin.Controllers
                 //locales
                 foreach (var localized in model.Locales)
                 {
-                    pluginDescriptor.Instance().SaveLocalizedFriendlyName(_localizationService, localized.LanguageId, localized.FriendlyName);
+                    await pluginDescriptor.Instance(_pluginFinder.ServiceProvider).SaveLocalizedFriendlyName(_localizationService, localized.LanguageId, localized.FriendlyName);
                 }
                 //enabled/disabled
                 if (pluginDescriptor.Installed)
                 {
-                    var pluginInstance = pluginDescriptor.Instance();
-                    if (pluginInstance is IPaymentMethod)
+                    var pluginInstance = pluginDescriptor.Instance(_pluginFinder.ServiceProvider);
+                    //payment plugin
+                    if (pluginInstance is IPaymentMethod pm)
                     {
-                        //payment plugin
-                        var pm = (IPaymentMethod)pluginInstance;
                         if (pm.IsPaymentMethodActive(_paymentSettings))
                         {
                             if (!model.IsEnabled)
                             {
                                 //mark as disabled
                                 _paymentSettings.ActivePaymentMethodSystemNames.Remove(pm.PluginDescriptor.SystemName);
-                                _settingService.SaveSetting(_paymentSettings);
+                                await _settingService.SaveSetting(_paymentSettings);
                             }
                         }
                         else
@@ -637,21 +606,19 @@ namespace Grand.Web.Areas.Admin.Controllers
                             {
                                 //mark as active
                                 _paymentSettings.ActivePaymentMethodSystemNames.Add(pm.PluginDescriptor.SystemName);
-                                _settingService.SaveSetting(_paymentSettings);
+                                await _settingService.SaveSetting(_paymentSettings);
                             }
                         }
                     }
-                    else if (pluginInstance is IShippingRateComputationMethod)
+                    else if (pluginInstance is IShippingRateComputationMethod srcm) //shipping rate computation method
                     {
-                        //shipping rate computation method
-                        var srcm = (IShippingRateComputationMethod)pluginInstance;
                         if (srcm.IsShippingRateComputationMethodActive(_shippingSettings))
                         {
                             if (!model.IsEnabled)
                             {
                                 //mark as disabled
                                 _shippingSettings.ActiveShippingRateComputationMethodSystemNames.Remove(srcm.PluginDescriptor.SystemName);
-                                _settingService.SaveSetting(_shippingSettings);
+                                await _settingService.SaveSetting(_shippingSettings);
                             }
                         }
                         else
@@ -660,7 +627,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                             {
                                 //mark as active
                                 _shippingSettings.ActiveShippingRateComputationMethodSystemNames.Add(srcm.PluginDescriptor.SystemName);
-                                _settingService.SaveSetting(_shippingSettings);
+                                await _settingService.SaveSetting(_shippingSettings);
                             }
                         }
                     }
@@ -670,25 +637,23 @@ namespace Grand.Web.Areas.Admin.Controllers
                         if (model.IsEnabled)
                         {
                             _taxSettings.ActiveTaxProviderSystemName = model.SystemName;
-                            _settingService.SaveSetting(_taxSettings);
+                            await _settingService.SaveSetting(_taxSettings);
                         }
                         else
                         {
                             _taxSettings.ActiveTaxProviderSystemName = "";
-                            _settingService.SaveSetting(_taxSettings);
+                            await _settingService.SaveSetting(_taxSettings);
                         }
                     }
-                    else if (pluginInstance is IExternalAuthenticationMethod)
+                    else if (pluginInstance is IExternalAuthenticationMethod eam) //external auth method
                     {
-                        //external auth method
-                        var eam = (IExternalAuthenticationMethod)pluginInstance;
                         if (eam.IsMethodActive(_externalAuthenticationSettings))
                         {
                             if (!model.IsEnabled)
                             {
                                 //mark as disabled
                                 _externalAuthenticationSettings.ActiveAuthenticationMethodSystemNames.Remove(eam.PluginDescriptor.SystemName);
-                                _settingService.SaveSetting(_externalAuthenticationSettings);
+                                await _settingService.SaveSetting(_externalAuthenticationSettings);
                             }
                         }
                         else
@@ -697,21 +662,19 @@ namespace Grand.Web.Areas.Admin.Controllers
                             {
                                 //mark as active
                                 _externalAuthenticationSettings.ActiveAuthenticationMethodSystemNames.Add(eam.PluginDescriptor.SystemName);
-                                _settingService.SaveSetting(_externalAuthenticationSettings);
+                                await _settingService.SaveSetting(_externalAuthenticationSettings);
                             }
                         }
                     }
-                    else if (pluginInstance is IWidgetPlugin)
+                    else if (pluginInstance is IWidgetPlugin widget) //Misc plugins
                     {
-                        //Misc plugins
-                        var widget = (IWidgetPlugin)pluginInstance;
                         if (widget.IsWidgetActive(_widgetSettings))
                         {
                             if (!model.IsEnabled)
                             {
                                 //mark as disabled
                                 _widgetSettings.ActiveWidgetSystemNames.Remove(widget.PluginDescriptor.SystemName);
-                                _settingService.SaveSetting(_widgetSettings);
+                                await _settingService.SaveSetting(_widgetSettings);
                             }
                         }
                         else
@@ -720,12 +683,12 @@ namespace Grand.Web.Areas.Admin.Controllers
                             {
                                 //mark as active
                                 _widgetSettings.ActiveWidgetSystemNames.Add(widget.PluginDescriptor.SystemName);
-                                _settingService.SaveSetting(_widgetSettings);
+                                await _settingService.SaveSetting(_widgetSettings);
                             }
                         }
                     }
                 }
-                _cacheManager.Clear();
+                await _cacheManager.Clear();
                 ViewBag.RefreshPage = true;
                 ViewBag.btnId = btnId;
                 ViewBag.formId = formId;
@@ -735,7 +698,6 @@ namespace Grand.Web.Areas.Admin.Controllers
             //If we got this far, something failed, redisplay form
             return View(model);
         }
-
         #endregion
     }
 }

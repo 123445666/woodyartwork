@@ -5,17 +5,18 @@
     ViewBag.Title = T("Admin.Catalog.BulkEdit").Text;
 }
 <form asp-controller="Product" asp-action="BulkEdit" method="post">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
-                    <div class="caption">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
+                    <div class="caption level-caption">
                         <i class="fa fa-cubes"></i>
                         @T("Admin.Catalog.BulkEdit")
                     </div>
+                    <vc:admin-widget widget-zone="product_bulk_edit_buttons" additional-data="null" />
                 </div>
-                <div class="portlet-body form">
+                <div class="x_content form">
                     <div class="form-horizontal">
                         <div class="form-body">
                             <div class="form-group">
@@ -42,6 +43,12 @@
                                     <admin-select asp-for="SearchProductTypeId" asp-items="Model.AvailableProductTypes" />
                                 </div>
                             </div>
+                            <div class="form-group">
+                                <admin-label asp-for="SearchStoreId" />
+                                <div class="col-md-9 col-sm-9">
+                                    <admin-select asp-for="SearchStoreId" asp-items="Model.AvailableStores" />
+                                </div>
+                            </div>
                             <div class="form-actions">
                                 <div class="row">
                                     <div class="col-md-offset-3 col-sm-offset-3 col-md-9 col-sm-9">
@@ -51,7 +58,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="portlet-body">
+                            <div class="x_content">
                                 <div id="products-grid"></div>
                             </div>
                         </div>
@@ -162,12 +169,12 @@
                 }, {
                     field: "ProductId",
                     title: "@T("Admin.Common.View")",
-                    width: 50,
-                    template: '<a class="k-link" href="@Url.Content("~/Admin/Product/Edit/")#=Id#">@T("Admin.Common.View")</a>'
+                    width: 80,
+                    template: '<a href="@Url.Content("~/Admin/Product/Edit/")#=Id#">@T("Admin.Common.View")</a>'
                 },{
                     field: "Sku",
                     title: "@T("Admin.Catalog.BulkEdit.Fields.Sku")",
-                    width: 150
+                    width: 100
                 }, {
                     field: "Price",
                     title: "@T("Admin.Catalog.BulkEdit.Fields.Price")",
@@ -192,11 +199,11 @@
                                 decimals: 4
                             });
                     }
-                }, {
+                }, @*{
                     field: "ManageInventoryMethod",
                     title: "@T("Admin.Catalog.BulkEdit.Fields.ManageInventoryMethod")",
-                    width: 150
-                }, {
+                    width: 120
+                },*@ {
                     field: "StockQuantity",
                     title: "@T("Admin.Catalog.BulkEdit.Fields.StockQuantity")",
                     //integer format
@@ -205,7 +212,7 @@
                 },{
                     field: "Published",
                     title: "@T("Admin.Catalog.BulkEdit.Fields.Published")",
-                    width: 100
+                    width: 90
                 }, {
                     command: { name: "destroy", text: "@T("Admin.Common.Delete")" },
                     title: "@T("Admin.Common.Delete")",
@@ -239,7 +246,8 @@
                 SearchProductName: $('#@Html.FieldIdFor(model => model.SearchProductName)').val(),
                 SearchCategoryId: $('#SearchCategoryId').val(),
                 SearchManufacturerId: $('#SearchManufacturerId').val(),
-                SearchProductTypeId: $('#SearchProductTypeId').val()
+                SearchProductTypeId: $('#SearchProductTypeId').val(),
+                SearchStoreId: $('#SearchStoreId').val(),
             };
             addAntiForgeryToken(data);
             return data;

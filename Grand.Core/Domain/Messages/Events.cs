@@ -1,8 +1,9 @@
-using System.Collections.Generic;
+using DotLiquid;
+using MediatR;
 
 namespace Grand.Core.Domain.Messages
 {
-    public class EmailSubscribedEvent
+    public class EmailSubscribedEvent : INotification
     {
         private readonly string _email;
 
@@ -18,16 +19,21 @@ namespace Grand.Core.Domain.Messages
 
         public bool Equals(EmailSubscribedEvent other)
         {
-            if (ReferenceEquals(null, other)) return false;
-            if (ReferenceEquals(this, other)) return true;
+            if (ReferenceEquals(null, other))
+                return false;
+            if (ReferenceEquals(this, other))
+                return true;
             return Equals(other._email, _email);
         }
 
         public override bool Equals(object obj)
         {
-            if (ReferenceEquals(null, obj)) return false;
-            if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != typeof(EmailSubscribedEvent)) return false;
+            if (ReferenceEquals(null, obj))
+                return false;
+            if (ReferenceEquals(this, obj))
+                return true;
+            if (obj.GetType() != typeof(EmailSubscribedEvent))
+                return false;
             return Equals((EmailSubscribedEvent)obj);
         }
 
@@ -37,7 +43,7 @@ namespace Grand.Core.Domain.Messages
         }
     }
 
-    public class EmailUnsubscribedEvent
+    public class EmailUnsubscribedEvent : INotification
     {
         private readonly string _email;
 
@@ -53,16 +59,21 @@ namespace Grand.Core.Domain.Messages
 
         public bool Equals(EmailUnsubscribedEvent other)
         {
-            if (ReferenceEquals(null, other)) return false;
-            if (ReferenceEquals(this, other)) return true;
+            if (ReferenceEquals(null, other))
+                return false;
+            if (ReferenceEquals(this, other))
+                return true;
             return Equals(other._email, _email);
         }
 
         public override bool Equals(object obj)
         {
-            if (ReferenceEquals(null, obj)) return false;
-            if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != typeof(EmailUnsubscribedEvent)) return false;
+            if (ReferenceEquals(null, obj))
+                return false;
+            if (ReferenceEquals(this, obj))
+                return true;
+            if (obj.GetType() != typeof(EmailUnsubscribedEvent))
+                return false;
             return Equals((EmailUnsubscribedEvent)obj);
         }
 
@@ -76,38 +87,42 @@ namespace Grand.Core.Domain.Messages
     /// A container for tokens that are added.
     /// </summary>
     /// <typeparam name="T">Entity type</typeparam>
-    /// <typeparam name="U"></typeparam>
-    public class EntityTokensAddedEvent<T, U> where T : ParentEntity
+    /// <param name="liquidDrop">DotLiquid Drop, e.g. LiquidOrder</param>
+    /// <param name="liquidObject">An object that acumulates all DotLiquid Drops</param>
+    public class EntityTokensAddedEvent<T> : INotification where T : ParentEntity
     {
         private readonly T _entity;
-        private readonly IList<U> _tokens;
+        private readonly Drop _liquidDrop;
+        private readonly LiquidObject _liquidObject;
 
-        public EntityTokensAddedEvent(T entity, IList<U> tokens)
+        public EntityTokensAddedEvent(T entity, Drop liquidDrop, LiquidObject liquidObject)
         {
             _entity = entity;
-            _tokens = tokens;
+            _liquidDrop = liquidDrop;
+            _liquidObject = liquidObject;
         }
 
         public T Entity { get { return _entity; } }
-        public IList<U> Tokens { get { return _tokens; } }
+        public Drop LiquidDrop { get { return _liquidDrop; } }
+        public LiquidObject LiquidObject { get { return _liquidObject; } }
     }
 
     /// <summary>
     /// A container for tokens that are added.
     /// </summary>
     /// <typeparam name="U"></typeparam>
-    public class MessageTokensAddedEvent<U>
+    public class MessageTokensAddedEvent : INotification
     {
         private readonly MessageTemplate _message;
-        private readonly IList<U> _tokens;
+        private readonly LiquidObject _liquidObject;
 
-        public MessageTokensAddedEvent(MessageTemplate message, IList<U> tokens)
+        public MessageTokensAddedEvent(MessageTemplate message, LiquidObject liquidObject)
         {
             _message = message;
-            _tokens = tokens;
+            _liquidObject = liquidObject;
         }
 
         public MessageTemplate Message { get { return _message; } }
-        public IList<U> Tokens { get { return _tokens; } }
+        public LiquidObject LiquidObject { get { return _liquidObject; } }
     }
 }

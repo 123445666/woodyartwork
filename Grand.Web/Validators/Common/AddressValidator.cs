@@ -5,14 +5,18 @@ using Grand.Services.Directory;
 using Grand.Services.Localization;
 using Grand.Web.Models.Common;
 using System;
+using System.Collections.Generic;
 
 namespace Grand.Web.Validators.Common
 {
     public class AddressValidator : BaseGrandValidator<AddressModel>
     {
-        public AddressValidator(ILocalizationService localizationService,
+        public AddressValidator(
+            IEnumerable<IValidatorConsumer<AddressModel>> validators,
+            ILocalizationService localizationService,
             IStateProvinceService stateProvinceService,
             AddressSettings addressSettings)
+            : base(validators)
         {
             RuleFor(x => x.FirstName)
                 .NotEmpty()
@@ -37,15 +41,15 @@ namespace Grand.Web.Validators.Common
             }
             if (addressSettings.CountryEnabled && addressSettings.StateProvinceEnabled)
             {
-                RuleFor(x => x.StateProvinceId).Must((x, context) =>
+                RuleFor(x => x.StateProvinceId).MustAsync(async (x, y, context) =>
                 {
                     //does selected country has states?
                     var countryId = !String.IsNullOrEmpty(x.CountryId) ? x.CountryId : "";
-                    var hasStates = stateProvinceService.GetStateProvincesByCountryId(countryId).Count > 0;
+                    var hasStates = (await stateProvinceService.GetStateProvincesByCountryId(countryId)).Count > 0;
                     if (hasStates)
                     {
                         //if yes, then ensure that state is selected
-                        if (String.IsNullOrEmpty(x.StateProvinceId))
+                        if (String.IsNullOrEmpty(y))
                         {
                             return false;
                         }
@@ -75,7 +79,7 @@ namespace Grand.Web.Validators.Common
             }
             if (addressSettings.CityRequired && addressSettings.CityEnabled)
             {
-                RuleFor(x => x.City).NotEmpty().WithMessage(localizationService.GetResource("Account.Fields.City.Required"));
+                RuleFor(x => x.City).NotEmpty().WithMessage(localizationService.GetResource("Account.Fields.City.Required"));               
             }
             if (addressSettings.PhoneRequired && addressSettings.PhoneEnabled)
             {

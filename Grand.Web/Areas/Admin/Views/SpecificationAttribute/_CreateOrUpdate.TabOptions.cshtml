@@ -3,15 +3,17 @@
     if (!String.IsNullOrEmpty(Model.Id))
     {
 
-        <div class="panel panel-default">
-            <div class="panel-body">
-                <div id="specificationattributeoptions-grid"></div>
-            </div>
-            <div class="panel-footer">
-                <input type="submit" id="btnAddNewOption" value="@T("Admin.Catalog.Attributes.SpecificationAttributes.Options.AddNew")" onclick="javascript:OpenWindow('@(Url.Action("OptionCreatePopup", "SpecificationAttribute", new { specificationAttributeId = Model.Id, btnId = "btnRefresh", formId = "specificationattribute-form" }))', 800, 350, true); return false;" class="k-button" />
-                <input type="submit" id="btnRefresh" style="display: none" />
-            </div>
-        </div>
+<div class="panel panel-default">
+    <vc:admin-widget widget-zone="specification_attribute_details_options_top" additional-data="null" />
+    <div class="panel-body">
+        <div id="specificationattributeoptions-grid"></div>
+    </div>
+    <div class="panel-footer">
+        <button type="submit" id="btnAddNewOption" onclick="javascript:OpenWindow('@(Url.Action("OptionCreatePopup", "SpecificationAttribute", new { specificationAttributeId = Model.Id, btnId = "btnRefresh", formId = "specificationattribute-form" }))', 800, 350, true); return false;" class="k-button"><i class="fa fa-plus"></i>&nbsp;@T("Admin.Catalog.Attributes.SpecificationAttributes.Options.AddNew")</button>
+        <input type="submit" id="btnRefresh" style="display: none" />
+    </div>
+    <vc:admin-widget widget-zone="specification_attribute_details_options_bottom" additional-data="Model" />
+</div>
 
         <script type="text/javascript">
             $(document).ready(function () {
@@ -62,7 +64,7 @@
                     columns: [{
                         field: "Name",
                         title: "@T("Admin.Catalog.Attributes.SpecificationAttributes.Options.Fields.Name")",
-                        template: "<a class='k-link' onclick=\"javascript:OpenWindow('@Url.Content("~/Admin/SpecificationAttribute/OptionEditPopup/")#=Id#?specificationAttributeId=#=SpecificationAttributeId#&btnId=btnRefresh&formId=specificationattribute-form', 800, 450, true); return false;\">#=Name#</a>"
+                        template: "<a class='k-link' onclick=\"javascript:OpenWindow('@Url.Content("~/Admin/SpecificationAttribute/OptionEditPopup/")#=Id#?btnId=btnRefresh&formId=specificationattribute-form', 800, 450, true); return false;\">#=kendo.htmlEncode(Name)#</a>"
                     }, {
                         field: "DisplayOrder",
                         title: "@T("Admin.Catalog.Attributes.SpecificationAttributes.Options.Fields.DisplayOrder")",

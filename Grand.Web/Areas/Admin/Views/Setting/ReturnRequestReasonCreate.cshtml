@@ -4,11 +4,11 @@
     ViewBag.Title = T("Admin.Configuration.Settings.Order.ReturnRequestReasons.AddNew").Text;
 }
 <form asp-controller="Setting" asp-action="ReturnRequestReasonCreate" method="post">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-list-alt"></i>
                         @T("Admin.Configuration.Settings.Order.ReturnRequestReasons.AddNew")
@@ -19,8 +19,8 @@
                         <button class="btn btn-success" type="submit" name="save-continue"><i class="fa fa-check-circle"></i> @T("Admin.Common.SaveContinue") </button>
                     </div>
                 </div>
-                <div class="portlet-body form">
-                    @Html.Partial("_CreateOrUpdate.ReturnRequestReason", Model)
+                <div class="x_content form">
+                   <partial name="_CreateOrUpdate.ReturnRequestReason" model="Model" />
                 </div>
             </div>
         </div>

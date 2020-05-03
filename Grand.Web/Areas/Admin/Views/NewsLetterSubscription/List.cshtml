@@ -5,12 +5,12 @@
     ViewBag.Title = T("Admin.Promotions.newsLetterSubscriptions").Text;
 }
 <form asp-controller="NewsletterSubscription" asp-action="List" method="post">
-    <antiforgery-token />
+    
 
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-envelope"></i>
                         @T("Admin.Promotions.NewsLetterSubscriptions")
@@ -18,9 +18,10 @@
                     <div class="actions btn-group btn-group-devided">
                         <input type="submit" name="exportcsv" class="btn default" value="@T("Admin.Common.ExportToCsv")" />
                         <input type="submit" id="importcsv" name="importcsv" class="btn default" value="@T("Admin.Common.ImportFromCsv")" />
+                        <vc:admin-widget widget-zone="newsletter_subscription_list_buttons" additional-data="null" />
                     </div>
                 </div>
-                <div class="portlet-body form">
+                <div class="x_content form">
                     <div class="form-horizontal">
                         <div class="form-body">
                             <div class="form-group">
@@ -43,7 +44,7 @@
                             </div>
                             <div class="form-group">
                                 <admin-label asp-for="SearchCategoryIds" />
-                                <div class="col-md-8 col-sm-8">
+                                <div class="col-xs-4 col-md-8 col-sm-8">
                                     <admin-input asp-for="SearchCategoryIds" asp-template="MultiSelect" asp-selectitem="Model.AvailableCategories" />
                                 </div>
                             </div>
@@ -59,7 +60,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="portlet-body">
+                <div class="x_content">
                     <div id="newsletter-subscriptions-grid"></div>
                 </div>
             </div>
@@ -101,7 +102,7 @@
                                 Email: { editable: true, type: "string" },
                                 Active: { editable: true, type: "boolean" },
                                 StoreName: { editable: false, type: "string" },
-                                CreatedOn: { editable: false, type: "date" },
+                                CreatedOn: { editable: false, type: "string" },
                                 Categories: { editable: false, type: "string"}
                             }
                         }
@@ -154,8 +155,7 @@
                         field: "CreatedOn",
                         title: "@T("Admin.Promotions.NewsLetterSubscriptions.Fields.CreatedOn")",
                         width: 150,
-                        type: "date",
-                        format: "{0:G}"
+                        type: "string"
                     }, {
                         command: [
                             {
@@ -216,7 +216,7 @@
     @*import emails form*@
     <div id="importcsv-window" style="display:none;">
         <form asp-controller="NewsLetterSubscription" asp-action="ImportCsv" method="post" enctype="multipart/form-data">
-            <antiforgery-token />
+            
             <table style="text-align:left;">
                 <tr>
                     <td>

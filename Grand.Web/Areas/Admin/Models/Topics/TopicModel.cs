@@ -1,9 +1,8 @@
 ﻿using FluentValidation.Attributes;
 using Grand.Framework.Localization;
+using Grand.Framework.Mapping;
 using Grand.Framework.Mvc.ModelBinding;
 using Grand.Framework.Mvc.Models;
-using Grand.Web.Areas.Admin.Models.Customers;
-using Grand.Web.Areas.Admin.Models.Stores;
 using Grand.Web.Areas.Admin.Validators.Topics;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System.Collections.Generic;
@@ -11,7 +10,7 @@ using System.Collections.Generic;
 namespace Grand.Web.Areas.Admin.Models.Topics
 {
     [Validator(typeof(TopicValidator))]
-    public partial class TopicModel : BaseGrandEntityModel, ILocalizedModel<TopicLocalizedModel>
+    public partial class TopicModel : BaseGrandEntityModel, ILocalizedModel<TopicLocalizedModel>, IAclMappingModel, IStoreMappingModel
     {
         public TopicModel()
         {
@@ -39,12 +38,12 @@ namespace Grand.Web.Areas.Admin.Models.Topics
         [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.IncludeInTopMenu")]
         public bool IncludeInTopMenu { get; set; }
 
-        [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.IncludeInFooterColumn1")]
-        public bool IncludeInFooterColumn1 { get; set; }
-        [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.IncludeInFooterColumn2")]
-        public bool IncludeInFooterColumn2 { get; set; }
-        [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.IncludeInFooterColumn3")]
-        public bool IncludeInFooterColumn3 { get; set; }
+        [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.IncludeInFooterRow1")]
+        public bool IncludeInFooterRow1 { get; set; }
+        [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.IncludeInFooterRow2")]
+        public bool IncludeInFooterRow2 { get; set; }
+        [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.IncludeInFooterRow3")]
+        public bool IncludeInFooterRow3 { get; set; }
         [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.DisplayOrder")]
         public int DisplayOrder { get; set; }
 
@@ -53,6 +52,9 @@ namespace Grand.Web.Areas.Admin.Models.Topics
 
         [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.IsPasswordProtected")]
         public bool IsPasswordProtected { get; set; }
+
+        [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.Published")]
+        public bool Published { get; set; }
 
         [GrandResourceDisplayName("Admin.ContentManagement.Topics.Fields.Password")]
         public string Password { get; set; }
@@ -97,10 +99,9 @@ namespace Grand.Web.Areas.Admin.Models.Topics
         public List<CustomerRoleModel> AvailableCustomerRoles { get; set; }
         public string[] SelectedCustomerRoleIds { get; set; }
 
-
     }
 
-    public partial class TopicLocalizedModel : ILocalizedModelLocal
+    public partial class TopicLocalizedModel : ILocalizedModelLocal, ISlugModelLocal
     {
         public string LanguageId { get; set; }
 

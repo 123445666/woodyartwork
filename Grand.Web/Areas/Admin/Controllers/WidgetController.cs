@@ -3,75 +3,67 @@ using Grand.Core.Domain.Cms;
 using Grand.Core.Plugins;
 using Grand.Framework.Kendoui;
 using Grand.Framework.Mvc;
+using Grand.Framework.Security.Authorization;
 using Grand.Services.Cms;
 using Grand.Services.Configuration;
 using Grand.Services.Security;
 using Grand.Web.Areas.Admin.Extensions;
 using Grand.Web.Areas.Admin.Models.Cms;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Grand.Web.Areas.Admin.Controllers
 {
+    [PermissionAuthorize(PermissionSystemName.Widgets)]
     public partial class WidgetController : BaseAdminController
 	{
 		#region Fields
-
         private readonly IWidgetService _widgetService;
-        private readonly IPermissionService _permissionService;
         private readonly ISettingService _settingService;
-        private readonly WidgetSettings _widgetSettings;
 	    private readonly IPluginFinder _pluginFinder;
         private readonly ICacheManager _cacheManager;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly WidgetSettings _widgetSettings;
         #endregion
 
         #region Constructors
 
         public WidgetController(IWidgetService widgetService,
-            IPermissionService permissionService, ISettingService settingService,
-            WidgetSettings widgetSettings, IPluginFinder pluginFinder,
-            ICacheManager cacheManager)
+            ISettingService settingService,
+            IPluginFinder pluginFinder,
+            ICacheManager cacheManager,
+            IServiceProvider serviceProvider,
+            WidgetSettings widgetSettings)
 		{
-            this._widgetService = widgetService;
-            this._permissionService = permissionService;
-            this._settingService = settingService;
-            this._widgetSettings = widgetSettings;
-            this._pluginFinder = pluginFinder;
-            this._cacheManager = cacheManager;
-
+            _widgetService = widgetService;
+            _widgetSettings = widgetSettings;
+            _pluginFinder = pluginFinder;
+            _cacheManager = cacheManager;
+            _serviceProvider = serviceProvider;
+            _settingService = settingService;
         }
 
 		#endregion 
         
         #region Methods
         
-        public IActionResult Index()
-        {
-            return RedirectToAction("List");
-        }
+        public IActionResult Index() => RedirectToAction("List");
 
-        public IActionResult List()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageWidgets))
-                return AccessDeniedView();
-
-            return View();
-        }
+        public IActionResult List() => View();
 
         [HttpPost]
         public IActionResult List(DataSourceRequest command)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageWidgets))
-                return AccessDeniedView();
-
             var widgetsModel = new List<WidgetModel>();
             var widgets = _widgetService.LoadAllWidgets();
             foreach (var widget in widgets)
             {
                 var tmp1 = widget.ToModel();
                 tmp1.IsActive = widget.IsWidgetActive(_widgetSettings);
-                tmp1.ConfigurationUrl = widget.PluginDescriptor.Instance().GetConfigurationPageUrl();
+                tmp1.ConfigurationUrl = widget.PluginDescriptor.Instance(_serviceProvider).GetConfigurationPageUrl();
                 tmp1.ConfigurationUrl = widget.GetConfigurationPageUrl();
                 widgetsModel.Add(tmp1);
             }
@@ -86,11 +78,8 @@ namespace Grand.Web.Areas.Admin.Controllers
         }
 
         [HttpPost]
-        public IActionResult WidgetUpdate( WidgetModel model)
+        public async Task<IActionResult> WidgetUpdate(WidgetModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageWidgets))
-                return AccessDeniedView();
-
             var widget = _widgetService.LoadWidgetBySystemName(model.SystemName);
             if (widget.IsWidgetActive(_widgetSettings))
             {
@@ -98,7 +87,7 @@ namespace Grand.Web.Areas.Admin.Controllers
                 {
                     //mark as disabled
                     _widgetSettings.ActiveWidgetSystemNames.Remove(widget.PluginDescriptor.SystemName);
-                    _settingService.SaveSetting(_widgetSettings);
+                    await _settingService.SaveSetting(_widgetSettings);
                 }
             }
             else
@@ -107,10 +96,10 @@ namespace Grand.Web.Areas.Admin.Controllers
                 {
                     //mark as active
                     _widgetSettings.ActiveWidgetSystemNames.Add(widget.PluginDescriptor.SystemName);
-                    _settingService.SaveSetting(_widgetSettings);
+                    await _settingService.SaveSetting(_widgetSettings);
                 }
             }
-            _cacheManager.Clear();
+            await _cacheManager.Clear();
             var pluginDescriptor = widget.PluginDescriptor;
             //display order
             pluginDescriptor.DisplayOrder = model.DisplayOrder;

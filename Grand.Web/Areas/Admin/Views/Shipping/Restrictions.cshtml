@@ -1,65 +1,44 @@
 ﻿@model ShippingMethodRestrictionModel
-@inject IEventPublisher eventPublisher
+
 @{
     //page title
     ViewBag.Title = T("Admin.Configuration.Shipping.Restrictions").Text;
 }
 <form asp-controller="Shipping" asp-action="Restrictions" method="post">
-    <antiforgery-token />
+    
     <div class="row">
         <div class="col-md-12">
-            <div class="portlet light form-fit">
-                <div class="portlet-title">
+            <div class="x_panel light form-fit">
+                <div class="x_title">
                     <div class="caption">
                         <i class="fa fa-truck"></i>
                         @T("Admin.Configuration.Shipping.Restrictions")
                     </div>
                     <div class="actions">
                         <button class="btn btn-success" type="submit" name="save"><i class="fa fa-check"></i> @T("Admin.Common.Save") </button>
+                        <vc:admin-widget widget-zone="shipping_restriction_list_buttons" additional-data="null" />
                     </div>
                 </div>
-                <div class="portlet-body form">
-                    <script type="text/javascript">
-                        $(document).ready(function () {
-                            $('#shippingrestriction-edit').show();
-                            $("#shippingrestriction-edit").kendoTabStrip({
-                                animation: {
-                                    open: {
-                                        effects: "fadeIn"
-                                    }
-                                },
-                                select: tabstrip_on_tab_select
-                            });
-                        });
-                    </script>
-                    <div id="shippingrestriction-edit" style="display:none">
-                        <ul>
-                            <li @Html.RenderSelectedTabIndex(0, GetSelectedTabIndex())>
-                                @T("Admin.Configuration.Shipping.Restrictions.Country")
-                            </li>
-                            <li @Html.RenderSelectedTabIndex(1, GetSelectedTabIndex())>
-                                @T("Admin.Configuration.Shipping.Restrictions.Role")
-                            </li>
-                        </ul>
-                        <div>
-                            @Html.Partial("Restrictions.TabCountry", Model)
-                        </div>
-                        <div>
-                            @Html.Partial("Restrictions.TabRole", Model)
-                        </div>
-                    </div>
-                    @{
-                        //custom tabs
-                        var eventMessage = new AdminTabStripCreated(this.Html, "shippingrestriction-edit");
-                        eventPublisher.Publish(eventMessage);
-                        foreach (var eventBlock in eventMessage.BlocksToRender)
-                        {
-                            @eventBlock
-                        }
-                    }
-
-                    @*save selected tab index*@
-                    <input type="hidden" id="selected-tab-index" name="selected-tab-index" value="@(GetSelectedTabIndex())">
+                <div class="x_content form">
+                    <admin-tabstrip name="shippingrestriction-edit">
+                        <items>
+                            <tabstrip-item text="@T("Admin.Configuration.Shipping.Restrictions.Country")" tab-index="0">
+                                <content>
+                                    <div>
+                                        <partial name="Restrictions.TabCountry" model="Model" />
+                                    </div>
+                                </content>
+                            </tabstrip-item>
+                            <tabstrip-item text="@T("Admin.Configuration.Shipping.Restrictions.Role")" tab-index="1">
+                                <content>
+                                    <div>
+                                        <partial name="Restrictions.TabRole" model="Model" />
+                                    </div>
+                                </content>
+                            </tabstrip-item>
+                            <vc:admin-widget widget-zone="shipping_details_tabs" additional-data="Model" />
+                        </items>
+                    </admin-tabstrip>
                 </div>
             </div>
         </div>

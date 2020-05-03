@@ -1,26 +1,25 @@
 ﻿using Grand.Core.Caching;
-using Grand.Core.Domain.Tasks;
-using Grand.Core.Infrastructure;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Tasks
 {
     /// <summary>
     /// Clear cache schedueled task implementation
     /// </summary>
-    public partial class ClearCacheScheduleTask : ScheduleTask, IScheduleTask
+    public partial class ClearCacheScheduleTask : IScheduleTask
     {
-        private readonly object _lock = new object();
-        
+        private readonly ICacheManager _cacheManager;
+
+        public ClearCacheScheduleTask(ICacheManager cacheManager)
+        {
+            _cacheManager = cacheManager;
+        }
         /// <summary>
         /// Executes a task
         /// </summary>
-        public void Execute()
+        public async Task Execute()
         {
-            lock (_lock)
-            {
-                var cacheManager = EngineContext.Current.Resolve<ICacheManager>();
-                cacheManager.Clear();
-            }
+            await _cacheManager.Clear();
         }
     }
 }

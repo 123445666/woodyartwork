@@ -1,7 +1,4 @@
-﻿@using Microsoft.AspNetCore.Http
-@using Microsoft.Net.Http.Headers
-@using System.Text.Encodings.Web;
-@inject IHttpContextAccessor httpContextAccessor
+﻿@using System.Text.Encodings.Web;
 @{
 
     //success messages
@@ -46,52 +43,29 @@
     <div id="loading"><div class="loader"></div></div>
 </div>
 
-<div id="bar-notification" class="generalNote card text-white text-xs-center" style="display:none;">
-    <span class="close" title="@T("Common.Close")"><span class="fa fa-times" aria-hidden="true"></span></span>
-</div>
+<div id="bar-notification" class="generalNote"></div>
 
-<a class="popup-action-banner" data-mfp-src="#action_modal_banner" style="display:none"></a>
-<div id="action_modal_banner" class="zoom-anim-dialog mfp-hide">
-    <div id="action-body-banner"></div>
+@await Component.InvokeAsync("PopupAction")
+
+<div class="modal fade" id="ModalAddToCart" tabindex="-1" role="dialog" aria-hidden="true">
 </div>
-<a class="popup-action-form" data-mfp-src="#action_modal_form" style="display:none"></a>
-<div id="action_modal_form" class="zoom-anim-dialog mfp-hide">
-    <form asp-route="PopupInteractiveForm" method="post" id="interactive-form">
-        <div class="message-error">
-            <div class="validation-summary-errors">
-                <div id="errorMessages"></div>
+<div class="modal fade" id="ModalQuickView" tabindex="-2" role="dialog" aria-hidden="true">
+</div>
+<a class="nc-action-form" data-mfp-src="#nc_modal_form" style="display:none"></a>
+<div id="nc_modal_form" class="zoom-anim-dialog mfp-hide">
+</div>
+<div class="modal fade" id="generalModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header p-0 border-bottom-0">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="dialog_error"></div>
+                <div id="dialog_success"></div>
             </div>
         </div>
-        <div id="action-body-form"></div>
-        <div style="padding: 20px 0px 0px 0px;">
-            <input type="submit" id="send-interactive-form" class="btn btn-success interactive-form-button" value="@T("PopupInteractiveForm.Send")" />
-        </div>
-    </form>
+    </div>
 </div>
-<div class="modal fade" id="ModalAddToCart" tabindex="-1" role="dialog">
-</div>
-<div class="modal fade" id="ModalQuickView" tabindex="-1" role="dialog">
-</div>
-<div class="modal fade" id="generalModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-      <div class="modal-content">
-          <div class="modal-header border-bottom-0">
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                  <span aria-hidden="true">&times;</span>
-              </button>
-          </div>
-          <div class="modal-body px-4 pt-0 pb-4">
-              <div id="dialog_error" class="bg-danger"></div>
-              <div id="dialog_success" class="bg-success"></div>
-          </div>
-      </div>
-  </div>
-</div>
-<script asp-location="Footer">
-    $(document).ready(function () {
-        CustomerAction.init('@Url.Action("CustomerActionEventUrl", "Common")', '@Url.Action("GetActivePopup", "Common")', '@Url.Action("RemovePopup", "Common")');
-        CustomerAction.checkActiveUrl('@httpContextAccessor.HttpContext.Request.Path.ToString()', '@httpContextAccessor.HttpContext.Request.Headers[HeaderNames.Referer]');
-    });
-</script>
-
-@await Component.InvokeAsync("Widget", new { widgetZone = "notifications" })

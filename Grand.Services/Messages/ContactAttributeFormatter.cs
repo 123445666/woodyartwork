@@ -8,6 +8,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Grand.Services.Messages
 {
@@ -17,22 +18,19 @@ namespace Grand.Services.Messages
     public partial class ContactAttributeFormatter : IContactAttributeFormatter
     {
         private readonly IWorkContext _workContext;
-        private readonly IContactAttributeService _contactAttributeService;
         private readonly IContactAttributeParser _contactAttributeParser;
         private readonly IDownloadService _downloadService;
         private readonly IWebHelper _webHelper;
 
         public ContactAttributeFormatter(IWorkContext workContext,
-            IContactAttributeService contactAttributeService,
             IContactAttributeParser contactAttributeParser,
             IDownloadService downloadService,
             IWebHelper webHelper)
         {
-            this._workContext = workContext;
-            this._contactAttributeService = contactAttributeService;
-            this._contactAttributeParser = contactAttributeParser;
-            this._downloadService = downloadService;
-            this._webHelper = webHelper;
+            _workContext = workContext;
+            _contactAttributeParser = contactAttributeParser;
+            _downloadService = downloadService;
+            _webHelper = webHelper;
         }
 
         /// <summary>
@@ -40,10 +38,10 @@ namespace Grand.Services.Messages
         /// </summary>
         /// <param name="attributesXml">Attributes in XML format</param>
         /// <returns>Attributes</returns>
-        public virtual string FormatAttributes(string attributesXml)
+        public virtual async Task<string> FormatAttributes(string attributesXml)
         {
             var customer = _workContext.CurrentCustomer;
-            return FormatAttributes(attributesXml, customer);
+            return await FormatAttributes(attributesXml, customer);
         }
 
         /// <summary>
@@ -55,7 +53,7 @@ namespace Grand.Services.Messages
         /// <param name="htmlEncode">A value indicating whether to encode (HTML) values</param>
         /// <param name="allowHyperlinks">A value indicating whether to HTML hyperink tags could be rendered (if required)</param>
         /// <returns>Attributes</returns>
-        public virtual string FormatAttributes(string attributesXml,
+        public virtual async Task<string> FormatAttributes(string attributesXml,
             Customer customer, 
             string serapator = "<br />", 
             bool htmlEncode = true, 
@@ -63,7 +61,7 @@ namespace Grand.Services.Messages
         {
             var result = new StringBuilder();
 
-            var attributes = _contactAttributeParser.ParseContactAttributes(attributesXml);
+            var attributes = await _contactAttributeParser.ParseContactAttributes(attributesXml);
             for (int i = 0; i < attributes.Count; i++)
             {
                 var attribute = attributes[i];
@@ -90,7 +88,7 @@ namespace Grand.Services.Messages
                             //file upload
                             Guid downloadGuid;
                             Guid.TryParse(valueStr, out downloadGuid);
-                            var download = _downloadService.GetDownloadByGuid(downloadGuid);
+                            var download = await _downloadService.GetDownloadByGuid(downloadGuid);
                             if (download != null)
                             {
                                 //TODO add a method for getting URL (use routing because it handles all SEO friendly URLs)

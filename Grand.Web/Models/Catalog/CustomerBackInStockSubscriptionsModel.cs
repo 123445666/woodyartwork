@@ -8,7 +8,7 @@ namespace Grand.Web.Models.Catalog
     {
         public CustomerBackInStockSubscriptionsModel()
         {
-            this.Subscriptions = new List<BackInStockSubscriptionModel>();
+            Subscriptions = new List<BackInStockSubscriptionModel>();
         }
 
         public IList<BackInStockSubscriptionModel> Subscriptions { get; set; }
@@ -20,6 +20,7 @@ namespace Grand.Web.Models.Catalog
         {
             public string ProductId { get; set; }
             public string ProductName { get; set; }
+            public string AttributeDescription { get; set; }
             public string SeName { get; set; }
         }
 

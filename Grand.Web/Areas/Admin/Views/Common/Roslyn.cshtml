@@ -5,15 +5,16 @@
     ViewBag.Title = T("Admin.System.Roslyn").Text;
 }
 
-<antiforgery-token />
+
 <div class="row">
     <div class="col-md-12">
-        <div class="portlet light form-fit">
-            <div class="portlet-title">
-                <div class="caption">
+        <div class="x_panel light form-fit">
+            <div class="x_title level-caption">
+                <div class="caption level-caption">
                     <i class="fa fa-sitemap"></i>
                     @T("Admin.System.Roslyn")
                 </div>
+                <vc:admin-widget widget-zone="roslyn_buttons" additional-data="null" />
             </div>
             @if (!Model)
             {
@@ -21,8 +22,10 @@
                     @T("Admin.System.Roslyn.Disabled")
                 </div>
             }
-            <div class="portlet-body">
+            <div class="x_content">
+                <vc:admin-widget widget-zone="roslyn_top" additional-data="null" />
                 <div id="roslyn-grid"></div>
+                <vc:admin-widget widget-zone="roslyn_bottom" additional-data="null" />
             </div>
         </div>
     </div>
