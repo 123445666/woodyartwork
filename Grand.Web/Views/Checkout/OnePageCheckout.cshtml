@@ -6,7 +6,7 @@
     Html.AddScriptParts(ResourceLocation.Footer, "~/scripts/public.accordion.js");
     Html.AddScriptParts(ResourceLocation.Footer, "~/scripts/public.onepagecheckout.js");
 
-    var storeLocation = webHelper.GetStoreLocation();
+    var storeLocation = webHelper.GetStoreLocation(true);
 
     //title
     Html.AddTitleParts(T("PageTitle.Checkout").Text);
