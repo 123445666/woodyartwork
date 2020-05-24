@@ -24,12 +24,8 @@
     <Content Include="Themes\**" CopyToPublishDirectory="PreserveNewest" Exclude="Themes\**\*.config;Themes\**\*.cshtml" />
     <Content Include="Roslyn\**" CopyToPublishDirectory="PreserveNewest" Exclude="Roslyn\**\*.dll" />
     <Content Include="logs\**" CopyToPublishDirectory="PreserveNewest" />
-    <Compile Remove="Plugins\**" />
-    <Content Remove="Plugins\**" />
     <Content Remove="wwwroot\content\images\thumbs\*.jpeg;wwwroot\content\images\thumbs\*.jpg;wwwroot\content\images\thumbs\*.png" />
     <Content Remove="wwwroot\bundles\*.css;wwwroot\bundles\*.js" />
-    <EmbeddedResource Remove="Plugins\**" />
-    <None Remove="Plugins\**" />
   </ItemGroup>
   <Target Name="PublishViews" BeforeTargets="PrepareForPublish">
     <ItemGroup>
@@ -39,4 +35,13 @@
     <Copy SourceFiles="@(ThemeViews)" DestinationFolder="$(PublishDir)/Themes/%(RecursiveDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PublishDir)/Plugins/%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
+  <ItemGroup>
+    <Content Remove="Plugins\**" />
+    <Compile Remove="Plugins\**" />
+    <EmbeddedResource Remove="Plugins\**" />
+    <None Remove="Plugins\**" />
+    <Content Update="Plugins\**">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>
